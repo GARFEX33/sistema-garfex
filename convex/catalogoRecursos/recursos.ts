@@ -42,6 +42,86 @@ const salidaRecurso = v.object({
   revision: v.number(),
   valores: v.array(salidaValor),
 });
+const referenciaClase = v.object({
+  id: v.id("clasesRecurso"),
+  clave: v.string(),
+  nombre: v.string(),
+  activo: v.boolean(),
+  revision: v.number(),
+});
+const referenciaFamilia = v.object({
+  id: v.id("familiasRecurso"),
+  clave: v.string(),
+  nombre: v.string(),
+  activo: v.boolean(),
+  revision: v.number(),
+});
+const referenciaTipo = v.object({
+  id: v.id("tiposRecurso"),
+  clave: v.string(),
+  nombre: v.string(),
+  activo: v.boolean(),
+  revision: v.number(),
+});
+const referenciaOpcion = v.object({
+  id: v.id("opcionesAtributo"),
+  clave: v.string(),
+  nombre: v.string(),
+  activo: v.boolean(),
+  revision: v.number(),
+});
+const referenciaUnidad = v.object({
+  id: v.id("unidades"),
+  clave: v.string(),
+  nombre: v.string(),
+  simbolo: v.union(v.string(), v.null()),
+  activo: v.boolean(),
+  revision: v.number(),
+});
+const detalleAtributo = v.object({
+  id: v.id("atributosRecurso"),
+  clave: v.string(),
+  nombre: v.string(),
+  tipoDato: v.union(
+    v.literal("TEXTO"),
+    v.literal("NUMERO"),
+    v.literal("BOOLEANO"),
+    v.literal("OPCION"),
+  ),
+  aplicabilidad: v.union(
+    v.literal("REQUIRED"),
+    v.literal("OPTIONAL"),
+    v.literal("CONDITIONAL"),
+    v.literal("FORBIDDEN"),
+    v.literal("NOT_APPLICABLE"),
+  ),
+  participaIdentidad: v.boolean(),
+  orden: v.number(),
+  activo: v.boolean(),
+  valor: v.union(v.string(), v.number(), v.boolean(), v.null()),
+  opcion: v.union(referenciaOpcion, v.null()),
+  unidad: v.union(referenciaUnidad, v.null()),
+});
+const salidaDetalleRecurso = v.object({
+  id: v.id("recursos"),
+  identificadorTecnico: v.string(),
+  nombre: v.string(),
+  descripcion: v.optional(v.string()),
+  activo: v.boolean(),
+  revision: v.number(),
+  clase: referenciaClase,
+  familia: referenciaFamilia,
+  tipo: referenciaTipo,
+  unidad: v.object({
+    id: v.id("unidades"),
+    clave: v.string(),
+    nombre: v.string(),
+    simbolo: v.union(v.string(), v.null()),
+    activo: v.boolean(),
+    revision: v.number(),
+  }),
+  atributos: v.array(detalleAtributo),
+});
 const revisionArgs = {
   recursoId: v.id("recursos"),
   revisionEsperada: v.number(),
@@ -135,6 +215,113 @@ export const obtenerRecurso = query({
   },
 });
 
+function catalogoReferencia<T extends string>(documento: {
+  _id: T;
+  clave: string;
+  nombre: string;
+  activo: boolean;
+  revision: number;
+}) {
+  return {
+    id: documento._id,
+    clave: documento.clave,
+    nombre: documento.nombre,
+    activo: documento.activo,
+    revision: documento.revision,
+  };
+}
+
+function unidadReferencia(documento: {
+  _id: Id<"unidades">;
+  clave: string;
+  nombre: string;
+  simbolo?: string;
+  activo: boolean;
+  revision: number;
+}) {
+  return {
+    ...catalogoReferencia(documento),
+    simbolo: documento.simbolo ?? null,
+  };
+}
+
+function inconsistencia(referencia: string): never {
+  throw new Error(`Inconsistencia técnica del catálogo: falta ${referencia}`);
+}
+
+export const obtenerDetalleRecurso = query({
+  args: { recursoId: v.id("recursos") },
+  returns: v.union(salidaDetalleRecurso, v.null()),
+  handler: async (ctx, { recursoId }) => {
+    const recurso = await ctx.db.get(recursoId);
+    if (!recurso) return null;
+
+    const tipo = await ctx.db.get(recurso.tipoRecursoId);
+    if (!tipo) inconsistencia("tipo de recurso");
+    const familia = await ctx.db.get(tipo.familiaRecursoId);
+    if (!familia) inconsistencia("familia de recurso");
+    const clase = await ctx.db.get(familia.claseRecursoId);
+    if (!clase) inconsistencia("clase de recurso");
+    const unidad = await ctx.db.get(recurso.unidadId);
+    if (!unidad) inconsistencia("unidad del recurso");
+
+    const valores = await conValores(ctx, recursoId);
+    const atributos = [];
+    for (const valor of valores) {
+      const atributo = await ctx.db.get(valor.atributoRecursoId);
+      if (!atributo) inconsistencia("atributo del valor almacenado");
+      const definicion = await ctx.db.get(atributo.definicionAtributoId);
+      if (!definicion) inconsistencia("definición de atributo");
+
+      let opcion = null;
+      if (valor.opcionAtributoId) {
+        opcion = await ctx.db.get(valor.opcionAtributoId);
+        if (!opcion) inconsistencia("opción seleccionada");
+        if (opcion.definicionAtributoId !== definicion._id)
+          inconsistencia("definición de la opción seleccionada");
+      }
+      let unidadDefinicion = null;
+      if (definicion.unidadId) {
+        unidadDefinicion = await ctx.db.get(definicion.unidadId);
+        if (!unidadDefinicion)
+          inconsistencia("unidad de definición de atributo");
+      }
+
+      atributos.push({
+        id: atributo._id,
+        clave: definicion.clave,
+        nombre: definicion.nombre,
+        tipoDato: definicion.tipoDato,
+        aplicabilidad: atributo.aplicabilidad,
+        participaIdentidad: atributo.participaIdentidad,
+        orden: atributo.orden,
+        activo: atributo.activo,
+        valor: valor.valor,
+        opcion: opcion ? catalogoReferencia(opcion) : null,
+        unidad: unidadDefinicion ? unidadReferencia(unidadDefinicion) : null,
+      });
+    }
+    atributos.sort((a, b) => a.orden - b.orden);
+
+    return {
+      id: recurso._id,
+      identificadorTecnico: recurso.identificadorTecnico,
+      nombre: recurso.nombre,
+      descripcion: recurso.descripcion,
+      activo: recurso.activo,
+      revision: recurso.revision,
+      clase: catalogoReferencia(clase),
+      familia: catalogoReferencia(familia),
+      tipo: catalogoReferencia(tipo),
+      unidad: {
+        ...catalogoReferencia(unidad),
+        simbolo: unidad.simbolo ?? null,
+      },
+      atributos,
+    };
+  },
+});
+
 export const listarRecursos = query({
   args: {
     tipoRecursoId: v.optional(v.id("tiposRecurso")),
@@ -162,13 +349,17 @@ export const listarRecursos = query({
         : await ctx.db
             .query("recursos")
             .withIndex("porActivo", (q) =>
-                  args.activo === undefined ? q : q.eq("activo", args.activo!),
-                )
+              args.activo === undefined ? q : q.eq("activo", args.activo!),
+            )
             .collect();
     return await Promise.all(
       recursos
-        .sort((a, b) => args.tipoRecursoId === undefined ? a.identificadorTecnico.localeCompare(b.identificadorTecnico) : 0)
-            .filter(
+        .sort((a, b) =>
+          args.tipoRecursoId === undefined
+            ? a.identificadorTecnico.localeCompare(b.identificadorTecnico)
+            : 0,
+        )
+        .filter(
           (r) =>
             args.tipoRecursoId !== undefined ||
             args.activo === undefined ||

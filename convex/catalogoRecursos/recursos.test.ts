@@ -40,14 +40,14 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
     const booleano = await ctx.db.insert("atributosRecurso", { familiaRecursoId: familia, definicionAtributoId: booleanoDef, aplicabilidad: "OPTIONAL", participaIdentidad: true, orden: 7, activo: true, revision: 1 });
     const numeroDef = await ctx.db.insert("definicionesAtributo", { clave: "NUM_ID", nombre: "Número identidad", tipoDato: "NUMERO", activo: true, revision: 1 });
     const numero = await ctx.db.insert("atributosRecurso", { familiaRecursoId: familia, definicionAtributoId: numeroDef, aplicabilidad: "OPTIONAL", participaIdentidad: true, orden: 8, activo: true, revision: 1 });
-    const unidad = await ctx.db.insert("unidades", { clave: "UN", nombre: "Unidad", activo: true, revision: 1 });
+    const unidad = await ctx.db.insert("unidades", { clave: "UN", nombre: "Unidad", simbolo: "u", activo: true, revision: 1 });
     const unidadMala = await ctx.db.insert("unidades", { clave: "M", nombre: "Mala", activo: true, revision: 1 });
     const unidadTipo = await ctx.db.insert("unidades", { clave: "UT", nombre: "Unidad por tipo", activo: true, revision: 1 });
     await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: familia, unidadId: unidad, principal: true, activo: true, revision: 1 });
     await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: familia, tipoRecursoId: tipo, unidadId: unidadTipo, principal: true, activo: true, revision: 1 });
         await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: otraFamilia, unidadId: unidad, principal: true, activo: true, revision: 1 });
     const colorDef = await ctx.db.insert("definicionesAtributo", { clave: "COLOR", nombre: "Color", tipoDato: "OPCION", activo: true, revision: 1 });
-    const pesoDef = await ctx.db.insert("definicionesAtributo", { clave: "PESO", nombre: "Peso", tipoDato: "NUMERO", activo: true, revision: 1 });
+    const pesoDef = await ctx.db.insert("definicionesAtributo", { clave: "PESO", nombre: "Peso", tipoDato: "NUMERO", unidadId: unidad, activo: true, revision: 1 });
     const modoDef = await ctx.db.insert("definicionesAtributo", { clave: "MODO", nombre: "Modo", tipoDato: "OPCION", activo: true, revision: 1 });
     const secretoDef = await ctx.db.insert("definicionesAtributo", { clave: "SECRETO", nombre: "Secreto", tipoDato: "TEXTO", activo: true, revision: 1 });
     const color = await ctx.db.insert("atributosRecurso", { familiaRecursoId: familia, definicionAtributoId: colorDef, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, revision: 1 });
@@ -60,7 +60,7 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
     const automatico = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: modoDef, clave: "AUTO", nombre: "Automático", activo: true, revision: 1 });
     const opcionInactiva = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: colorDef, clave: "INACTIVA", nombre: "Inactiva", activo: false, revision: 1 });
     await ctx.db.insert("reglasAtributoRecurso", { tipoRecursoId: tipo, atributoCondicionId: color, opcionCondicionId: rojo, atributoAfectadoId: modo, aplicabilidad: "REQUIRED", activo: true, revision: 1 });
-    return { clase, familia, tipo, unidad, unidadMala, unidadTipo, color, peso, modo, secreto, noAplica, rojo, automatico, opcionInactiva, otraClase, otraFamilia, otroTipo, atributoOtraFamilia, condicionalBase, texto, booleano, numero };
+    return { clase, familia, tipo, unidad, unidadMala, unidadTipo, color, peso, modo, secreto, noAplica, rojo, automatico, opcionInactiva, otraClase, otraFamilia, otroTipo, atributoOtraFamilia, condicionalBase, texto, booleano, numero, modoDef };
   });
 }
 
@@ -191,7 +191,46 @@ describe("recursos", () => {
     expect(obtenido!.valores.map(({ atributoRecursoId, valor, opcionAtributoId }) => ({ atributoRecursoId, valor, opcionAtributoId }))).toEqual(supplied);
   });
 
-  it("devuelve null para un recurso inexistente", async () => {
+  it("devuelve el detalle unido, con opciones y orden configurado", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const recurso = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [...input(f).valores, { atributoRecursoId: f.peso, valor: 42 }] }));
+        const detalle = await t.query(api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: recurso._id });
+        expect(detalle).toMatchObject({ identificadorTecnico: recurso.identificadorTecnico, nombre: "Bomba visible", activo: true, revision: 1, clase: { clave: "EQUIPO", nombre: "Equipo" }, familia: { clave: "BOMBA", nombre: "Bomba" }, tipo: { clave: "CENTRIFUGA", nombre: "Centrífuga" }, unidad: { clave: "UN", nombre: "Unidad", simbolo: "u" } });
+        expect(detalle!.atributos.map((a: { clave: string }) => a.clave)).toEqual(["COLOR", "PESO", "MODO"]);
+        expect(detalle!.atributos.find((a: { clave: string }) => a.clave === "COLOR")).toMatchObject({ valor: "rojo", participaIdentidad: true, aplicabilidad: "REQUIRED", opcion: { clave: "ROJO", nombre: "Rojo" } });
+        expect(detalle!.atributos.find((a: { clave: string }) => a.clave === "PESO")).toMatchObject({ valor: 42, tipoDato: "NUMERO", participaIdentidad: true, unidad: { clave: "UN", nombre: "Unidad", simbolo: "u" } });
+            expect(JSON.stringify(detalle)).not.toContain("atributoRecursoId");
+      });
+
+      it("rechaza una opción almacenada de otra definición", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const recurso = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+        await t.run(async ctx => { await ctx.db.patch(f.rojo, { definicionAtributoId: f.modoDef }); });
+        await expect(t.query(api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: recurso._id })).rejects.toThrow(/Inconsistencia técnica del catálogo/);
+      });
+
+      it("mantiene visible el detalle histórico de un recurso inactivo", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const recurso = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+        await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
+        expect(await t.query(api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: recurso._id })).toMatchObject({ activo: false, revision: 2, atributos: expect.arrayContaining([expect.objectContaining({ clave: "COLOR", valor: "rojo" })]) });
+      });
+
+      it("devuelve null para un detalle inexistente", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const recurso = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+        await t.run(async ctx => { await ctx.db.delete(recurso._id); });
+        expect(await t.query(api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: recurso._id })).toBeNull();
+      });
+
+      it("falla claramente ante una referencia física de catálogo ausente", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const recurso = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+        await t.run(async ctx => { await ctx.db.delete(f.tipo); });
+        await expect(t.query(api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: recurso._id })).rejects.toThrow(/Inconsistencia técnica del catálogo/);
+      });
+
+      it("devuelve null para un recurso inexistente", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
     const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     await t.run(async ctx => {
