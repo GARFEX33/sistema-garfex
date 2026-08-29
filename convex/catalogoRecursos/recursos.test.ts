@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "./_generated/api";
+import { api } from "../_generated/api";
 import { identidadRecurso } from "./validacionRecurso";
-import schema from "./schema";
+import schema from "../schema";
 
-const modules = (import.meta as ImportMeta & { glob: (pattern: string) => Record<string, () => Promise<unknown>> }).glob("./**/*.{ts,js}");
+const generatedModules = (import.meta as ImportMeta & {
+  glob: (pattern: string) => Record<string, () => Promise<unknown>>;
+}).glob("../_generated/**/*.{ts,js}");
+const localModules = (import.meta as ImportMeta & {
+  glob: (pattern: string) => Record<string, () => Promise<unknown>>;
+}).glob("./*.{ts,js}");
+const modules = {
+  ...generatedModules,
+  ...Object.fromEntries(
+    Object.entries(localModules).map(([path, module]) => [
+      `../catalogoRecursos/${path.slice(2)}`,
+      module,
+    ]),
+  ),
+};
 
 type Fixture = Awaited<ReturnType<typeof seedFixture>>;
 
@@ -60,16 +74,16 @@ function input(f: Fixture, overrides: Record<string, unknown> = {}) {
 describe("recursos", () => {
   it("crea con identidad determinista y obtiene sus valores", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f));
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     expect(creado.identificadorTecnico).toBe("v1|EQUIPO|BOMBA|CENTRIFUGA|COLOR=ROJO");
     expect(creado.revision).toBe(1); expect(creado.activo).toBe(true);
-    expect(await t.query(api.recursos.obtenerRecurso, { recursoId: creado._id })).toMatchObject({ nombre: "Bomba visible", valores: expect.arrayContaining([expect.objectContaining({ atributoRecursoId: f.color })]) });
+    expect(await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id })).toMatchObject({ nombre: "Bomba visible", valores: expect.arrayContaining([expect.objectContaining({ atributoRecursoId: f.color })]) });
   });
 
   it("no usa el nombre para identidad y rechaza duplicados", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await t.mutation(api.recursos.crearRecurso, input(f));
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { nombre: "Otro nombre" }))).rejects.toThrow(/duplic|identificador/i);
+    await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { nombre: "Otro nombre" }))).rejects.toThrow(/duplic|identificador/i);
   });
 
   it.each([
@@ -82,12 +96,12 @@ describe("recursos", () => {
     ["regla condicional requerida", (f: Fixture) => ({ valores: [{ atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo }] }), /Atributo requerido ausente/],
   ])("rechaza %s", async (_name, change, error) => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, change(f)))).rejects.toThrow(error);
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, change(f)))).rejects.toThrow(error);
   });
 
   it("permite un CONDITIONAL base sin regla activa", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f));
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     expect(creado._id).toBeDefined();
   });
 
@@ -96,7 +110,7 @@ describe("recursos", () => {
     ["familia y tipo incompatibles", (f: Fixture) => ({ familiaRecursoId: f.otraFamilia })],
   ])("rechaza jerarquía: %s", async (_name, change) => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, change(f)))).rejects.toThrow(/Jerarquía/);
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, change(f)))).rejects.toThrow(/Jerarquía/);
   });
 
   it("canonicaliza valores de identidad sin usar el nombre visible", async () => {
@@ -108,14 +122,14 @@ describe("recursos", () => {
       { atributoRecursoId: f.booleano, valor: true },
       { atributoRecursoId: f.numero, valor: 12.5 },
     ];
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f, { nombre: "Nombre A", valores }));
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { nombre: "Nombre A", valores }));
     expect(creado.identificadorTecnico).toBe("v1|EQUIPO|BOMBA|CENTRIFUGA|BOOL_ID=TRUE|COLOR=ROJO|NUM_ID=12.5|TEXTO_ID=É TEXTO");
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { nombre: "Nombre B", valores }))).rejects.toThrow(/duplicado/);
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { nombre: "Nombre B", valores }))).rejects.toThrow(/duplicado/);
   });
 
   it("rechaza números no finitos", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { valores: [
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [
       { atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.numero, valor: Infinity },
     ] }))).rejects.toThrow(/Número no finito/);
@@ -123,7 +137,7 @@ describe("recursos", () => {
 
   it("acepta una política de unidad específica del tipo", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f, { unidadId: f.unidadTipo }));
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { unidadId: f.unidadTipo }));
     expect(creado.unidadId).toBe(f.unidadTipo);
   });
 
@@ -131,7 +145,7 @@ describe("recursos", () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
     for (const id of [f.clase, f.familia, f.tipo]) {
       await t.run(async ctx => { await ctx.db.patch(id, { activo: false }); });
-      await expect(t.mutation(api.recursos.crearRecurso, input(f))).rejects.toThrow("Jerarquía o unidad inexistente/inactiva");
+      await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f))).rejects.toThrow("Jerarquía o unidad inexistente/inactiva");
       await t.run(async ctx => { await ctx.db.patch(id, { activo: true }); });
     }
   });
@@ -139,21 +153,21 @@ describe("recursos", () => {
   it("rechaza una unidad inactiva", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
     await t.run(async ctx => { await ctx.db.patch(f.unidad, { activo: false }); });
-    await expect(t.mutation(api.recursos.crearRecurso, input(f))).rejects.toThrow("Jerarquía o unidad inexistente/inactiva");
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f))).rejects.toThrow("Jerarquía o unidad inexistente/inactiva");
   });
 
   it("rechaza atributos repetidos y opciones inactivas o sobre valores no OPCION", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { valores: [
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [
       { atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.modo, valor: "auto", opcionAtributoId: f.automatico },
     ] }))).rejects.toThrow("Atributo repetido");
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { valores: [
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [
       { atributoRecursoId: f.color, valor: "inactiva", opcionAtributoId: f.opcionInactiva },
       { atributoRecursoId: f.modo, valor: "auto", opcionAtributoId: f.automatico },
     ] }))).rejects.toThrow("Opción inválida");
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { valores: [
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [
       { atributoRecursoId: f.texto, valor: "texto", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.modo, valor: "auto", opcionAtributoId: f.automatico },
@@ -170,8 +184,8 @@ describe("recursos", () => {
       { atributoRecursoId: f.booleano, valor: false },
       { atributoRecursoId: f.numero, valor: 0 },
     ];
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f, { descripcion: "Descripción exacta", valores: supplied }));
-    const obtenido = await t.query(api.recursos.obtenerRecurso, { recursoId: creado._id });
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { descripcion: "Descripción exacta", valores: supplied }));
+    const obtenido = await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id });
     expect(obtenido).not.toBeNull();
     expect(obtenido).toMatchObject({ nombre: "Bomba visible", descripcion: "Descripción exacta" });
     expect(obtenido!.valores.map(({ atributoRecursoId, valor, opcionAtributoId }) => ({ atributoRecursoId, valor, opcionAtributoId }))).toEqual(supplied);
@@ -179,17 +193,17 @@ describe("recursos", () => {
 
   it("devuelve null para un recurso inexistente", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    const creado = await t.mutation(api.recursos.crearRecurso, input(f));
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     await t.run(async ctx => {
       for (const valor of await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", creado._id)).collect()) await ctx.db.delete(valor._id);
       await ctx.db.delete(creado._id);
     });
-    expect(await t.query(api.recursos.obtenerRecurso, { recursoId: creado._id })).toBeNull();
+    expect(await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id })).toBeNull();
   });
 
     describe("listado, actualización y ciclo de vida", () => {
       async function crear(t: ReturnType<typeof convexTest>, f: Fixture, overrides: Record<string, unknown> = {}) {
-        return t.mutation(api.recursos.crearRecurso, input(f, overrides));
+        return t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, overrides));
       }
 
       it("lista sin filtro, por tipo y por estado activo", async () => {
@@ -197,11 +211,11 @@ describe("recursos", () => {
         const primero = await crear(t, f, { nombre: "Primero" });
         const segundo = await crear(t, f, { nombre: "Segundo", valores: [...input(f).valores, { atributoRecursoId: f.peso, valor: 2 }] });
             const tercero = await crear(t, f, { claseRecursoId: f.otraClase, familiaRecursoId: f.otraFamilia, tipoRecursoId: f.otroTipo, nombre: "Válvula Este", valores: [] });
-        await t.mutation(api.recursos.desactivarRecurso, { recursoId: segundo._id, revisionEsperada: 1 });
-        expect((await t.query(api.recursos.listarRecursos, {})).map(r => r.nombre)).toEqual(["Primero", "Segundo", "Válvula Este"]);
-        expect((await t.query(api.recursos.listarRecursos, { tipoRecursoId: f.tipo })).map(r => r.nombre)).toEqual(["Primero", "Segundo"]);
-        expect((await t.query(api.recursos.listarRecursos, { activo: true })).map(r => r.nombre)).toEqual(["Primero", "Válvula Este"]);
-        expect((await t.query(api.recursos.listarRecursos, { activo: false })).map(r => r.nombre)).toEqual(["Segundo"]);
+        await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: segundo._id, revisionEsperada: 1 });
+        expect((await t.query(api.catalogoRecursos.recursos.listarRecursos, {})).map(r => r.nombre)).toEqual(["Primero", "Segundo", "Válvula Este"]);
+        expect((await t.query(api.catalogoRecursos.recursos.listarRecursos, { tipoRecursoId: f.tipo })).map(r => r.nombre)).toEqual(["Primero", "Segundo"]);
+        expect((await t.query(api.catalogoRecursos.recursos.listarRecursos, { activo: true })).map(r => r.nombre)).toEqual(["Primero", "Válvula Este"]);
+        expect((await t.query(api.catalogoRecursos.recursos.listarRecursos, { activo: false })).map(r => r.nombre)).toEqual(["Segundo"]);
       });
 
       it("busca por nombre visible combinando tipo y estado", async () => {
@@ -209,77 +223,77 @@ describe("recursos", () => {
         const activo = await crear(t, f, { nombre: "Bomba Norte" });
         const inactivo = await crear(t, f, { nombre: "Bomba Sur", valores: [...input(f).valores, { atributoRecursoId: f.peso, valor: 3 }] });
             const otroTipo = await crear(t, f, { claseRecursoId: f.otraClase, familiaRecursoId: f.otraFamilia, tipoRecursoId: f.otroTipo, nombre: "Válvula Norte", valores: [] });
-        await t.mutation(api.recursos.desactivarRecurso, { recursoId: inactivo._id, revisionEsperada: 1 });
-        expect((await t.query(api.recursos.buscarRecursos, { texto: "Bomba", tipoRecursoId: f.tipo, activo: true })).map(r => r._id)).toEqual([activo._id]);
-        expect((await t.query(api.recursos.buscarRecursos, { texto: "Sur", tipoRecursoId: f.tipo, activo: false })).map(r => r._id)).toEqual([inactivo._id]);
-            expect((await t.query(api.recursos.buscarRecursos, { texto: "Válvula", tipoRecursoId: f.tipo })).map(r => r._id)).toEqual([]);
-            expect((await t.query(api.recursos.buscarRecursos, { texto: "Norte", tipoRecursoId: f.otroTipo, activo: true })).map(r => r._id)).toEqual([otroTipo._id]);
+        await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: inactivo._id, revisionEsperada: 1 });
+        expect((await t.query(api.catalogoRecursos.recursos.buscarRecursos, { texto: "Bomba", tipoRecursoId: f.tipo, activo: true })).map(r => r._id)).toEqual([activo._id]);
+        expect((await t.query(api.catalogoRecursos.recursos.buscarRecursos, { texto: "Sur", tipoRecursoId: f.tipo, activo: false })).map(r => r._id)).toEqual([inactivo._id]);
+            expect((await t.query(api.catalogoRecursos.recursos.buscarRecursos, { texto: "Válvula", tipoRecursoId: f.tipo })).map(r => r._id)).toEqual([]);
+            expect((await t.query(api.catalogoRecursos.recursos.buscarRecursos, { texto: "Norte", tipoRecursoId: f.otroTipo, activo: true })).map(r => r._id)).toEqual([otroTipo._id]);
       });
 
       it("actualiza una vez, conserva identidad con cambio de nombre y cambia identidad con valor técnico", async () => {
         const t = convexTest(schema, modules); const f = await seedFixture(t); const original = await crear(t, f);
-        const nombre = await t.mutation(api.recursos.actualizarRecurso, { ...input(f, { nombre: "Nuevo nombre" }), recursoId: original._id, revisionEsperada: 1 });
+        const nombre = await t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { nombre: "Nuevo nombre" }), recursoId: original._id, revisionEsperada: 1 });
         expect(nombre.revision).toBe(2); expect(nombre.identificadorTecnico).toBe(original.identificadorTecnico);
         const valores = [...input(f).valores, { atributoRecursoId: f.peso, valor: 8 }];
-        const cambiado = await t.mutation(api.recursos.actualizarRecurso, { ...input(f, { valores }), recursoId: original._id, revisionEsperada: 2 });
+        const cambiado = await t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { valores }), recursoId: original._id, revisionEsperada: 2 });
         expect(cambiado.revision).toBe(3); expect(cambiado.identificadorTecnico).not.toBe(original.identificadorTecnico);
       });
 
       it("rechaza actualización obsoleta y duplicada sin cambiar valores", async () => {
         const t = convexTest(schema, modules); const f = await seedFixture(t);
         const primero = await crear(t, f); const segundo = await crear(t, f, { nombre: "Segundo", valores: [...input(f).valores, { atributoRecursoId: f.peso, valor: 4 }] });
-        const antes = await t.query(api.recursos.obtenerRecurso, { recursoId: primero._id });
-        await expect(t.mutation(api.recursos.actualizarRecurso, { ...input(f, { nombre: "Obsoleto" }), recursoId: primero._id, revisionEsperada: 0 })).rejects.toThrow(/obsoleta/);
-        await expect(t.mutation(api.recursos.actualizarRecurso, { ...input(f, { nombre: "Duplicado" }), recursoId: segundo._id, revisionEsperada: 1 })).rejects.toThrow(/duplicado/);
-        expect(await t.query(api.recursos.obtenerRecurso, { recursoId: primero._id })).toMatchObject({ revision: antes!.revision, identificadorTecnico: antes!.identificadorTecnico, nombre: antes!.nombre });
+        const antes = await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: primero._id });
+        await expect(t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { nombre: "Obsoleto" }), recursoId: primero._id, revisionEsperada: 0 })).rejects.toThrow(/obsoleta/);
+        await expect(t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { nombre: "Duplicado" }), recursoId: segundo._id, revisionEsperada: 1 })).rejects.toThrow(/duplicado/);
+        expect(await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: primero._id })).toMatchObject({ revision: antes!.revision, identificadorTecnico: antes!.identificadorTecnico, nombre: antes!.nombre });
       });
 
       it("reemplaza valores atómicamente", async () => {
         const t = convexTest(schema, modules); const f = await seedFixture(t); const recurso = await crear(t, f);
         const valores = [...input(f).valores, { atributoRecursoId: f.peso, valor: 9 }];
-        const actualizado = await t.mutation(api.recursos.actualizarRecurso, { ...input(f, { valores }), recursoId: recurso._id, revisionEsperada: 1 });
+        const actualizado = await t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { valores }), recursoId: recurso._id, revisionEsperada: 1 });
         expect(actualizado.valores.map(v => v.atributoRecursoId)).toEqual(valores.map(v => v.atributoRecursoId));
         expect(new Set(actualizado.valores.map(v => v._id)).size).toBe(valores.length);
-        await expect(t.mutation(api.recursos.actualizarRecurso, { ...input(f, { valores: [] }), recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/requerido/);
-        expect((await t.query(api.recursos.obtenerRecurso, { recursoId: recurso._id }))!.valores.map(v => v.atributoRecursoId)).toEqual(valores.map(v => v.atributoRecursoId));
+        await expect(t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { valores: [] }), recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/requerido/);
+        expect((await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: recurso._id }))!.valores.map(v => v.atributoRecursoId)).toEqual(valores.map(v => v.atributoRecursoId));
       });
 
       it("desactiva una vez, conserva datos y rechaza repetición u obsolescencia", async () => {
         const t = convexTest(schema, modules); const f = await seedFixture(t); const recurso = await crear(t, f);
-        const desactivado = await t.mutation(api.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
+        const desactivado = await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
         expect(desactivado).toMatchObject({ activo: false, revision: 2, identificadorTecnico: recurso.identificadorTecnico, valores: recurso.valores });
-        expect((await t.query(api.recursos.listarRecursos, { activo: false })).map(r => r._id)).toContain(recurso._id);
-        expect(await t.query(api.recursos.obtenerRecurso, { recursoId: recurso._id })).toMatchObject({ activo: false, valores: recurso.valores });
-        await expect(t.mutation(api.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 })).rejects.toThrow(/obsoleta/);
-        await expect(t.mutation(api.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/activo/);
+        expect((await t.query(api.catalogoRecursos.recursos.listarRecursos, { activo: false })).map(r => r._id)).toContain(recurso._id);
+        expect(await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: recurso._id })).toMatchObject({ activo: false, valores: recurso.valores });
+        await expect(t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 })).rejects.toThrow(/obsoleta/);
+        await expect(t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/activo/);
       });
 
       it("reactiva con identidad persistida y rechaza estado activo, revisión obsoleta y catálogos invalidados", async () => {
         const t = convexTest(schema, modules); const f = await seedFixture(t); const recurso = await crear(t, f);
-        await t.mutation(api.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
+        await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
         await t.run(async ctx => { await ctx.db.patch(f.tipo, { clave: "CENTRIFUGA-2" }); });
-            const reactivado = await t.mutation(api.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 });
+            const reactivado = await t.mutation(api.catalogoRecursos.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 });
         expect(reactivado).toMatchObject({ activo: true, revision: 3, identificadorTecnico: "v1|EQUIPO|BOMBA|CENTRIFUGA-2|COLOR=ROJO" });
-            expect((await t.query(api.recursos.obtenerRecurso, { recursoId: recurso._id }))!.identificadorTecnico).toBe("v1|EQUIPO|BOMBA|CENTRIFUGA-2|COLOR=ROJO");
-        await expect(t.mutation(api.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 3 })).rejects.toThrow(/activo/);
-        await expect(t.mutation(api.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/obsoleta/);
+            expect((await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: recurso._id }))!.identificadorTecnico).toBe("v1|EQUIPO|BOMBA|CENTRIFUGA-2|COLOR=ROJO");
+        await expect(t.mutation(api.catalogoRecursos.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 3 })).rejects.toThrow(/activo/);
+        await expect(t.mutation(api.catalogoRecursos.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow(/obsoleta/);
       });
 
       it.each(["unidad", "atributo", "opcion", "regla"])("no reactiva tras invalidar %s del catálogo", async kind => {
         const t = convexTest(schema, modules); const f = await seedFixture(t); const recurso = await crear(t, f);
-        await t.mutation(api.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
+        await t.mutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: recurso._id, revisionEsperada: 1 });
         await t.run(async ctx => {
           const id = kind === "unidad" ? f.unidad : kind === "atributo" ? f.color : kind === "opcion" ? f.rojo : (await ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", f.tipo)).first())!._id;
           await ctx.db.patch(id, { activo: false });
         });
-        await expect(t.mutation(api.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow();
-        expect((await t.query(api.recursos.obtenerRecurso, { recursoId: recurso._id }))!.activo).toBe(false);
+        await expect(t.mutation(api.catalogoRecursos.recursos.reactivarRecurso, { recursoId: recurso._id, revisionEsperada: 2 })).rejects.toThrow();
+        expect((await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: recurso._id }))!.activo).toBe(false);
       });
     });
 
   it("revierte toda la creación cuando falla la validación", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    await expect(t.mutation(api.recursos.crearRecurso, input(f, { valores: [
+    await expect(t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { valores: [
       { atributoRecursoId: f.color, valor: "rojo", opcionAtributoId: f.rojo },
       { atributoRecursoId: f.modo, valor: "auto", opcionAtributoId: f.automatico },
       { atributoRecursoId: f.noAplica, valor: "no debe persistir" },

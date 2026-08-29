@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "./_generated/api";
-import schema from "./schema";
+import { api } from "../_generated/api";
+import schema from "../schema";
 
-const modules = (
-  import.meta as ImportMeta & { glob: (pattern: string) => Record<string, () => Promise<unknown>> }
-).glob("./**/*.{ts,js}");
+const generatedModules = (import.meta as ImportMeta & {
+  glob: (pattern: string) => Record<string, () => Promise<unknown>>;
+}).glob("../_generated/**/*.{ts,js}");
+const localModules = (import.meta as ImportMeta & {
+  glob: (pattern: string) => Record<string, () => Promise<unknown>>;
+}).glob("./*.{ts,js}");
+const modules = {
+  ...generatedModules,
+  ...Object.fromEntries(
+    Object.entries(localModules).map(([path, module]) => [
+      `../catalogoRecursos/${path.slice(2)}`,
+      module,
+    ]),
+  ),
+};
 
 type Fixture = Awaited<ReturnType<typeof seedFixture>>;
 
@@ -358,7 +370,7 @@ describe("consultas públicas del catálogo", () => {
   it("consulta clases activas y excluye inactivas", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarClases, {});
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarClases, {});
     expect(result).toEqual([
       expect.objectContaining({ id: f.claseBombas, clave: "CLASE_BOMBAS", nombre: "Bombas industriales" }),
       expect.objectContaining({ id: f.claseValvulas, clave: "CLASE_VALVULAS", nombre: "Válvulas industriales" }),
@@ -369,10 +381,10 @@ describe("consultas públicas del catálogo", () => {
   it("consulta familias sólo de la clase solicitada y sólo activas", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarFamiliasDeClase, { claseRecursoId: f.claseBombas });
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarFamiliasDeClase, { claseRecursoId: f.claseBombas });
     expect(result).toEqual([expect.objectContaining({ id: f.familiaCentrifugas, claseRecursoId: f.claseBombas })]);
     expect(result.some((row) => row.id === f.familiaValvulas || row.id === f.familiaInactiva)).toBe(false);
-    expect(await t.query(api.catalogo.consultarFamiliasDeClase, { claseRecursoId: f.claseValvulas })).toEqual([
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarFamiliasDeClase, { claseRecursoId: f.claseValvulas })).toEqual([
       expect.objectContaining({ id: f.familiaValvulas }),
     ]);
   });
@@ -380,16 +392,16 @@ describe("consultas públicas del catálogo", () => {
   it("consulta tipos sólo de la familia solicitada y excluye tipos inactivos", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarTiposDeFamilia, { familiaRecursoId: f.familiaCentrifugas });
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarTiposDeFamilia, { familiaRecursoId: f.familiaCentrifugas });
     expect(result.map((row) => row.id)).toEqual([f.tipoIndustrial, f.tipoCompacto]);
     expect(result.some((row) => row.id === f.tipoInactivo || row.id === f.tipoValvula)).toBe(false);
-    expect(await t.query(api.catalogo.consultarTiposDeFamilia, { familiaRecursoId: f.familiaInactiva })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarTiposDeFamilia, { familiaRecursoId: f.familiaInactiva })).toEqual([]);
   });
 
   it("combina unidades de familia y tipo, excluye políticas o unidades inactivas", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarUnidadesValidas, {
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarUnidadesValidas, {
       familiaRecursoId: f.familiaCentrifugas,
       tipoRecursoId: f.tipoIndustrial,
     });
@@ -398,14 +410,14 @@ describe("consultas públicas del catálogo", () => {
       expect.objectContaining({ id: f.unidadTipo, clave: "UNIDAD_TIPO", principal: true }),
     ]);
     expect(result.some((row) => row.id === f.unidadInactiva || row.id === f.unidadPoliticaInactiva)).toBe(false);
-    expect((await t.query(api.catalogo.consultarUnidadesValidas, { familiaRecursoId: f.familiaCentrifugas })).map((row) => row.id)).toEqual([f.unidadBase]);
-    expect(await t.query(api.catalogo.consultarUnidadesValidas, { familiaRecursoId: f.familiaValvulas, tipoRecursoId: f.tipoIndustrial })).toEqual([]);
+    expect((await t.query(api.catalogoRecursos.catalogo.consultarUnidadesValidas, { familiaRecursoId: f.familiaCentrifugas })).map((row) => row.id)).toEqual([f.unidadBase]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarUnidadesValidas, { familiaRecursoId: f.familiaValvulas, tipoRecursoId: f.tipoIndustrial })).toEqual([]);
   });
 
   it("aplica precedencia específica del tipo y conserva los tipos de dato en español", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarAtributosAplicables, {
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarAtributosAplicables, {
       familiaRecursoId: f.familiaCentrifugas,
       tipoRecursoId: f.tipoIndustrial,
     });
@@ -421,22 +433,22 @@ describe("consultas públicas del catálogo", () => {
     expect(result.some((row) => row.id === f.atributoDefinicionInactiva)).toBe(false);
     expect(result.some((row) => row.id === f.atributoInactivo)).toBe(false);
     expect(result.some((row) => row.id === f.atributoOtroTipo)).toBe(false);
-    expect(await t.query(api.catalogo.consultarAtributosAplicables, { familiaRecursoId: f.familiaValvulas })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarAtributosAplicables, { familiaRecursoId: f.familiaValvulas })).toEqual([]);
   });
 
   it("consulta opciones sólo de la definición solicitada y excluye opciones inactivas", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.consultarOpcionesPermitidas, { definicionAtributoId: f.definicionColor });
+    const result = await t.query(api.catalogoRecursos.catalogo.consultarOpcionesPermitidas, { definicionAtributoId: f.definicionColor });
     expect(result).toEqual([expect.objectContaining({ id: f.opcionRojo, definicionAtributoId: f.definicionColor, clave: "OPCION_ROJO" })]);
     expect(result.some((row) => row.clave === "OPCION_AZUL_INACTIVA")).toBe(false);
-    expect(await t.query(api.catalogo.consultarOpcionesPermitidas, { definicionAtributoId: f.definicionPresion })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarOpcionesPermitidas, { definicionAtributoId: f.definicionPresion })).toEqual([]);
   });
 
   it("devuelve reglas activas con sus atributos y opción unidos, sin cruzar tipos", async () => {
     const t = convexTest(schema, modules);
     const f = await seedFixture(t);
-    const result = await t.query(api.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoIndustrial });
+    const result = await t.query(api.catalogoRecursos.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoIndustrial });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       id: f.reglaActiva,
@@ -446,7 +458,7 @@ describe("consultas públicas del catálogo", () => {
       opcionCondicion: { id: f.opcionRojo, clave: "OPCION_ROJO" },
       atributoAfectado: { id: f.atributoNota, clave: "ATRIBUTO_NOTA", tipoDato: "TEXTO" },
     });
-    expect((await t.query(api.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoCompacto })).length).toBe(0);
-    expect((await t.query(api.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoValvula })).length).toBe(0);
+    expect((await t.query(api.catalogoRecursos.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoCompacto })).length).toBe(0);
+    expect((await t.query(api.catalogoRecursos.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoValvula })).length).toBe(0);
   });
 });

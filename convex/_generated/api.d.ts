@@ -8,9 +8,9 @@
  * @module
  */
 
-import type * as catalogo from "../catalogo.js";
-import type * as recursos from "../recursos.js";
-import type * as validacionRecurso from "../validacionRecurso.js";
+import type * as catalogoRecursos_catalogo from "../catalogoRecursos/catalogo.js";
+import type * as catalogoRecursos_recursos from "../catalogoRecursos/recursos.js";
+import type * as catalogoRecursos_validacionRecurso from "../catalogoRecursos/validacionRecurso.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  catalogo: typeof catalogo;
-  recursos: typeof recursos;
-  validacionRecurso: typeof validacionRecurso;
+  "catalogoRecursos/catalogo": typeof catalogoRecursos_catalogo;
+  "catalogoRecursos/recursos": typeof catalogoRecursos_recursos;
+  "catalogoRecursos/validacionRecurso": typeof catalogoRecursos_validacionRecurso;
 }>;
 
 /**

@@ -1,8 +1,8 @@
-import type { Id, Doc } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
-import { identidadRecurso as identidadDominio } from "../src/catalogoRecursos/dominio/identidadRecurso";
-import { validarRecurso as validarDominio } from "../src/catalogoRecursos/dominio/validarRecurso";
-import type { Atributo, CatalogoSnapshot, EntradaRecurso, Opcion, Definicion, ValorEntrada as ValorDominio } from "../src/catalogoRecursos/dominio/tipos";
+import type { Id, Doc } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
+import { identidadRecurso as identidadDominio } from "../../src/catalogoRecursos/dominio/identidadRecurso";
+import { validarRecurso as validarDominio } from "../../src/catalogoRecursos/dominio/validarRecurso";
+import type { Atributo, CatalogoSnapshot, EntradaRecurso, Opcion, Definicion, ValorEntrada as ValorDominio } from "../../src/catalogoRecursos/dominio/tipos";
 
 export type ValorEntrada = Omit<ValorDominio, "atributoRecursoId" | "opcionAtributoId"> & {
   atributoRecursoId: Id<"atributosRecurso">;
