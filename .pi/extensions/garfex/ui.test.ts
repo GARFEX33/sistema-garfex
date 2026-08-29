@@ -1,6 +1,7 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import { getConvexUrl, resourceRequest } from "./convexClient";
+import garfexExtension, { runGarfexMenus } from "./index";
 import { ResourceBrowser } from "./ui";
 import { stateAfterLoad, type Resource } from "./types";
 
@@ -26,6 +27,77 @@ it("routes list and search queries without side effects", () => {
 it("represents empty and populated results as distinct view states", () => {
   expect(stateAfterLoad({ kind: "list" }, [])).toEqual({ kind: "empty", query: "" });
   expect(stateAfterLoad({ kind: "search", text: "bomba" }, [resource])).toMatchObject({ kind: "list", query: "bomba", selected: 0 });
+});
+
+describe("GARFEX menu orchestration", () => {
+  function menuContext(select: (...args: any[]) => Promise<string | undefined>, input = async () => undefined) {
+    return { mode: "tui", ui: { select, input, notify: vi.fn() } } as any;
+  }
+
+  it("shows the system menu first and ignores command arguments", async () => {
+    const command = { handler: undefined as any };
+    const select = vi.fn().mockResolvedValueOnce("Salir");
+    garfexExtension({ registerCommand: (_name: string, definition: any) => { command.handler = definition.handler; } } as any);
+    const ctx = menuContext(select);
+    await command.handler("cable", ctx);
+    expect(select).toHaveBeenNthCalledWith(1, "Sistema GARFEX", ["Catálogo de Recursos", "Salir"]);
+  });
+
+  it("sends exact list and trimmed search queries through the seam", async () => {
+    const select = vi.fn()
+      .mockResolvedValueOnce("Catálogo de Recursos")
+      .mockResolvedValueOnce("Listar recursos")
+      .mockResolvedValueOnce("Buscar recursos")
+      .mockResolvedValueOnce("Volver")
+      .mockResolvedValueOnce(undefined);
+    const input = vi.fn().mockResolvedValue("  bomba  ");
+    const showBrowser = vi.fn().mockResolvedValue(undefined);
+    await runGarfexMenus(menuContext(select, input), showBrowser);
+    expect(showBrowser).toHaveBeenNthCalledWith(1, { kind: "list" });
+    expect(showBrowser).toHaveBeenNthCalledWith(2, { kind: "search", text: "bomba" });
+  });
+
+  it("does not open the browser for blank or cancelled searches", async () => {
+    const showBrowser = vi.fn().mockResolvedValue(undefined);
+    const blankSelect = vi.fn()
+      .mockResolvedValueOnce("Catálogo de Recursos")
+      .mockResolvedValueOnce("Buscar recursos")
+      .mockResolvedValueOnce("Volver")
+      .mockResolvedValueOnce(undefined);
+    await runGarfexMenus(menuContext(blankSelect, vi.fn().mockResolvedValue("   ")), showBrowser);
+    const cancelledSelect = vi.fn()
+      .mockResolvedValueOnce("Catálogo de Recursos")
+      .mockResolvedValueOnce("Buscar recursos")
+      .mockResolvedValueOnce("Volver")
+      .mockResolvedValueOnce(undefined);
+    await runGarfexMenus(menuContext(cancelledSelect, vi.fn().mockResolvedValue(undefined)), showBrowser);
+    expect(showBrowser).not.toHaveBeenCalled();
+  });
+
+  it("waits for browser completion before showing the catalog submenu again", async () => {
+    let finish!: () => void;
+    const browserDone = new Promise<void>((resolve) => { finish = resolve; });
+    const select = vi.fn()
+      .mockResolvedValueOnce("Catálogo de Recursos")
+      .mockResolvedValueOnce("Listar recursos")
+      .mockResolvedValueOnce("Volver")
+      .mockResolvedValueOnce(undefined);
+    const showBrowser = vi.fn().mockReturnValue(browserDone);
+    const running = runGarfexMenus(menuContext(select), showBrowser);
+    await flush();
+    expect(select).toHaveBeenCalledTimes(2);
+    finish();
+    await running;
+    expect(select).toHaveBeenCalledWith("Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Volver"]);
+  });
+
+  it("returns from catalog cancel and closes on main cancel", async () => {
+    const select = vi.fn().mockResolvedValueOnce("Catálogo de Recursos").mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+    await runGarfexMenus(menuContext(select), vi.fn().mockResolvedValue(undefined));
+    expect(select).toHaveBeenNthCalledWith(1, "Sistema GARFEX", ["Catálogo de Recursos", "Salir"]);
+    expect(select).toHaveBeenNthCalledWith(2, "Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Volver"]);
+    expect(select).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("ResourceBrowser controls and state help", () => {
