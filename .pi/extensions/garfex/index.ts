@@ -1,37 +1,34 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { createResourceClient } from "./convexClient";
+import { createResourceDataSource } from "./convexClient";
 import { ResourceBrowser } from "./ui";
-import type { Resource, ResourceQuery } from "./types";
+import type { ResourceDataSource, ResourceQuery } from "./types";
 
 const MAIN_MENU = ["Catálogo de Recursos", "Salir"];
 const CATALOG_MENU = ["Listar recursos", "Buscar recursos", "Volver"];
 
 async function openBrowser(ctx: ExtensionContext, query: ResourceQuery): Promise<void> {
-  let load: (query: ResourceQuery) => Promise<Resource[]>;
+  let source: ResourceDataSource;
   try {
-    load = createResourceClient();
+    source = createResourceDataSource();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Convex no está configurado.";
-    load = async () => Promise.reject(new Error(message));
+    source = { list: async () => Promise.reject(new Error(message)), search: async () => Promise.reject(new Error(message)), getDetail: async () => null };
   }
 
   await ctx.ui.custom<void>((tui, theme, keybindings, done) =>
-    new ResourceBrowser(query, load, theme, tui, keybindings, done),
+    new ResourceBrowser(query, source, theme, tui, keybindings, done),
   );
 }
 
 async function openCatalog(ctx: ExtensionContext, showBrowser: (query: ResourceQuery) => Promise<void>): Promise<void> {
   while (true) {
     const choice = await ctx.ui.select("Catálogo de Recursos", CATALOG_MENU);
-    if (choice === "Listar recursos") {
-      await showBrowser({ kind: "list" });
-    } else if (choice === "Buscar recursos") {
+    if (choice === "Listar recursos") await showBrowser({ kind: "list" });
+    else if (choice === "Buscar recursos") {
       const entered = await ctx.ui.input("Buscar recursos", "Texto a buscar");
       const text = entered?.trim() ?? "";
       if (text) await showBrowser({ kind: "search", text });
-    } else {
-      return;
-    }
+    } else return;
   }
 }
 
@@ -54,7 +51,6 @@ export default function garfexExtension(pi: ExtensionAPI) {
         ctx.ui.notify("/garfex requiere modo interactivo", "error");
         return;
       }
-
       await runGarfexMenus(ctx, (query) => openBrowser(ctx, query));
     },
   });
