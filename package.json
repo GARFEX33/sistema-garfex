@@ -12,6 +12,7 @@
     "typescript": "^7.0.2"
   },
   "devDependencies": {
+    "@earendil-works/pi-tui": "0.84.4",
     "@edge-runtime/vm": "^5.0.0",
     "convex-test": "^0.0.56",
     "vitest": "^4.1.11"
