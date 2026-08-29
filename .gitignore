@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Local runtime state and secrets
+.atl/
+.convex/
+.env
+.env.*
+!.env.example

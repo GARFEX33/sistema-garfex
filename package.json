@@ -1,0 +1,19 @@
+{
+  "name": "sistema-garfex",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "dev": "convex dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.45.0",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "convex-test": "^0.0.56",
+    "vitest": "^4.1.11"
+  }
+}
