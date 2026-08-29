@@ -10,5 +10,5 @@
     "allowJs": true,
     "resolveJsonModule": true
   },
-  "include": ["convex/**/*.ts", "convex/**/*.js"]
+  "include": ["convex/**/*.ts", "convex/**/*.js", "src/**/*.ts"]
 }

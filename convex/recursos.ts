@@ -55,8 +55,8 @@ async function conIdentidad(
 ) {
   const definiciones = new Map<Id<"definicionesAtributo">, { clave: string }>();
   for (const atributo of validado.atributos.values()) {
-    const def = await ctx.db.get(atributo.definicionAtributoId);
-    if (def) definiciones.set(atributo.definicionAtributoId, def);
+    const def = atributo.definicion;
+    definiciones.set(atributo.definicionAtributoId, def);
   }
   const opciones = new Map<Id<"opcionesAtributo">, { clave: string }>();
   for (const value of valores)
