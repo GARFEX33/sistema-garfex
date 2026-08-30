@@ -1,11 +1,9 @@
-strict_tdd: false
+strict_tdd: true
 context: |
-  sistema-garfex is a Unclassified software project project.
-  Detected markers: none.
-  No reliable test runner was detected; verify testing manually before enabling strict TDD.
-  Unit tests: none.
-  Integration tests: none.
-  E2E tests: none.
+  sistema-garfex uses Vitest 4.1.11 through pnpm.
+  Unit/domain tests run with Vitest; Convex integration-style tests use convex-test under the same runner.
+  No E2E test layer or command is configured.
+  Typecheck uses the package script pnpm typecheck, which runs tsc --noEmit.
 rules:
   proposal:
     require_problem_statement: true
@@ -16,23 +14,23 @@ rules:
   tasks:
     protect_review_workload: true
   apply:
-    test_command: ""
+    test_command: "pnpm exec vitest run"
   verify:
-    test_command: ""
+    test_command: "pnpm exec vitest run && pnpm typecheck"
 testing:
   detected: "2026-08-28"
   runner:
-    command: ""
-    framework: ""
+    command: "pnpm exec vitest run"
+    framework: "Vitest 4"
   layers:
-    unit: ""
-    integration: ""
+    unit: "Vitest"
+    integration: "convex-test via Vitest"
     e2e: ""
   commands:
     unit:
-      []
+      - "pnpm exec vitest run"
     integration:
-      []
+      - "pnpm exec vitest run"
     e2e:
       []
   coverage:
@@ -43,9 +41,9 @@ quality:
   lint: ""
   lint_commands:
     []
-  typecheck: ""
+  typecheck: "pnpm typecheck (tsc --noEmit)"
   typecheck_commands:
-    []
+    - "pnpm typecheck"
   format: ""
   format_commands:
     []
