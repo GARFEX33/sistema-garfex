@@ -7,6 +7,7 @@ import {
   validarRecurso,
   type CrearRecursoEntrada,
 } from "./validacionRecurso";
+import { registrarAlias } from "./identidadesRecurso";
 
 const valor = v.object({
   atributoRecursoId: v.id("atributosRecurso"),
@@ -21,6 +22,7 @@ const entrada = v.object({
   nombre: v.string(),
   descripcion: v.optional(v.string()),
   valores: v.array(valor),
+  organizacionId: v.optional(v.id("organizaciones")),
 });
 const salidaValor = v.object({
   _id: v.id("valoresAtributoRecurso"),
@@ -40,6 +42,8 @@ const salidaRecurso = v.object({
   descripcion: v.optional(v.string()),
   activo: v.boolean(),
   revision: v.number(),
+  organizacionId: v.optional(v.id("organizaciones")),
+  identidadVersion: v.optional(v.number()),
   valores: v.array(salidaValor),
 });
 const referenciaClase = v.object({
@@ -178,12 +182,9 @@ export const crearRecurso = mutation({
       validado,
       args.valores,
     );
-    const existente = await ctx.db
-      .query("recursos")
-      .withIndex("porIdentificadorTecnico", (q) =>
-        q.eq("identificadorTecnico", identificadorTecnico),
-      )
-      .first();
+    const existente = args.organizacionId === undefined
+      ? await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", (q) => q.eq("identificadorTecnico", identificadorTecnico)).first()
+      : await ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", (q) => q.eq("organizacionId", args.organizacionId).eq("identificadorTecnico", identificadorTecnico)).first();
     if (existente)
       throw new Error("Recurso duplicado por identificador técnico");
     const recursoId = await ctx.db.insert("recursos", {
@@ -194,7 +195,11 @@ export const crearRecurso = mutation({
       descripcion: args.descripcion,
       activo: true,
       revision: 1,
+      organizacionId: args.organizacionId,
+      identidadVersion: args.organizacionId === undefined ? undefined : 1,
     });
+    if (args.organizacionId !== undefined)
+      await registrarAlias(ctx, { organizacionId: args.organizacionId, recursoId, version: 1, clave: identificadorTecnico });
     for (const item of args.valores)
       await ctx.db.insert("valoresAtributoRecurso", {
         recursoId,
@@ -410,12 +415,11 @@ export const actualizarRecurso = mutation({
       validado,
       args.valores,
     );
-    const existente = await ctx.db
-      .query("recursos")
-      .withIndex("porIdentificadorTecnico", (q) =>
-        q.eq("identificadorTecnico", identificadorTecnico),
-      )
-      .first();
+    const existente = actual.organizacionId === undefined
+      ? await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", (q) => q.eq("identificadorTecnico", identificadorTecnico)).first()
+      : await ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", (q) => q.eq("organizacionId", actual.organizacionId).eq("identificadorTecnico", identificadorTecnico)).first();
+    if (actual.organizacionId !== undefined && identificadorTecnico !== actual.identificadorTecnico)
+      throw new Error("No se puede cambiar la identidad de un recurso vinculado a una organización");
     if (existente && existente._id !== actual._id)
       throw new Error("Recurso duplicado por identificador técnico");
     for (const v of await conValores(ctx, actual._id))
@@ -493,12 +497,11 @@ export const reactivarRecurso = mutation({
     if (reglas.some((regla) => !regla.activo))
       throw new Error("Catálogo de reglas inválido");
     const identidad = await conIdentidad(ctx, validado, entradaActual.valores);
-    const existente = await ctx.db
-      .query("recursos")
-      .withIndex("porIdentificadorTecnico", (q) =>
-        q.eq("identificadorTecnico", identidad),
-      )
-      .first();
+    const existente = recurso.organizacionId === undefined
+      ? await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", (q) => q.eq("identificadorTecnico", identidad)).first()
+      : await ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", (q) => q.eq("organizacionId", recurso.organizacionId).eq("identificadorTecnico", identidad)).first();
+    if (recurso.organizacionId !== undefined && identidad !== recurso.identificadorTecnico)
+      throw new Error("No se puede cambiar la identidad de un recurso vinculado a una organización");
     if (existente && existente._id !== recurso._id)
       throw new Error("Recurso duplicado por identificador técnico");
     await ctx.db.patch(recurso._id, {
