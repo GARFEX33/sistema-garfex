@@ -1,6 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../../../convex/_generated/api";
-import { createResourceDataSource } from "./convexClient";
+import { createResourceDataSource, loadProjectEnv } from "./convexClient";
 import {
   buildAttributeDisplayLabel,
   buildCreateResourceArgs,
@@ -23,6 +26,19 @@ const args = {
 } as CreateResourceArgs;
 
 describe("create resource adapter", () => {
+  it("loads project .env files with .env.local precedence", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "garfex-env-"));
+    try {
+      writeFileSync(join(cwd, ".env"), "GARFEX_TEST_SENTINEL=base\n");
+      writeFileSync(join(cwd, ".env.local"), "GARFEX_TEST_SENTINEL=local\nCONVEX_URL=http://127.0.0.1:3210\n");
+      const loaded = loadProjectEnv(cwd);
+      expect(loaded.GARFEX_TEST_SENTINEL).toBe("local");
+      expect(loaded.CONVEX_URL).toBe(process.env.CONVEX_URL ?? "http://127.0.0.1:3210");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("uses the generated references and exact arguments for catalog and creation calls", async () => {
     const query = vi.fn().mockResolvedValue([]);
     const mutation = vi.fn().mockResolvedValue(args);

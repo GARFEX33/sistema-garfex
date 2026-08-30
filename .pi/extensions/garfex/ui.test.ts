@@ -93,6 +93,13 @@ describe("GARFEX menu orchestration", () => {
     expect(showBrowser).toHaveBeenNthCalledWith(2, { kind: "search", text: "bomba" });
   });
 
+  it("routes the visible create option to the create seam", async () => {
+    const select = vi.fn().mockResolvedValueOnce("Catálogo de Recursos").mockResolvedValueOnce("Crear recurso").mockResolvedValueOnce("Volver").mockResolvedValueOnce(undefined);
+    const createResource = vi.fn().mockResolvedValue(undefined);
+    await runGarfexMenus(menuContext(select), vi.fn().mockResolvedValue(undefined), createResource);
+    expect(createResource).toHaveBeenCalledOnce();
+  });
+
   it("does not open the browser for blank or cancelled searches", async () => {
     const showBrowser = vi.fn().mockResolvedValue(undefined);
     const blankSelect = vi.fn()

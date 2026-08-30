@@ -13,7 +13,7 @@ type CreateResource = () => Promise<void>;
 async function openBrowser(ctx: ExtensionContext, query: ResourceQuery): Promise<void> {
   let source: ResourceBrowserDataSource;
   try {
-    source = createResourceDataSource();
+    source = createResourceDataSource(undefined, undefined, ctx.cwd);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Convex no está configurado.";
     source = { list: async () => Promise.reject(new Error(message)), search: async () => Promise.reject(new Error(message)), getDetail: async () => null };
@@ -27,7 +27,7 @@ async function openBrowser(ctx: ExtensionContext, query: ResourceQuery): Promise
 async function openCreator(ctx: ExtensionContext): Promise<void> {
   let source: ResourceCreationDataSource;
   try {
-    source = createResourceDataSource();
+    source = createResourceDataSource(undefined, undefined, ctx.cwd);
   } catch (error) {
     ctx.ui.notify(error instanceof Error ? error.message : "Convex no está configurado.", "error");
     return;

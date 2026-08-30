@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { parseEnv } from "node:util";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import type {
@@ -14,6 +17,23 @@ import type {
 
 export function getConvexUrl(env: Record<string, string | undefined> = process.env): string | undefined {
   return env.GARFEX_CONVEX_URL || env.CONVEX_URL;
+}
+
+function readEnvFile(path: string): Record<string, string | undefined> {
+  try {
+    return parseEnv(readFileSync(path, "utf8"));
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+export function loadProjectEnv(cwd: string): Record<string, string | undefined> {
+  return {
+    ...readEnvFile(resolve(cwd, ".env")),
+    ...readEnvFile(resolve(cwd, ".env.local")),
+    ...process.env,
+  };
 }
 
 export type ResourceRequest =
@@ -35,10 +55,11 @@ type ResourceQueryClient = Pick<ConvexHttpClient, "query" | "mutation">;
 type ResourceQueryClientFactory = (url: string) => ResourceQueryClient;
 
 export function createResourceDataSource(
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> | undefined = undefined,
   createClient: ResourceQueryClientFactory = (url) => new ConvexHttpClient(url, { logger: false }),
+  cwd: string = process.cwd(),
 ): ResourceDataSource {
-  const url = getConvexUrl(env);
+  const url = getConvexUrl(env ?? loadProjectEnv(cwd));
   if (!url) throw new Error("Configura GARFEX_CONVEX_URL (o CONVEX_URL) para conectar con Convex.");
 
   const client = createClient(url);
