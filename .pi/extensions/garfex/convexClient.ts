@@ -1,6 +1,16 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
-import type { ResourceDataSource, ResourceId, ResourceQuery } from "./types";
+import type {
+  AllowedOptionsArgs,
+  ApplicableAttributesArgs,
+  CreateResourceArgs,
+  FamiliesArgs,
+  ResourceDataSource,
+  ResourceId,
+  ResourceQuery,
+  TypesArgs,
+  ValidUnitsArgs,
+} from "./types";
 
 export function getConvexUrl(env: Record<string, string | undefined> = process.env): string | undefined {
   return env.GARFEX_CONVEX_URL || env.CONVEX_URL;
@@ -10,17 +20,18 @@ export type ResourceRequest =
   | { kind: "list"; args: { activo: true } }
   | { kind: "search"; args: { texto: string; activo: true } };
 
+export function resourceRequest(query: { kind: "list" }): Extract<ResourceRequest, { kind: "list" }>;
+export function resourceRequest(query: { kind: "search"; text: string }): Extract<ResourceRequest, { kind: "search" }>;
 export function resourceRequest(query: ResourceQuery): ResourceRequest {
-  return query.kind === "list"
-    ? { kind: "list", args: { activo: true } }
-    : { kind: "search", args: { texto: query.text, activo: true } };
+  if (query.kind === "list") return { kind: "list", args: { activo: true } };
+  return { kind: "search", args: { texto: query.text, activo: true } };
 }
 
 export function detailRequest(resourceId: ResourceId): { recursoId: ResourceId } {
   return { recursoId: resourceId };
 }
 
-type ResourceQueryClient = Pick<ConvexHttpClient, "query">;
+type ResourceQueryClient = Pick<ConvexHttpClient, "query" | "mutation">;
 type ResourceQueryClientFactory = (url: string) => ResourceQueryClient;
 
 export function createResourceDataSource(
@@ -43,6 +54,34 @@ export function createResourceDataSource(
     getDetail: (resourceId) => client.query(
       api.catalogoRecursos.recursos.obtenerDetalleRecurso,
       detailRequest(resourceId),
+    ),
+    consultarClases: () => client.query(
+      api.catalogoRecursos.catalogo.consultarClases,
+      {},
+    ),
+    consultarFamiliasDeClase: (args: FamiliesArgs) => client.query(
+      api.catalogoRecursos.catalogo.consultarFamiliasDeClase,
+      args,
+    ),
+    consultarTiposDeFamilia: (args: TypesArgs) => client.query(
+      api.catalogoRecursos.catalogo.consultarTiposDeFamilia,
+      args,
+    ),
+    consultarUnidadesValidas: (args: ValidUnitsArgs) => client.query(
+      api.catalogoRecursos.catalogo.consultarUnidadesValidas,
+      args,
+    ),
+    consultarAtributosAplicables: (args: ApplicableAttributesArgs) => client.query(
+      api.catalogoRecursos.catalogo.consultarAtributosAplicables,
+      args,
+    ),
+    consultarOpcionesPermitidas: (args: AllowedOptionsArgs) => client.query(
+      api.catalogoRecursos.catalogo.consultarOpcionesPermitidas,
+      args,
+    ),
+    crearRecurso: (args: CreateResourceArgs) => client.mutation(
+      api.catalogoRecursos.recursos.crearRecurso,
+      args,
     ),
   };
 }

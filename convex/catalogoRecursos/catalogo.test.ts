@@ -425,8 +425,15 @@ describe("consultas públicas del catálogo", () => {
       f.definicionColor, f.definicionPresion, f.definicionDisponible, f.definicionNota,
     ]);
     expect(result.find((row) => row.definicionAtributoId === f.definicionPresion)).toMatchObject({
-      id: f.atributoPresionTipo, tipoDato: "NUMERO", aplicabilidad: "REQUIRED", participaIdentidad: true,
+      id: f.atributoPresionTipo,
+      definicionAtributoId: f.definicionPresion,
+      unidadId: f.unidadBase,
+      unidad: { id: f.unidadBase, clave: "UNIDAD_BASE", nombre: "Unidad base", simbolo: "ub" },
+      tipoDato: "NUMERO",
+      aplicabilidad: "REQUIRED",
+      participaIdentidad: true,
     });
+    expect(result.find((row) => row.definicionAtributoId === f.definicionColor)?.unidad).toBeNull();
     expect(result.find((row) => row.definicionAtributoId === f.definicionDisponible)?.tipoDato).toBe("BOOLEANO");
     expect(result.find((row) => row.definicionAtributoId === f.definicionNota)?.tipoDato).toBe("TEXTO");
     expect(result.some((row) => row.id === f.atributoPresionFamilia)).toBe(false);
