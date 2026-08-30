@@ -10,5 +10,5 @@
     "allowJs": true,
     "resolveJsonModule": true
   },
-  "include": ["convex/**/*.ts", "convex/**/*.js", "src/**/*.ts"]
+  "include": ["convex/**/*.ts", "convex/**/*.js", "src/**/*.ts", ".pi/extensions/garfex/**/*.ts"]
 }
