@@ -60,6 +60,17 @@ describe("canonicalización del catálogo publicado", () => {
         expect(canonicalizeCatalog([original])).not.toBe(canonicalizeCatalog([changed]));
       });
 
+      it("preserva el orden semántico de tokens y excluye identidad de almacenamiento", () => {
+        const first = entry("A", "A");
+        first.snapshot.presentacionCanonica = { tipoNombre: "A", separador: "-", tokens: [{ tipo: "TYPE_NAME" }, { tipo: "LITERAL", texto: "x" }] };
+        const second = structuredClone(first);
+        second.snapshot.presentacionCanonica!.tokens.reverse();
+        expect(canonicalizeCatalog([first])).not.toBe(canonicalizeCatalog([second]));
+        const historical = structuredClone(first) as typeof first & { revision?: number; id?: string; creadoEn?: number };
+        historical.revision = 4; historical.id = "storage-id"; historical.creadoEn = 123;
+        expect(canonicalizeCatalog([first])).toBe(canonicalizeCatalog([historical]));
+      });
+
       it("produce el vector SHA-256 conocido", async () => {
     expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
