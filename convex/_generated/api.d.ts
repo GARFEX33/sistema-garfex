@@ -10,6 +10,7 @@
 
 import type * as catalogoAdmin_jerarquia from "../catalogoAdmin/jerarquia.js";
 import type * as catalogoAdmin_lib_backfillMetadatos from "../catalogoAdmin/lib/backfillMetadatos.js";
+import type * as catalogoAdmin_lib_cargarAgregado from "../catalogoAdmin/lib/cargarAgregado.js";
 import type * as catalogoAdmin_lib_errors from "../catalogoAdmin/lib/errors.js";
 import type * as catalogoAdmin_lib_pagination from "../catalogoAdmin/lib/pagination.js";
 import type * as catalogoAdmin_lib_revisions from "../catalogoAdmin/lib/revisions.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "catalogoAdmin/jerarquia": typeof catalogoAdmin_jerarquia;
   "catalogoAdmin/lib/backfillMetadatos": typeof catalogoAdmin_lib_backfillMetadatos;
+  "catalogoAdmin/lib/cargarAgregado": typeof catalogoAdmin_lib_cargarAgregado;
   "catalogoAdmin/lib/errors": typeof catalogoAdmin_lib_errors;
   "catalogoAdmin/lib/pagination": typeof catalogoAdmin_lib_pagination;
   "catalogoAdmin/lib/revisions": typeof catalogoAdmin_lib_revisions;

@@ -203,3 +203,49 @@ describe("lecturas administrativas de clases", () => {
     });
   });
 });
+
+describe("ciclo administrativo de tipos", () => {
+  async function tree(t: ReturnType<typeof convexTest>, familyActive = true, classActive = true, prefix = "A") {
+    return t.run(async ctx => {
+      const clase = await ctx.db.insert("clasesRecurso", { clave: `C${prefix}`, nombre: "Clase", activo: classActive, revision: 1 });
+      const familia = await ctx.db.insert("familiasRecurso", { claseRecursoId: clase, clave: `F${prefix}`, nombre: "Familia", activo: familyActive, revision: 1 });
+      const tipo = await ctx.db.insert("tiposRecurso", { familiaRecursoId: familia, clave: `T${prefix}`, nombre: "Tipo", activo: false, revision: 1 });
+      return { clase, familia, tipo };
+    });
+  }
+
+  it("crea, lista y mantiene inmutable la Familia, incluso bajo otra Familia", async () => {
+    const t = convexTest(schema, modules);
+    const first = await tree(t, true, true, "1");
+    const second = await tree(t, true, true, "2");
+    const created = await t.mutation(api.catalogoAdmin.jerarquia.crearTipo, { familiaRecursoId: first.familia, clave: "T", nombre: " Tipo " });
+    expect(created.item).toMatchObject({ familiaRecursoId: first.familia, revision: 1, aggregateStatus: "NOT_EVALUATED" });
+    await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: created.item.id, expectedRevision: 1, familiaRecursoId: second.familia })).rejects.toMatchObject({ data: { code: "ADMIN_IMMUTABLE_FIELD" } });
+    const page = await t.query(api.catalogoAdmin.jerarquia.listarTipos, { familiaRecursoId: first.familia, modo: "ALL", pageSize: 10, cursor: null });
+    expect(page.items).toHaveLength(2);
+    expect(await t.query(api.catalogoAdmin.jerarquia.obtenerTipo, { tipoRecursoId: created.item.id })).toMatchObject({ effective: false });
+  });
+
+  it("rechaza activación incompleta, prioriza stale/no-op y bloquea recursos activos", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await tree(t);
+    await expect(t.mutation(api.catalogoAdmin.jerarquia.activarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 2 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+    await expect(t.mutation(api.catalogoAdmin.jerarquia.activarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+    expect(await t.query(api.catalogoAdmin.jerarquia.obtenerTipo, { tipoRecursoId: ids.tipo })).toMatchObject({ activo: false, revision: 1 });
+    await t.run(async ctx => {
+      await ctx.db.patch(ids.tipo, { activo: true });
+      const unit = await ctx.db.insert("unidades", { clave: "U", nombre: "U", activo: true, revision: 1 });
+      await ctx.db.insert("recursos", { tipoRecursoId: ids.tipo, unidadId: unit, identificadorTecnico: "R", nombre: "R", activo: true, revision: 1 });
+    });
+    await expect(t.mutation(api.catalogoAdmin.jerarquia.desactivarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED" } });
+  });
+
+  it("activa el padre atómicamente cuando uno de sus tipos está incompleto", async () => {
+    const t = convexTest(schema, modules);
+    const first = await tree(t, false);
+    const second = await tree(t, false);
+    await t.run(async ctx => { await ctx.db.patch(first.tipo, { activo: true }); await ctx.db.patch(second.tipo, { activo: true }); await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId: first.tipo, tokens: [], separador: "", activo: true, revision: 1 }); });
+    await expect(t.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: first.familia, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+    expect(await t.query(api.catalogoAdmin.jerarquia.obtenerFamilia, { familiaRecursoId: first.familia })).toMatchObject({ activo: false, revision: 1 });
+  });
+});
