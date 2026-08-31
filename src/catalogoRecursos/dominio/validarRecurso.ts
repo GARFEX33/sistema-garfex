@@ -1,5 +1,6 @@
-import { aplicabilidadBase, resolverAsignaciones, type AsignacionEfectiva } from "./asignacionesEfectivas";
+import { aplicabilidadBase } from "./asignacionesEfectivas";
 import { evaluarReglasCondicionales } from "./reglasCondicionales";
+import { resolverCatalogoEfectivo } from "./catalogoEfectivo";
 import type {
   Aplicabilidad, AtributoConDefinicion, CatalogoSnapshot, EntradaRecurso, FalloValidacion,
   IdDominio, ResultadoDominio, ValorEntrada,
@@ -7,23 +8,17 @@ import type {
 
 export function validarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecurso): ResultadoDominio {
   const { clase, familia, tipo, unidad } = snapshot;
-  if (!clase?.activo || !familia?.activo || !tipo?.activo || !unidad?.activo)
-    return fallo("JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA");
-  if (familia.claseRecursoId !== clase.id || tipo.familiaRecursoId !== familia.id)
-    return fallo("JERARQUIA_INVALIDA");
+  const resolved = resolverCatalogoEfectivo(snapshot);
+  if (!resolved.effective || !clase || !familia || !tipo || !unidad?.activo)
+    return fallo(resolved.effectiveReasons.includes("HIERARCHY_INVALID") ? "JERARQUIA_INVALIDA" : "JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA");
+  if (!resolved.policies.some(policy => policy.unidadId === unidad.id && policy.activo)) return fallo("UNIDAD_NO_PERMITIDA");
 
-  const familiaPolicy = snapshot.politicas.find(p => p.tipoRecursoId === undefined && p.unidadId === unidad.id && p.activo);
-  const tipoPolicy = snapshot.politicas.find(p => p.tipoRecursoId === tipo.id && p.unidadId === unidad.id && p.activo);
-  if (!familiaPolicy && !tipoPolicy) return fallo("UNIDAD_NO_PERMITIDA");
-
-  const rows = snapshot.atributos.map(registro => ({ ...registro, familiaId: familia.id, tipoId: registro.tipoRecursoId, definicionId: registro.definicionAtributoId, definicionClave: registro.definicion?.clave ?? registro.definicionAtributoId, orden: (registro as AtributoConDefinicion & { orden?: number }).orden ?? 0 } as AtributoConDefinicion & AsignacionEfectiva));
-  const resolution = resolverAsignaciones({ familia: rows.filter(row => row.tipoId === undefined), tipo: rows.filter(row => row.tipoId === tipo.id), familiaId: familia.id, tipoId: tipo.id });
+  const originalById = new Map(snapshot.atributos.map(row => [row.id, row]));
   const aplicables = new Map<IdDominio, AtributoConDefinicion & { definicion: NonNullable<AtributoConDefinicion["definicion"]> }>();
-  const originalById = new Map(rows.map(row => [row.id, row]));
-  for (const selected of resolution.selected) {
-    const atributo = originalById.get(selected.id)!;
-    const definicion = atributo.definicion;
-    if (atributo.activo && definicion?.activo) aplicables.set(atributo.definicionAtributoId, { ...atributo, definicion });
+  for (const selected of resolved.assignments) {
+    const atributo = originalById.get(selected.id);
+    const definicion = atributo?.definicion;
+    if (atributo && atributo.activo && definicion?.activo) aplicables.set(atributo.definicionAtributoId, { ...atributo, definicion });
   }
 
   const valores = new Map<IdDominio, ValorEntrada>(entrada.valores.map(valor => [valor.atributoRecursoId, valor]));
@@ -34,8 +29,7 @@ export function validarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecur
   const aplicabilidadBasePorId = new Map<IdDominio, Aplicabilidad>(
     [...aplicables.values()].map(atributo => [atributo.id, aplicabilidadBase(atributo.aplicabilidad)]),
   );
-  const reglasEfectivas = snapshot.reglas.filter(regla => regla.activo && (regla.opcionCondicionId === undefined || snapshot.opciones.some(option => option.id === regla.opcionCondicionId && option.activo)));
-  const aplicabilidad = evaluarReglasCondicionales(reglasEfectivas, valores, aplicabilidadBasePorId);
+  const aplicabilidad = evaluarReglasCondicionales(resolved.rules, valores, aplicabilidadBasePorId);
 
   for (const [id, atributo] of aplicables) {
     const estado = aplicabilidad.get(atributo.id);

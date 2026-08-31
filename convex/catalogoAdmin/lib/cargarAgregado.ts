@@ -6,6 +6,7 @@ import { resolverAsignaciones, validarCompletitudAsignaciones } from "../../../s
 import { validarReglasCondicionales, type ReglaCondicional } from "../../../src/catalogoRecursos/dominio/reglasCondicionales";
 import { validarEstructuraPresentacion } from "../../../src/catalogoRecursos/dominio/presentacionCanonica";
 import { politicasCompatibilidadEnConflicto } from "../../../src/catalogoRecursos/dominio/compatibilidadOpciones";
+import { resolverJerarquiaEfectiva } from "../../../src/catalogoRecursos/dominio/catalogoEfectivo";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -33,11 +34,17 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const family = type ? await ctx.db.get(type.familiaRecursoId) : null;
   const clase = family ? await ctx.db.get(family.claseRecursoId) : null;
   if (!type || !family || !clase || type.revision < 1 || family.revision < 1 || clase.revision < 1) return { effective: false, status: "INVALID", violations: [{ code: "HIERARCHY_REFERENCE_INVALID" }] };
-  const hierarchyValid = type.familiaRecursoId === family._id && family.claseRecursoId === clase._id;
-  const typeActive = overrides.typeActive ?? type.activo;
-  const familyActive = overrides.familyActiveId === family._id ? true : family.activo;
-  const classActive = overrides.classActiveId === clase._id ? true : clase.activo;
-  const effective = hierarchyValid && typeActive && familyActive && classActive;
+  const hierarchy = resolverJerarquiaEfectiva({
+    classId: String(clase._id), familyId: String(family._id), typeId: String(type._id),
+    familyClassId: String(family.claseRecursoId), typeFamilyId: String(type.familiaRecursoId),
+    classActive: clase.activo, familyActive: family.activo, typeActive: type.activo,
+    overrides: {
+      classActive: overrides.classActiveId === clase._id ? true : undefined,
+      familyActive: overrides.familyActiveId === family._id ? true : undefined,
+      typeActive: overrides.typeActive,
+    },
+  });
+  const effective = hierarchy.effective;
   if (!effective) return { effective: false, status: "NOT_EVALUATED", violations: [] };
 
   const familyPolicies = await ctx.db.query("politicasUnidadRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", family._id)).take(MAX_AGGREGATE_ROWS + 1);

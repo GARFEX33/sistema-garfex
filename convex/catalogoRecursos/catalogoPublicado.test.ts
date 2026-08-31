@@ -71,6 +71,18 @@ describe("catálogo publicado", () => {
     expect((await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: second.revisionId, tipoClave: "TEST_CABLE" }))?.snapshot.tipo.nombre).toBe("Etiqueta nueva");
   });
 
+  it("omite la configuración activa bajo una familia inactiva sin bloquear publicación", async () => {
+    const t = convexTest(schema, modules); const seeded = await crearFixture(t);
+    const org = await t.mutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "ORG_A", nombre: "A" });
+    await t.run(async ctx => {
+      await ctx.db.patch(seeded.familiaRecursoId, { activo: false });
+      const policy = await ctx.db.query("politicasCompatibilidadOpciones").withIndex("porTipo", q => q.eq("tipoRecursoId", seeded.tipoRecursoId)).first();
+      if (policy) await ctx.db.patch(policy._id, { activo: true });
+    });
+    const published = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    expect(await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: published.revisionId, tipoClave: "TEST_CABLE" })).toBeNull();
+  });
+
   it("rechaza unidad natural ausente o con múltiples principales", async () => {
     const t = convexTest(schema, modules);
     const seeded = await crearFixture(t);
