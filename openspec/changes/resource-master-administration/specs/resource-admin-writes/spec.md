@@ -2,137 +2,128 @@
 
 ## Purpose
 
-Define atomic, revision-guarded Resource creation, updates, identity rules, and lifecycle changes against the current effective catalog.
+Define thin, revision-guarded Resource mutations that rely on Convex atomic transactions and optimistic concurrency control while retaining GARFEX aggregate, identity, ownership, and lifecycle rules.
 
 ## Requirements
 
-### Requirement: Atomic validated Resource creation
+### Requirement: Thin atomic Resource creation
 
-Creation MUST validate the complete proposed Resource with the existing Resource validator and completed effective-catalog resolver. It MUST require an effective Class → Family → Type chain, a permitted active Unit, valid assignments, rules, definitions and options, valid values, and an existing active organization when organization ownership is supplied.
+Creation MUST be one Convex mutation. It MUST reuse the authoritative Resource validator and effective-catalog resolver to validate the complete candidate, including effective Class → Family → Type ownership, permitted active Unit, assignments, rules, definitions, options, values, and active organization when organization ownership is supplied.
 
-The system MUST derive `identificadorTecnico`; callers MUST NOT write it directly. Duplicate identity checks MUST use bounded indexes, include active and inactive Resources, and use global scope for global Resources or organization scope for organization-owned Resources. Creation MUST atomically insert the Resource at revision 1, all values, and any versioned organization alias. Any validation, duplicate, alias, or value-write failure MUST leave all Resource, value, and alias data unchanged.
+The mutation MUST derive `identificadorTecnico`; callers MUST NOT write it directly. Duplicate checks MUST be bounded, ownership-scoped, and inclusive of inactive Resources. Organization alias checks MUST use the existing indexed alias boundary.
+
+After all GARFEX checks pass, the mutation MUST insert Resource revision 1, values, and any organization alias in the same Convex transaction. Convex atomicity and OCC MUST be the rollback and race authority. The implementation MUST NOT add a transaction coordinator, compensating writes, application lock, custom retry protocol, or cache invalidation layer.
 
 #### Scenario: Duplicate inactive identity is rejected
 
-- GIVEN an inactive Resource already has a derived identity in the applicable global or organization scope
-- WHEN creation derives the same identity in that scope
-- THEN creation fails with `ADMIN_DUPLICATE_KEY` or `ADMIN_CONFLICT`
-- AND no Resource, value, or alias row is added.
+- GIVEN an inactive Resource owns the same derived identity in the applicable scope
+- WHEN creation is attempted
+- THEN it fails with `ADMIN_DUPLICATE_KEY` or `ADMIN_CONFLICT`
+- AND final Resource, value, and alias state is unchanged.
 
-#### Scenario: Alias collision rolls back creation
+#### Scenario: Alias or value failure leaves no partial aggregate
 
-- GIVEN an organization alias already conflicts with the alias required by a valid proposed Resource
-- WHEN creation is requested
-- THEN the command fails with `ADMIN_DUPLICATE_KEY` or `ADMIN_CONFLICT`
-- AND neither the Resource nor any of its values is stored.
+- GIVEN a valid candidate encounters an alias conflict or value-write failure
+- WHEN the mutation fails
+- THEN Convex commits none of the mutation writes
+- AND final Resource, value, and alias state equals the pre-command state.
 
-#### Scenario: Failed atomic create leaves no partial aggregate
+#### Scenario: Concurrent equivalent creates have one valid outcome
 
-- GIVEN Resource validation succeeds but an alias or value-row write fails
-- WHEN creation executes
-- THEN the command fails with a structured `ADMIN_*` error
-- AND no Resource, value, or alias change is committed.
+- GIVEN equivalent creates race for one scoped identity
+- WHEN Convex resolves transaction conflicts through OCC
+- THEN at most one aggregate is committed for that identity
+- AND the other observable outcome is a structured duplicate/conflict failure
+- AND no custom lock or retry state is stored.
 
 ### Requirement: Revision-first atomic Resource update
 
-Every update MUST require `expectedRevision` and compare it with the stored revision first, before no-op detection, blockers, immutable-field checks, duplicate checks, or aggregate validation. A stale revision MUST fail with `ADMIN_STALE_REVISION` and change nothing.
+Update MUST be one Convex mutation and MUST require `expectedRevision`. It MUST compare the stored revision before no-op detection and GARFEX business validation. A stale revision MUST return `ADMIN_STALE_REVISION` and change nothing.
 
-After the revision check, a current update MUST validate immutable fields, construct and validate the complete proposed effective aggregate with the existing Resource validator and current effective-catalog resolver, whether the stored Resource is active or inactive, and only then decide whether the candidate is a semantic no-op. An invalid aggregate MUST NOT succeed as `UNCHANGED`. It MUST atomically replace values, apply mutable Resource fields, and increment revision exactly once when a material change succeeds. Duplicate identity checks MUST remain bounded, ownership-scoped, and inclusive of inactive Resources. A failed update MUST preserve the prior Resource, revision, values, and aliases.
+After the revision check, update MUST:
 
-#### Scenario: Stale revision wins before a no-op
+1. enforce immutable classification, organization ownership, direct technical identity, and lifecycle boundaries;
+2. bounded-load stored values using the single authoritative `MAX_RESOURCE_VALUES` definition;
+3. construct the complete proposed aggregate;
+4. validate current effective catalog and Resource rules;
+5. decide semantic no-op only after the candidate is valid;
+6. check any changed derived identity through bounded ownership-aware indexes including inactive rows; and
+7. atomically replace values and patch mutable Resource fields with one revision increment when material.
 
-- GIVEN a Resource is already in the requested data state at revision 9
-- WHEN update supplies `expectedRevision` 8
+Convex transaction atomicity MUST preserve prior state on any failure. Tests MUST assert final state, not implement or depend on compensating behavior or internal retry choreography.
+
+#### Scenario: Stale revision wins before no-op
+
+- GIVEN stored state already equals the proposal at revision 9
+- WHEN update supplies revision 8
 - THEN it fails with `ADMIN_STALE_REVISION`
-- AND no validation or no-op success supersedes the stale failure
-- AND stored data remains unchanged.
+- AND final state remains unchanged.
 
-#### Scenario: Failed atomic update preserves the old aggregate
+#### Scenario: Invalid candidate cannot become unchanged
 
-- GIVEN a current update proposes replacement values
-- WHEN validation, duplicate checking, or a value write fails
-- THEN the command returns a structured `ADMIN_*` failure
-- AND the old Resource fields, revision, values, and aliases remain unchanged.
+- GIVEN the stored Resource is now invalid against current effective catalog state
+- WHEN update submits semantically equal mutable values with the current revision
+- THEN validation fails with a structured `ADMIN_*` code
+- AND `UNCHANGED` is not returned.
 
-#### Scenario: Update rejects an ineffective catalog
+#### Scenario: Failed replacement preserves final state
 
-- GIVEN an inactive Resource is stored under a catalog configuration that is now ineffective
-- WHEN an update is requested with its current revision
-- THEN the update fails with `ADMIN_INVALID_STATE`, `ADMIN_INVALID_REFERENCE`, or `ADMIN_AGGREGATE_INCOMPLETE` and coded context
-- AND the historical Resource remains unchanged and inspectable.
+- GIVEN update proposes replacement values
+- WHEN validation, duplicate checking, or a write fails
+- THEN stored fields, revision, values, and aliases equal their pre-command state.
 
-### Requirement: Classification, ownership, identity, and active state boundaries
+### Requirement: GARFEX immutable and identity boundaries
 
-Organization ownership and classification MUST be immutable after creation. An update MUST NOT move a Resource between global and organization scope, between organizations, or to another Type or resolved Class/Family. `identificadorTecnico` MUST remain derived. For an organization-owned Resource, identity-participating value changes MUST be rejected when they would change the derived identity. Historical alias rows MUST NOT be deleted or transferred by normal updates.
+Organization ownership and classification MUST remain immutable after creation. Update MUST NOT move a Resource between global and organization scope, between organizations, or to another Type or resolved Class/Family. Technical identity MUST remain derived. Organization-owned identity-participating values MUST NOT change the stored derived identity. Historical aliases MUST NOT be deleted, transferred, or recreated by normal update.
 
-Name, description, Unit, and values MAY change only through the guarded update when the complete candidate remains valid. Active state MUST change only through lifecycle commands and MUST NOT be accepted by general update.
+Name, description, Unit, and values MAY change only when the complete candidate is valid. Active state MUST change only through lifecycle mutations.
 
-#### Scenario: Immutable-field attempt is rejected
+#### Scenario: Immutable change is rejected
 
 - GIVEN an existing Resource
-- WHEN update attempts to change its organization ownership, Type or resolved classification, or directly supplied technical identity
-- THEN it fails with `ADMIN_IMMUTABLE_FIELD`
-- AND all Resource, value, and alias data remains unchanged.
+- WHEN update attempts classification, ownership, direct identity, or active-state change
+- THEN it fails with `ADMIN_IMMUTABLE_FIELD` or the established structured conflict code
+- AND final aggregate and aliases are unchanged.
 
-#### Scenario: Organization-owned derived identity cannot drift
+### Requirement: Thin revision-guarded lifecycle mutations
 
-- GIVEN an organization-owned Resource has a versioned alias
-- WHEN replacement values would change its derived technical identity
-- THEN update fails with `ADMIN_IMMUTABLE_FIELD` or `ADMIN_CONFLICT`
-- AND no alias is deleted, transferred, or added.
+Activation and deactivation MUST each be one Convex mutation. Both MUST compare `expectedRevision` before same-state handling. A current same-state command MUST return `UNCHANGED` without incrementing revision; a stale same-state command MUST fail with `ADMIN_STALE_REVISION`.
 
-#### Scenario: General update cannot change lifecycle state
+Activation MUST bounded-load the stored aggregate, validate current effective catalog and Resource rules, re-derive/check identity where required, and patch active state plus one revision increment. Deactivation MUST patch only active state and one revision increment. It MUST preserve values, aliases, identity, classification, ownership, catalog records, publication revisions, and snapshots.
 
-- GIVEN a Resource is active
-- WHEN general update attempts to set it inactive
-- THEN the command fails with a structured administrative error
-- AND lifecycle state and revision remain unchanged.
+No hard delete, custom transaction layer, compensating write, or cache invalidation is allowed.
 
-### Requirement: Revision-guarded Resource lifecycle
-
-Activation and deactivation MUST require `expectedRevision` and validate it before same-state handling or business validation. After a successful revision check, a same-state request MUST return `UNCHANGED` and leave the revision unchanged. A state change MUST increment revision exactly once.
-
-Activation MUST validate the complete stored Resource against the current effective catalog and existing Resource rules. Failed activation MUST leave the Resource inactive. Deactivation MUST preserve identity, values, aliases, classification, and ownership; it MUST NOT cascade to catalog configuration or value lifecycle state. Resource administration MUST expose no hard-delete operation.
-
-#### Scenario: Same-state lifecycle is idempotent only for a current revision
+#### Scenario: Current same-state lifecycle is unchanged
 
 - GIVEN an active Resource at revision 5
-- WHEN activation is requested with `expectedRevision` 5
-- THEN the command returns `UNCHANGED`
-- AND the Resource remains at revision 5 with no dependent changes.
+- WHEN activation uses revision 5
+- THEN it returns `UNCHANGED`
+- AND final revision and aggregate data remain unchanged.
 
-#### Scenario: Stale same-state lifecycle fails first
+#### Scenario: Failed activation remains inactive
 
-- GIVEN an inactive Resource at revision 5
-- WHEN deactivation is requested with `expectedRevision` 4
-- THEN it fails with `ADMIN_STALE_REVISION`
-- AND it is not reported as `UNCHANGED`.
-
-#### Scenario: Activation rejects an inactive catalog
-
-- GIVEN an inactive Resource references a currently inactive or invalid effective catalog aggregate
-- WHEN activation is requested with the current revision
-- THEN it fails with `ADMIN_INVALID_STATE`, `ADMIN_INVALID_REFERENCE`, or `ADMIN_AGGREGATE_INCOMPLETE` and coded violations
-- AND the Resource remains inactive and unchanged.
+- GIVEN an inactive Resource is invalid against current effective catalog state
+- WHEN activation uses the current revision
+- THEN it fails with a structured `ADMIN_*` error
+- AND final Resource state remains inactive with unchanged revision, values, and aliases.
 
 #### Scenario: Deactivation does not cascade
 
-- GIVEN an active Resource has stored values and aliases
-- WHEN deactivation succeeds with the current revision
-- THEN only the Resource lifecycle state and revision change
-- AND its values, aliases, catalog records, and published data remain unchanged.
+- GIVEN an active Resource has values and aliases
+- WHEN deactivation succeeds
+- THEN only active state and revision change
+- AND all dependent Resource, catalog, and publication data remains unchanged.
 
-#### Scenario: Missing Resource command fails structurally
+## Verification rules
 
-- GIVEN a well-formed Resource ID identifies no stored Resource
-- WHEN update, activation, or deactivation is requested
-- THEN the command fails with `ADMIN_NOT_FOUND`
-- AND no data is changed.
+- Failure tests MUST compare final persisted Resource/value/alias state with the pre-command state.
+- OCC tests MUST assert externally visible uniqueness and revision outcomes; they MUST NOT couple to Convex retry counts.
+- Revision-first, immutable-field, effective-catalog, identity, alias, and lifecycle rules remain explicit GARFEX behavior.
+- No mutation may introduce a cache, lock table, transaction coordinator, compensating action, or manual retry protocol.
 
 ## Acceptance Criteria
 
-- Create and update reuse authoritative Resource and effective-catalog validation and commit complete aggregates atomically.
-- Derived identities, inactive duplicates, ownership scopes, and organization aliases are checked through bounded atomic behavior.
-- Revision checks precede no-op and validation behavior, and material changes increment revision exactly once.
-- Classification and ownership are immutable, while active state is lifecycle-controlled.
-- Lifecycle commands are current-revision idempotent, activation validates current effectiveness, and deactivation never deletes or cascades.
+- Create, update, activate, and deactivate remain thin Convex mutations around GARFEX business rules.
+- Convex atomicity and OCC are used directly for commit, rollback, and race behavior.
+- Every failure leaves the expected final database state without custom rollback code.
+- Revision and domain rules remain fully covered.

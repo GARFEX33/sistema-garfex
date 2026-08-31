@@ -1,177 +1,141 @@
-# Exploration: resource-master-administration
+# Exploration: native-first Resource master administration
 
 ## Executive finding
 
-The completed catalog administration stack provides the right additive boundary, structured error vocabulary, revision helpers, cursor envelopes, effective catalog resolver, aggregate validation, static Convex contract, and stacked-to-main delivery model. Resource administration should be a focused extension of that stack, not a replacement of `convex/catalogoRecursos/recursos.ts`.
+Resource administration should use Convex's native paginated query contract end to end. The current plan over-engineered ordinary list and search behavior by importing the completed catalog-admin cursor envelope, adding Resource-specific sort metadata, multiplying indexes for a Unit filter without a demonstrated UI need, and proposing query-plan/order-version machinery that Convex already supplies.
 
-The existing Resource storage model is already sufficient for the core aggregate: `recursos` stores `tipoRecursoId`, `unidadId`, technical identity, display fields, lifecycle, revision, and optional `organizacionId`; `valoresAtributoRecurso` stores the value rows; `identidadesRecurso` stores organization/version aliases. The main gaps are administrative projections, bounded reads, full-text pagination, structured errors, and safe integration with effective catalog state.
+The correction is additive and artifact-scoped: preserve the completed W0, WU1, WU2a, and WU2b implementation evidence, then add a correction unit before WU3. That unit removes the unnecessary Resource additions from WU1 while retaining only `adminScopeKey` and the equality-prefix indexes needed for lifecycle state, Type, and organization scope.
 
-Repository structure was checked for `.codegraph/`; no CodeGraph MCP/CLI surface was available in this executor, so the structural evidence below comes from targeted repository reads after that check.
+Existing custom pagination in catalog administration is outside this Resource rescope. This change neither authorizes nor requires rewriting catalog-admin pagination, cursors, caches, or consumers.
 
-## Repository evidence
+## Audit method and evidence
 
-### Existing public Resource API
+The proposal, specifications, design, tasks, apply receipts, and targeted Resource implementation seams were inspected. Repository structure had already been checked for `.codegraph/`; no CodeGraph MCP/CLI surface is available in this executor, so targeted reads were used rather than broad filesystem exploration.
 
-`convex/catalogoRecursos/recursos.ts` exports these public functions, whose names, arguments, and return validators must remain compatible:
+Relevant committed state:
 
-- `crearRecurso`
-- `obtenerRecurso`
-- `obtenerDetalleRecurso`
-- `listarRecursos`
-- `buscarRecursos`
-- `actualizarRecurso`
-- `desactivarRecurso`
-- `reactivarRecurso`
+- `recursos` already has `porIdentificadorTecnico`, `porActivo`, `porTipo`, and `porTipoYActivo` indexes.
+- WU1 added optional `adminSortId`, optional `adminScopeKey`, sixteen `adminPor*` indexes, Unit as a search filter, and a Resource branch in the generic metadata backfill.
+- The native index order is stable and cursor-compatible without a Resource `adminSortId`; ordinary list order may be documented as the selected Convex index order rather than a product sort promise.
+- The Resource search index already searches `nombre`; the native search query can apply equality filters and call `.paginate()` directly.
+- WU2a defines `MAX_RESOURCE_VALUES` once in `resourceValidators.ts`, and the bounded detail loader imports it. No duplicate production constant currently exists, so a separate consolidation unit is unnecessary. Future Resource readers and mutations must import that existing constant rather than redefine it.
+- WU2a/WU2b already provide value-free projections, bounded detail contracts, diagnostics, and structured error mapping. Their completed evidence remains valid and must not be reopened merely because read pagination is simplified.
 
-The public output `salidaRecurso` includes stored resource fields plus all value rows. `obtenerDetalleRecurso` instead joins Class, Family, Type, Unit, attribute definitions, options, and definition Units, then sorts attributes by configured order. Existing tests explicitly protect identity derivation, value persistence, historical inactive detail, atomic replacement, lifecycle behavior, and current error text. The new surface must therefore be additive under `convex/catalogoAdmin/recursos.ts` (or a similarly focused module), with no rename, removal, or return-shape change to the public functions.
+## Native-first decision
 
-### Resource validation and identity
+### Mandatory read contract
 
-`convex/catalogoRecursos/validacionRecurso.ts` loads the hierarchy, unit policies, assignments, rules, definitions, and options, then delegates business validation to pure `src/catalogoRecursos/dominio/validarRecurso.ts`. The pure validator already enforces hierarchy/effective catalog state, permitted Units, duplicate attributes, applicability, required/forbidden values, finite numbers, data types, and option ownership/activity.
+Resource list and search queries will:
 
-`src/catalogoRecursos/dominio/identidadRecurso.ts` derives the deterministic `v1|Class|Family|Type|...` identity from classification keys and identity-participating values. It does not use the visible name. Option values contribute the option key; text is NFC-normalized, trimmed, whitespace-collapsed, and uppercased. Existing resource tests prove that changing a name does not change identity while changing an identity value does.
+1. declare `paginationOpts: paginationOptsValidator` in their arguments;
+2. return Convex's native `PaginationResult<ResourceSummary>` shape, validated with the installed Convex pagination result validator where a registered return validator is required;
+3. execute one indexed query ending in `.paginate(args.paginationOpts)`;
+4. expose generated query references directly to React `usePaginatedQuery`; and
+5. rely on Convex reactivity and native page accumulation instead of implementing a Resource cache or manual page accumulator.
 
-The current Convex adapter computes identity after validation and checks uniqueness through `recursos.porIdentificadorTecnico` for global resources or `porOrganizacionYIdentificadorTecnico` for organization-owned resources. Organization-owned updates reject a changed technical identity. `identidadesRecurso` registers an organization/version alias and rejects alias collisions. These facts make aliases and ownership part of the administrative safety boundary, even though the public Resource result does not expose aliases.
+The Resource surface will not introduce:
 
-### Schema and indexes
+- `AdminPage`;
+- a cursor envelope or cursor hash;
+- cursor/query-plan/order-version tokens;
+- manual page accumulation;
+- a Resource-specific cache; or
+- a custom pagination adapter for React.
 
-Current `recursos` indexes are:
+Native continuation cursors are opaque Convex values. Query arguments other than `paginationOpts` remain ordinary generated arguments, so `usePaginatedQuery` resets and reacts according to Convex's native behavior when text or equality filters change.
 
-- `porIdentificadorTecnico`
-- `porOrganizacionYIdentificadorTecnico`
-- `porTipo`
-- `porActivo`
-- `porTipoYActivo`
-- `porUnidad`
-- search index `buscar`, searching `nombre` and filtering by `tipoRecursoId` and `activo`
+### Essential filters only
 
-`valoresAtributoRecurso` has `porRecurso`, `porAtributo`, and `porRecursoYAtributo`. `identidadesRecurso` has `porOrganizacionVersionClave` and `porRecurso`.
+Supported Resource list/search filters are:
 
-The existing search index proves that full-text retrieval is already an intended Convex capability. For summary list pagination, use the documented indexed ordering and compatibility-safe metadata only where required by that ordinary-list plan; do not add a required field to populated tables. For search, use Convex 1.45.0 native indexed relevance traversal, bind query text, filters, search-order version, and the native cursor in the completed opaque cursor envelope, and prove unchanged-data traversal before depending on the endpoint. Do not claim that relevance ordering is lexical ordering; specify the native search order explicitly. If the traversal proof fails, stop and revise the design/specification explicitly rather than collecting, sorting, or silently falling back.
+- lifecycle state: `ALL`, `ACTIVE`, or `INACTIVE`;
+- `tipoRecursoId`; and
+- organization scope: all scopes, global only, or one organization.
 
-### Effective catalog integration
+Unit filtering is excluded. It may be proposed later only with a demonstrated UI requirement and an explicit index/query design.
 
-The completed stack's `src/catalogoRecursos/dominio/catalogoEfectivo.ts` is the single hierarchy/effective-state resolver. `convex/catalogoAdmin/lib/cargarAgregado.ts` loads bounded indexed configuration and resolves units, assignment precedence, rules, presentation, compatibility, and aggregate status. `validacionAgregado.ts` supplies coded aggregate violations, and completed admin mutations use `ConvexError` with the `ADMIN_*` contract from `convex/catalogoAdmin/lib/errors.ts` and `validators.ts`.
+`adminScopeKey` remains the only Resource-specific derived metadata needed for efficient global-versus-organization equality filtering:
 
-Resource admin create/update/activate must reuse `validarRecurso` and the effective resolver rather than duplicate catalog rules. A resource can remain stored and readable when its Class/Family/Type or configuration later becomes inactive; it must not be newly created, updated into, or reactivated against an invalid/inactive effective catalog. A direct admin detail should annotate stored classification/effective state and retain values for repair/history instead of throwing merely because the current catalog is inert. This matches the completed stack's stored-but-inert draft and dirty-data decisions.
+- global Resource: `GLOBAL`;
+- organization Resource: `ORG:<organizacionId>`.
 
-Publication remains explicit and immutable. Resource admin writes should not auto-publish, mutate revisions, or modify snapshots. Existing publication integration sees only effective catalog configuration, not administrative Resource summaries.
+### Equality-prefix index audit
 
-## Recommended bounded architecture
+Existing indexes cover all combinations that omit scope. Two Resource-specific indexes cover every combination that includes scope:
 
-### Public module and contracts
+| Filters | Index source |
+|---|---|
+| none | existing `porIdentificadorTecnico` |
+| lifecycle | existing `porActivo` |
+| Type | existing `porTipo` |
+| lifecycle + Type | existing `porTipoYActivo` |
+| scope | new `[adminScopeKey, tipoRecursoId, activo]` index, using the scope prefix |
+| scope + Type | same new index, using scope + Type prefix |
+| scope + Type + lifecycle | same new index, using all three equality fields |
+| scope + lifecycle | new `[adminScopeKey, activo]` index |
 
-Add `convex/catalogoAdmin/recursos.ts`, using the completed validators, pagination, revisions, and error helpers:
+The exact implementation names may follow repository naming conventions, but the field order and count must match this equality-prefix proof. No arbitrary target index count is allowed. In the audited schema this means two dedicated Resource list indexes, plus the four existing indexes above.
 
-1. `listarRecursosResumen`: paginated summaries, with lifecycle mode and bounded filters for Type, Unit, and organization ownership. Summary fields should be enough for a grid: Resource ID, technical identity, name, Type reference, Unit reference, organization reference when present, active state, revision, and effective/inert classification status. It must not load values.
-2. `buscarRecursosResumen`: paginated full-text summaries over `nombre` (and only additional indexed search fields if evidence justifies schema evolution), with the same lifecycle/Type/organization filters. Search text and all filters bind the opaque cursor.
-3. `obtenerDetalleRecurso`: direct ID read with classification references, effective-state annotations, assignments/rules/presentation/compatibility diagnostics as needed by the admin form, and all stored values. This is a new administrative function name; it must not replace the existing public detail function.
-4. `crearRecurso`, `actualizarRecurso`, `activarRecurso`, and `desactivarRecurso` under the admin namespace, returning the completed `CREATED` / `UPDATED` / `UNCHANGED` result shapes and structured errors.
+Search needs one native search index with equality filter fields `tipoRecursoId`, `activo`, and `adminScopeKey`. `unidadId` is removed from that search filter list.
 
-The administrative detail must use one indexed `valoresAtributoRecurso` read and a bounded guard (`MAX_RESOURCE_VALUES + 1`) rather than an unbounded `.collect()`. If the product requires resources above the limit, return a coded bounded-state error rather than silently truncating values. Summary and search endpoints must never call the value loader.
+### WU1 correction boundary
 
-### Create/update transaction flow
+WU1 remains historically complete. A new pending correction unit before WU3 will:
 
-Use one Convex mutation transaction:
+- remove Resource `adminSortId` schema/write/projection/backfill behavior when no other non-Resource contract depends on it;
+- replace the sixteen Resource `adminPor*` indexes with the equality-prefix-minimal scope indexes above;
+- remove Unit from Resource search filters;
+- reduce the Resource branch of the existing generic metadata backfill to idempotent `adminScopeKey` repair only;
+- preserve pre-existing catalog-admin backfill plans and behavior outside the appended Resource branch;
+- update focused schema/backfill/legacy tests; and
+- regenerate declarations only through Convex codegen during implementation.
 
-1. Validate intrinsic arguments and normalize mutable display text.
-2. Resolve the supplied Class → Family → Type ownership and effective catalog snapshot.
-3. Run the existing server-side resource validator, including Unit, assignment, rule, and option checks.
-4. Compute the deterministic technical identity through the existing identity domain function.
-5. Check duplicate identity across active and inactive resources in the correct ownership scope.
-6. On create, insert Resource revision 1 and all value rows atomically, then create the organization alias when applicable.
-7. On update, load by ID, compare `expectedRevision` first, verify immutable fields, construct and validate the complete proposed effective aggregate, decide semantic no-op only after that validation, then replace value rows atomically when material, patch the Resource once with revision plus one, and maintain aliases without deleting historical identity rows.
+Already stored optional `adminSortId` values do not require destructive cleanup. They may remain inert after the field/index/write dependency is removed, subject to normal Convex schema rollout safety.
 
-Any validation, duplicate, alias, or value-row failure must roll back the entire mutation. No hard-delete command is introduced.
+## Read data flows
 
-### Immutable classification and identity decisions
+### Ordinary list
 
-Evidence supports the following safe defaults:
+1. React calls `usePaginatedQuery(api.catalogoAdmin.recursos.listarRecursosResumen, filters, { initialNumItems })`.
+2. Convex supplies native pagination options to the generated query contract.
+3. The query normalizes lifecycle and scope, selects the equality-prefix-valid index, and applies only `.eq(...)` clauses supported by that prefix.
+4. The query calls `.paginate(paginationOpts)` once.
+5. The bounded page is projected to value-free summaries and returned as the native pagination result.
+6. Convex owns continuation, reactive updates, page accumulation, and generated typing.
 
-- `organizacionId` is immutable. Existing identity uniqueness and alias ownership are scoped by organization, and the public update path cannot safely transfer a resource between global and organization-owned scopes.
-- Resource classification is immutable in the administrative API: Class, Family, and Type are represented by the Type plus its resolved parents, and the Type reference must not change after creation. The existing public update currently accepts classification fields, but allowing an admin classification move would recalculate identity, alter effective assignments/rules/units, and interact with organization aliases and active-resource blockers. There is no repository evidence of a safe migration/alias-transfer contract. Keep the old public function unchanged; make the new administrative contract conservative and reject classification changes with `ADMIN_IMMUTABLE_FIELD`.
-- `identificadorTecnico` is derived and never writable. Identity-participating values may change only through the normal guarded update for a global resource. For an organization-owned resource, preserve the existing no-identity-change rule and return a structured administrative conflict/immutable error.
-- `unidadId` is mutable only when the candidate Unit remains valid for the effective Type and the resource update is otherwise valid. Name and description are mutable.
-- `activo` is lifecycle-controlled, not a general update field. Same-state lifecycle commands are idempotent after revision validation.
+No `.collect()`, post-index `.filter()`, custom cursor validation, or Resource-value load is allowed.
 
-These defaults avoid identity alias transfer, classification drift, and partial revalidation. Reopening classification migration should be an explicit future change with alias history and consumer impact evidence, not an implicit part of this API.
+### Full-text search
 
-### Organization ownership semantics
+1. Normalize text with NFC, trim, and collapsed internal whitespace; blank text is `ADMIN_INVALID_ARGUMENT`.
+2. Use `withSearchIndex("buscar", q => q.search("nombre", normalizedText)...)`.
+3. Apply supplied lifecycle, Type, and scope values as search-index equality filters.
+4. Call `.paginate(paginationOpts)` directly.
+5. Return the native pagination result after value-free projection.
 
-The schema makes ownership optional: `organizacionId === undefined` means a global resource, while a present ID means organization-owned. Existing code verifies the organization only indirectly through alias registration; there is no general ownership resolver or authentication boundary, and authentication/roles/permissions are explicitly out of scope. Therefore:
+Search order is Convex native relevance order. Regression tests cover text normalization, equality-filter behavior, equal-relevance traversal on unchanged data, and no value loading. There is no order token, version token, cursor wrapper, or fallback sort.
 
-- Admin commands accept the stored ownership scope as data, but do not invent authorization.
-- Create validates a supplied organization exists; inactive/missing organizations produce structured `ADMIN_INVALID_REFERENCE`.
-- Duplicate identity checks remain global for global resources and organization-scoped for organization-owned resources, matching existing indexes.
-- Do not reinterpret the optional field as tenant isolation. Organization-scoped publication is already established for revisions, but current catalog/resource configuration is shared.
-- Alias rows remain organization-owned and versioned; no alias deletion is added to support a normal update.
+## Write simplification
 
-### Lifecycle and catalog dependency matrix
+Convex mutations are already atomic transactions and use optimistic concurrency control. Resource mutations should remain thin orchestration around GARFEX rules:
 
-- Deactivating a Resource is always allowed after revision validation and preserves values and identity.
-- Reactivating a Resource requires current effective hierarchy, permitted active Unit, active applicable assignments/definitions/options, and valid active rules, matching `validarRecurso`; a failed reactivation leaves the row unchanged.
-- Updating an active or inactive Resource must validate the proposed values against the current effective Type. An inactive resource may remain inspectable while its catalog branch is inert, but cannot be changed into a newly invalid active configuration.
-- Catalog Class/Family/Type deactivation blockers already use indexed active-resource checks (`porTipoYActivo`) and must continue to see active Resources. Inactive Resources do not block catalog deactivation.
-- Resource administrative operations do not cascade catalog or value lifecycle changes.
+- revision-first `expectedRevision` checks;
+- immutable classification and organization ownership;
+- deterministic technical identity and alias rules;
+- current effective-catalog and Resource aggregate validation;
+- bounded duplicate checks including inactive Resources; and
+- lifecycle-specific domain behavior.
 
-### Structured errors
+No custom transaction coordinator, compensating writes, application lock, retry protocol, or rollback implementation is required. Tests assert the final database state after validation, duplicate, alias, or write failures. OCC race coverage should verify externally visible outcomes, not internal retry choreography.
 
-Use the completed `ADMIN_*` contract, asserting `ConvexError.data` in tests rather than message text. Resource-specific failures should map as follows:
+## Revised delivery recommendation
 
-- missing Resource: `ADMIN_NOT_FOUND`;
-- stale revision: `ADMIN_STALE_REVISION`;
-- duplicate technical identity or alias: `ADMIN_DUPLICATE_KEY` or `ADMIN_CONFLICT`, with normalized identity and scope;
-- classification/organization/derived identity change: `ADMIN_IMMUTABLE_FIELD`;
-- catalog, Unit, assignment, option, or organization reference failure: `ADMIN_INVALID_REFERENCE`;
-- invalid effective resource values or reactivation: `ADMIN_INVALID_STATE` or `ADMIN_AGGREGATE_INCOMPLETE`, with coded violations;
-- excessive value cardinality: `ADMIN_INVALID_STATE` with a bounded-limit reason.
+Preserve W0 → WU1 → WU2a → WU2b as completed history. Continue with:
 
-The existing public Spanish `Error` messages remain untouched for compatibility.
+`WU2c correction → WU3 native list → WU4 native search → WU5 detail → WU6 create → WU7 update → WU8 lifecycle → WU9 generated React contract`
 
-## Performance and correctness risks
+A separate `MAX_RESOURCE_VALUES` consolidation unit is not needed because the constant already has one production definition and consumers import it. WU2c adds an explicit no-duplication regression/check so later units cannot fork it.
 
-1. **Existing `.collect()` risk.** `listarRecursos` and `buscarRecursos` collect all matching Resources; `conValores` collects every value row. These paths are unbounded as tables grow and are unsuitable as the implementation template for admin pagination.
-2. **N+1 value loading.** Existing list/search map every Resource through `respuesta`, causing one indexed value query per result and returning large nested payloads. Admin summaries must avoid values entirely. Detail may load values once, with a bounded guard; do not use detail loading inside list/search.
-3. **Search ordering.** Convex full-text search is indexed but its native order is relevance-oriented, not necessarily the technical-identity/name order used by ordinary lists. Bind the search text and explicit ordering version in the cursor. If the native traversal proof fails, block the search work unit and require an explicit spec/design revision before implementation; no collect/sort or fallback path is authorized.
-4. **Duplicate identity race.** Convex transactions provide atomic conflict behavior, but uniqueness is application-enforced through indexes. Test concurrent-equivalent duplicate creates and include inactive rows in the candidate check.
-5. **Catalog drift.** Values can outlive an inactive or changed catalog row. Detail must remain readable for repair/history, while create/update/reactivation must use current effective validation and publication must remain independent.
-6. **Alias and identity drift.** Organization aliases are versioned and currently created only on create. Any update that changes identity must not silently orphan or transfer aliases; the conservative organization-owned immutability rule avoids this.
-7. **Fan-out limits.** Effective validation loads assignments, rules, options, and policies with bounded `take(limit + 1)` patterns. Resource detail needs an explicit value limit and admin search/list needs page-size limits from the completed pagination helper.
-8. **Classification change leakage.** The public update accepts classification IDs, but it has no dedicated migration semantics and can combine a Type move with values and identity recalculation. Treat this as unsafe for the new admin contract rather than widening the existing behavior.
+## Remaining product decisions
 
-## TDD and verification shape
-
-Each work unit follows RED → GREEN → TRIANGULATE → REFACTOR and keeps tests with the behavior:
-
-- pure tests for summary projection, classification immutability, identity scope, value limits, and effective/inert annotations;
-- `convex-test` coverage for paginated list/search traversal, cursor mismatch across text/filter/order, no value loading in summaries, direct detail values, create/update atomicity, stale-before-no-op, duplicate inactive identities, alias conflicts, lifecycle idempotence, reactivation validation, and structured `ADMIN_*` errors;
-- regression coverage for every existing `convex/catalogoRecursos/recursos.test.ts` scenario and unchanged public function signatures/returns;
-- contract fixture additions using generated `api`, `FunctionArgs`, `FunctionReturnType`, IDs, page results, and `AdminErrorData` from the completed static package exports;
-- `pnpm exec vitest run`, `pnpm typecheck`, `pnpm typecheck:consumer`, `pnpm exec convex codegen --typecheck enable`, and `pnpm exec convex dev --once` when a deployment is available (otherwise record `N/A — no deployment available`).
-
-## Forecast and stacked delivery
-
-The request spans a focused Resource API plus schema metadata/index work, tests, effective-catalog seams, and generated contract updates. It should remain stacked-to-main and should not be combined into one PR with the completed catalog implementation. The canonical split is W0 plus WU1–WU9 exactly as defined in the design and tasks; W0 is planning/runtime evidence, followed by nine behavior units.
-
-| Order | Work unit | Forecast authored changed lines | Boundary |
-|---|---|---:|---|
-| 0 | Planning/runtime metadata evidence | 12 | Remove only planning evidence |
-| 1 | Optional metadata, compatibility projection, indexes, and resumable backfill | 190 | Remove only schema/backfill/projection changes |
-| 2 | Resource validators, projections, diagnostics, and structured mapping | 180 | Remove only Resource contract helpers/tests |
-| 3 | Indexed summary list with filters, plans, and bound cursors | 175 | Remove summary list exports/planner |
-| 4 | Convex 1.45.0 native full-text search and traversal proof | 190 | Remove search export/plan only |
-| 5 | Direct admin detail and bounded value loading | 145 | Remove admin detail/value loader only |
-| 6 | Atomic administrative create | 210 | Remove Resource admin create/persistence behavior |
-| 7 | Revision-first update and immutable boundaries | 240 | Remove Resource admin update behavior |
-| 8 | Lifecycle commands and effective-state integration | 170 | Remove lifecycle seam integration |
-| 9 | Generated contract fixture, regressions, and rollout documentation | 130 authored (generated output excluded) | Remove only contract/documentation additions |
-
-Estimated authored total is approximately **1,642 lines** across W0 and WU1–WU9, so the whole change has high 400-line budget risk while every proposed behavior unit remains below the budget. W0 is not a product PR. Each child PR targets the immediately preceding branch and then main through the stacked chain; tests and contract evidence stay with their behavior. No size exception is recommended.
-
-## Open questions
-
-No product open question is required for the bounded architecture above. Native Convex 1.45.0 search pagination is a prerequisite implementation proof: verify repeated equal-relevance traversal against unchanged data before the search dependency is accepted. If it cannot be proven, block the search work and make an explicit design/specification revision; never collect, sort, or silently select a technical-identity/adminSortId fallback.
-
-## Recommendation
-
-Proceed to proposal/design with an additive `catalogoAdmin.recursos` surface, reuse of the completed catalog resolver/validators/errors/pagination/revision patterns, immutable administrative classification and organization ownership, value-free paginated summaries, bounded direct detail values, and explicit native full-text cursor binding. Preserve every existing public Resource export and return contract, avoid `.collect()` in new list/search paths, prove native search before dependency, and deliver W0 plus WU1–WU9 as stacked-to-main work under the 400-authored-line review budget.
+None. Unit filtering remains intentionally excluded until a future UI requirement is demonstrated. Search relevance and ordinary index order are native Convex semantics, not unresolved product sort decisions.
