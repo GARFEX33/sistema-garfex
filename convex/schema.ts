@@ -6,6 +6,9 @@ const estadoCatalogo = {
   revision: v.number(),
 };
 
+// Derived migration metadata. Optional until backfillMetadatos completes.
+const adminSort = { adminSortId: v.optional(v.string()) };
+
 const identificacionCatalogo = {
   clave: v.string(),
   nombre: v.string(),
@@ -25,7 +28,7 @@ const estadoRevisionCatalogo = v.literal("PUBLISHED");
 
 export default defineSchema({
   organizaciones: defineTable({ clave: v.string(), nombre: v.string(), activo: v.boolean(), revision: v.number() }).index("porClave", ["clave"]),
-  catalogoRevisiones: defineTable({ organizacionId: v.id("organizaciones"), numero: v.number(), estado: estadoRevisionCatalogo, hashContenido: v.string(), creadoEn: v.number(), publicadoEn: v.number() }).index("porOrganizacionYNumero", ["organizacionId", "numero"]).index("porOrganizacionYEstado", ["organizacionId", "estado"]),
+  catalogoRevisiones: defineTable({ organizacionId: v.id("organizaciones"), numero: v.number(), estado: estadoRevisionCatalogo, hashContenido: v.string(), creadoEn: v.number(), publicadoEn: v.number(), ...adminSort }).index("porOrganizacionYNumero", ["organizacionId", "numero"]).index("porOrganizacionYEstado", ["organizacionId", "estado"]).index("porOrganizacionYEstadoYNumeroYAdminSort", ["organizacionId", "estado", "numero", "adminSortId"]),
   catalogoTipoSnapshots: defineTable({
     organizacionId: v.id("organizaciones"), revisionId: v.id("catalogoRevisiones"), tipoClave: v.string(),
     snapshot: v.object({
@@ -39,26 +42,34 @@ export default defineSchema({
           politicasCompatibilidad: v.array(v.object({ atributoOrigenClave: v.string(), atributoDestinoClave: v.string(), modo: v.union(v.literal("ALLOWLIST"), v.literal("DENYLIST")), direccion: v.union(v.literal("DIRECTIONAL"), v.literal("SYMMETRIC")), pares: v.array(v.object({ origenOpcionClave: v.string(), destinoOpcionClave: v.string() })) })),
     }),
   }).index("porRevisionYTipo", ["revisionId", "tipoClave"]).index("porOrganizacionYTipo", ["organizacionId", "tipoClave"]),
-  clasesRecurso: defineTable(identificacionCatalogo).index("porClave", ["clave"]),
+  clasesRecurso: defineTable({ ...identificacionCatalogo, ...adminSort }).index("porClave", ["clave"]).index("porClaveYAdminSort", ["clave", "adminSortId"]).index("porActivoYClaveYAdminSort", ["activo", "clave", "adminSortId"]),
 
   familiasRecurso: defineTable({
     claseRecursoId: v.id("clasesRecurso"),
     ...identificacionCatalogo,
+    ...adminSort,
   })
     .index("porClase", ["claseRecursoId"])
-    .index("porClaseYClave", ["claseRecursoId", "clave"]),
+    .index("porClaseYClave", ["claseRecursoId", "clave"])
+    .index("porClaseYClaveYAdminSort", ["claseRecursoId", "clave", "adminSortId"])
+    .index("porActivoYClaseYClaveYAdminSort", ["activo", "claseRecursoId", "clave", "adminSortId"]),
 
   tiposRecurso: defineTable({
     familiaRecursoId: v.id("familiasRecurso"),
     ...identificacionCatalogo,
+    ...adminSort,
   })
     .index("porFamilia", ["familiaRecursoId"])
-    .index("porFamiliaYClave", ["familiaRecursoId", "clave"]),
+    .index("porFamiliaYClave", ["familiaRecursoId", "clave"])
+    .index("porFamiliaYClaveYAdminSort", ["familiaRecursoId", "clave", "adminSortId"])
+    .index("porClaveYAdminSort", ["clave", "adminSortId"])
+    .index("porActivoYFamiliaYClaveYAdminSort", ["activo", "familiaRecursoId", "clave", "adminSortId"]),
 
   unidades: defineTable({
     ...identificacionCatalogo,
+    ...adminSort,
     simbolo: v.optional(v.string()),
-  }).index("porClave", ["clave"]),
+  }).index("porClave", ["clave"]).index("porClaveYAdminSort", ["clave", "adminSortId"]).index("porActivoYClaveYAdminSort", ["activo", "clave", "adminSortId"]),
 
   politicasUnidadRecurso: defineTable({
     familiaRecursoId: v.id("familiasRecurso"),
@@ -66,16 +77,22 @@ export default defineSchema({
     unidadId: v.id("unidades"),
     principal: v.boolean(),
     ...estadoCatalogo,
+    ...adminSort,
   })
     .index("porFamilia", ["familiaRecursoId"])
     .index("porFamiliaYUnidad", ["familiaRecursoId", "unidadId"])
         .index("porFamiliaYTipoYUnidad", ["familiaRecursoId", "tipoRecursoId", "unidadId"])
     .index("porTipo", ["tipoRecursoId"])
     .index("porTipoYUnidad", ["tipoRecursoId", "unidadId"])
-    .index("porUnidad", ["unidadId"]),
+    .index("porUnidad", ["unidadId"])
+    .index("porFamiliaYTipoYUnidadYAdminSort", ["familiaRecursoId", "tipoRecursoId", "unidadId", "adminSortId"])
+    .index("porFamiliaYActivoYTipoYUnidadYAdminSort", ["familiaRecursoId", "activo", "tipoRecursoId", "unidadId", "adminSortId"])
+    .index("porTipoYActivoYFamiliaYUnidadYAdminSort", ["tipoRecursoId", "activo", "familiaRecursoId", "unidadId", "adminSortId"])
+    .index("porUnidadYActivoYFamiliaYTipoYAdminSort", ["unidadId", "activo", "familiaRecursoId", "tipoRecursoId", "adminSortId"]),
 
   definicionesAtributo: defineTable({
     ...identificacionCatalogo,
+    ...adminSort,
     tipoDato: v.union(
       v.literal("TEXTO"),
       v.literal("NUMERO"),
@@ -83,7 +100,10 @@ export default defineSchema({
       v.literal("OPCION"),
     ),
     unidadId: v.optional(v.id("unidades")),
-  }).index("porClave", ["clave"]).index("porUnidad", ["unidadId"]),
+  }).index("porClave", ["clave"]).index("porUnidad", ["unidadId"])
+    .index("porClaveYAdminSort", ["clave", "adminSortId"])
+    .index("porActivoYClaveYAdminSort", ["activo", "clave", "adminSortId"])
+    .index("porUnidadYActivoYClaveYAdminSort", ["unidadId", "activo", "clave", "adminSortId"]),
 
   atributosRecurso: defineTable({
     familiaRecursoId: v.id("familiasRecurso"),
@@ -92,21 +112,30 @@ export default defineSchema({
     aplicabilidad,
     participaIdentidad: v.boolean(),
     orden: v.number(),
+    definicionClave: v.optional(v.string()),
     ...estadoCatalogo,
+    ...adminSort,
   })
     .index("porFamilia", ["familiaRecursoId"])
     .index("porDefinicion", ["definicionAtributoId"])
     .index("porFamiliaYDefinicion", ["familiaRecursoId", "definicionAtributoId"])
         .index("porFamiliaYTipoYDefinicion", ["familiaRecursoId", "tipoRecursoId", "definicionAtributoId"])
     .index("porTipo", ["tipoRecursoId"])
-    .index("porTipoYDefinicion", ["tipoRecursoId", "definicionAtributoId"]),
+    .index("porTipoYDefinicion", ["tipoRecursoId", "definicionAtributoId"])
+    .index("porFamiliaYTipoYDefinicionYAdminSort", ["familiaRecursoId", "tipoRecursoId", "orden", "definicionClave", "adminSortId"])
+    .index("porDefinicionYActivoYFamiliaYTipoYOrdenYAdminSort", ["definicionClave", "activo", "familiaRecursoId", "tipoRecursoId", "orden", "adminSortId"])
+    .index("porAplicabilidadYActivoYFamiliaYTipoYOrdenYDefinicionYAdminSort", ["aplicabilidad", "activo", "familiaRecursoId", "tipoRecursoId", "orden", "definicionClave", "adminSortId"])
+    .index("porIdentidadYActivoYFamiliaYTipoYOrdenYDefinicionYAdminSort", ["participaIdentidad", "activo", "familiaRecursoId", "tipoRecursoId", "orden", "definicionClave", "adminSortId"]),
 
   opcionesAtributo: defineTable({
     definicionAtributoId: v.id("definicionesAtributo"),
     ...identificacionCatalogo,
+    ...adminSort,
   })
     .index("porDefinicion", ["definicionAtributoId"])
-    .index("porDefinicionYClave", ["definicionAtributoId", "clave"]),
+    .index("porDefinicionYClave", ["definicionAtributoId", "clave"])
+    .index("porDefinicionYClaveYAdminSort", ["definicionAtributoId", "clave", "adminSortId"])
+    .index("porActivoYDefinicionYClaveYAdminSort", ["activo", "definicionAtributoId", "clave", "adminSortId"]),
 
   politicasPresentacionCanonica: defineTable({
         tipoRecursoId: v.id("tiposRecurso"),
@@ -117,7 +146,9 @@ export default defineSchema({
         )),
         separador: v.string(),
         ...estadoCatalogo,
-      }).index("porTipo", ["tipoRecursoId"]).index("porTipoYActivo", ["tipoRecursoId", "activo"]),
+        ...adminSort,
+      }).index("porTipo", ["tipoRecursoId"]).index("porTipoYActivo", ["tipoRecursoId", "activo"])
+        .index("porTipoYActivoYAdminSort", ["tipoRecursoId", "activo", "adminSortId"]),
 
       politicasCompatibilidadOpciones: defineTable({
     tipoRecursoId: v.id("tiposRecurso"),
@@ -126,9 +157,14 @@ export default defineSchema({
     modo: v.union(v.literal("ALLOWLIST"), v.literal("DENYLIST")),
     direccion: v.union(v.literal("DIRECTIONAL"), v.literal("SYMMETRIC")),
     ...estadoCatalogo,
+    ...adminSort,
+    atributoOrigenIdNormalizado: v.optional(v.string()),
+    atributoDestinoIdNormalizado: v.optional(v.string()),
   })
     .index("porTipo", ["tipoRecursoId"])
-    .index("porTipoYEstado", ["tipoRecursoId", "activo"]),
+    .index("porTipoYEstado", ["tipoRecursoId", "activo"])
+    .index("porTipoYNormalizadosYDireccionYAdminSort", ["tipoRecursoId", "atributoOrigenIdNormalizado", "atributoDestinoIdNormalizado", "direccion", "adminSortId"])
+    .index("porTipoYActivoYNormalizadosYDireccionYAdminSort", ["tipoRecursoId", "activo", "atributoOrigenIdNormalizado", "atributoDestinoIdNormalizado", "direccion", "adminSortId"]),
 
   relacionesOpcionesAtributo: defineTable({
     opcionOrigenId: v.id("opcionesAtributo"),
@@ -136,12 +172,17 @@ export default defineSchema({
     politicaCompatibilidadId: v.optional(v.id("politicasCompatibilidadOpciones")),
     tipoRelacion: v.optional(v.string()),
     ...estadoCatalogo,
+    ...adminSort,
+    opcionOrigenIdNormalizada: v.optional(v.string()),
+    opcionDestinoIdNormalizada: v.optional(v.string()),
   })
     .index("porOrigen", ["opcionOrigenId"])
     .index("porDestino", ["opcionDestinoId"])
     .index("porOrigenYDestino", ["opcionOrigenId", "opcionDestinoId"])
     .index("porPolitica", ["politicaCompatibilidadId"])
-    .index("porActivo", ["activo"]),
+    .index("porActivo", ["activo"])
+    .index("porPoliticaYOpcionesNormalizadasYAdminSort", ["politicaCompatibilidadId", "opcionOrigenIdNormalizada", "opcionDestinoIdNormalizada", "adminSortId"])
+    .index("porPoliticaYActivoYOpcionesNormalizadasYAdminSort", ["politicaCompatibilidadId", "activo", "opcionOrigenIdNormalizada", "opcionDestinoIdNormalizada", "adminSortId"]),
 
   reglasAtributoRecurso: defineTable({
     tipoRecursoId: v.id("tiposRecurso"),
@@ -150,10 +191,13 @@ export default defineSchema({
     atributoAfectadoId: v.id("atributosRecurso"),
     aplicabilidad,
     ...estadoCatalogo,
+    ...adminSort,
   })
     .index("porTipo", ["tipoRecursoId"])
     .index("porAtributoCondicion", ["atributoCondicionId"])
-    .index("porAtributoAfectado", ["atributoAfectadoId"]),
+    .index("porAtributoAfectado", ["atributoAfectadoId"])
+    .index("porTipoYCondicionYOpcionYAfectadoYAdminSort", ["tipoRecursoId", "atributoCondicionId", "opcionCondicionId", "atributoAfectadoId", "adminSortId"])
+    .index("porTipoYActivoYCondicionYOpcionYAfectadoYAdminSort", ["tipoRecursoId", "activo", "atributoCondicionId", "opcionCondicionId", "atributoAfectadoId", "adminSortId"]),
 
 
   recursos: defineTable({

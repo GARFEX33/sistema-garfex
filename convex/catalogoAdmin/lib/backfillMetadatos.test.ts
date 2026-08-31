@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import { convexTest } from "convex-test";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import schema from "../../schema";
+
+const backfillReference = (internal as any).catalogoAdmin.lib.backfillMetadatos.backfillMetadatos;
+const modules = {
+  ...import.meta.glob("../../_generated/**/*.{ts,js}"),
+  ...Object.fromEntries(Object.entries(import.meta.glob("./*.{ts,js}")).map(([path, module]) => [`../../catalogoAdmin/lib/${path.slice(2)}`, module])),
+};
+
+type Fixture = {
+  clase: Id<"clasesRecurso">;
+  familia: Id<"familiasRecurso">;
+  tipo: Id<"tiposRecurso">;
+  unidad: Id<"unidades">;
+  definicion: Id<"definicionesAtributo">;
+  atributo: Id<"atributosRecurso">;
+  opcion: Id<"opcionesAtributo">;
+  revision: Id<"catalogoRevisiones">;
+  snapshot: Id<"catalogoTipoSnapshots">;
+};
+
+async function seed(t: ReturnType<typeof convexTest>): Promise<Fixture> {
+  return t.run(async ctx => {
+    const clase = await ctx.db.insert("clasesRecurso", { clave: "C", nombre: "Clase", activo: true, revision: 7 });
+    await ctx.db.insert("clasesRecurso", { clave: "C2", nombre: "Otra clase", activo: false, revision: 1 });
+    const familia = await ctx.db.insert("familiasRecurso", { claseRecursoId: clase, clave: "F", nombre: "Familia", activo: false, revision: 4 });
+    const tipo = await ctx.db.insert("tiposRecurso", { familiaRecursoId: familia, clave: "T", nombre: "Tipo", activo: true, revision: 3 });
+    const unidad = await ctx.db.insert("unidades", { clave: "U", nombre: "Unidad", activo: true, revision: 2 });
+    const definicion = await ctx.db.insert("definicionesAtributo", { clave: "D", nombre: "Definición", tipoDato: "OPCION", activo: true, revision: 5 });
+    const atributo = await ctx.db.insert("atributosRecurso", { familiaRecursoId: familia, tipoRecursoId: tipo, definicionAtributoId: definicion, aplicabilidad: "OPTIONAL", participaIdentidad: true, orden: 8, activo: true, revision: 6 });
+    const duplicate = await ctx.db.insert("atributosRecurso", { familiaRecursoId: familia, tipoRecursoId: tipo, definicionAtributoId: definicion, aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 9, activo: false, revision: 1 });
+    const opcion = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: definicion, clave: "O", nombre: "Opción", activo: true, revision: 2 });
+    await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: familia, tipoRecursoId: tipo, unidadId: unidad, principal: true, activo: true, revision: 3 });
+    await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId: tipo, tokens: [{ tipo: "TYPE_NAME" }], separador: " / ", activo: true, revision: 2 });
+    const policy = await ctx.db.insert("politicasCompatibilidadOpciones", { tipoRecursoId: tipo, atributoOrigenId: atributo, atributoDestinoId: duplicate, modo: "DENYLIST", direccion: "SYMMETRIC", activo: false, revision: 2 });
+    await ctx.db.insert("relacionesOpcionesAtributo", { opcionOrigenId: opcion, opcionDestinoId: opcion, politicaCompatibilidadId: policy, tipoRelacion: "legacy", activo: true, revision: 2 });
+    await ctx.db.insert("reglasAtributoRecurso", { tipoRecursoId: tipo, atributoCondicionId: atributo, atributoAfectadoId: duplicate, aplicabilidad: "OPTIONAL", activo: false, revision: 2 });
+    const organization = await ctx.db.insert("organizaciones", { clave: "ORG", nombre: "Org", activo: true, revision: 1 });
+    const revision = await ctx.db.insert("catalogoRevisiones", { organizacionId: organization, numero: 11, estado: "PUBLISHED", hashContenido: "hash", creadoEn: 1, publicadoEn: 2 });
+    const snapshot = await ctx.db.insert("catalogoTipoSnapshots", { organizacionId: organization, revisionId: revision, tipoClave: "T", snapshot: { clase: { id: clase, clave: "C", nombre: "Clase" }, familia: { id: familia, clave: "F", nombre: "Familia" }, tipo: { id: tipo, clave: "T", nombre: "Tipo" }, unidadNatural: { id: unidad, clave: "U", nombre: "Unidad" }, atributos: [], reglas: [], presentacionCanonica: { tipoNombre: "Tipo", tokens: [{ tipo: "TYPE_NAME" }], separador: " / " }, politicasCompatibilidad: [] } });
+    void duplicate;
+    return { clase, familia, tipo, unidad, definicion, atributo, opcion, revision, snapshot };
+  });
+}
+
+type BackfillResult = { processed: number; updated: number; nextCursor: string | null; duplicateReports: Array<{ table: string; identity: string; ids: string[] }> };
+
+async function runToCompletion(t: ReturnType<typeof convexTest>, batchSize = 2) {
+  let cursor: string | null = null;
+  const reports: unknown[] = [];
+  do {
+    const result: BackfillResult = await t.mutation(backfillReference, { cursor, batchSize });
+    reports.push(...result.duplicateReports);
+    cursor = result.nextCursor;
+  } while (cursor !== null);
+  return reports;
+}
+
+describe("backfill de metadatos administrativos", () => {
+  it("rellena metadatos opcionales en lotes reanudables y conserva datos", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seed(t);
+    await t.run(async ctx => { await ctx.db.patch(fixture.clase, { adminSortId: fixture.clase }); });
+    const before = await t.run(async ctx => ({
+      family: await ctx.db.get(fixture.familia),
+      type: await ctx.db.get(fixture.tipo),
+      revision: await ctx.db.get(fixture.revision),
+      snapshot: await ctx.db.get(fixture.snapshot),
+    }));
+
+    const first = await t.mutation(backfillReference, { cursor: null, batchSize: 1 });
+    expect(first.processed).toBe(1);
+    expect(first.nextCursor).not.toBeNull();
+    const reports = await runToCompletion(t);
+    const after = await t.run(async ctx => ({
+      family: await ctx.db.get(fixture.familia),
+      type: await ctx.db.get(fixture.tipo),
+      revision: await ctx.db.get(fixture.revision),
+      snapshot: await ctx.db.get(fixture.snapshot),
+      attribute: await ctx.db.get(fixture.atributo),
+    }));
+
+    expect(after.family).toMatchObject({ activo: before.family!.activo, revision: before.family!.revision, adminSortId: fixture.familia });
+    expect(after.type).toMatchObject({ activo: before.type!.activo, revision: before.type!.revision, adminSortId: fixture.tipo });
+    expect(after.revision).toMatchObject(before.revision!);
+    expect(after.snapshot).toEqual(before.snapshot);
+    expect(after.attribute).toMatchObject({ adminSortId: fixture.atributo, definicionClave: "D" });
+    const duplicate = reports.filter((report): report is { table: string; identity: string; ids: string[] } => typeof report === "object" && report !== null && (report as { table?: string }).table === "atributosRecurso");
+    expect(duplicate).toHaveLength(1);
+    expect(duplicate[0].ids).toEqual([...new Set(duplicate[0].ids)].sort());
+    expect(duplicate[0].identity).toContain("D");
+  });
+
+  it("es idempotente, admite tablas vacías y expone los índices administrativos", async () => {
+    const empty = convexTest(schema, modules);
+    expect(await runToCompletion(empty, 3)).toEqual([]);
+
+    const t = convexTest(schema, modules);
+    await seed(t);
+    await runToCompletion(t, 3);
+    const repeated = await runToCompletion(t, 3);
+    expect(repeated).toEqual(expect.any(Array));
+    await t.run(async ctx => {
+      await ctx.db.query("clasesRecurso").withIndex("porClaveYAdminSort").take(1);
+      await ctx.db.query("familiasRecurso").withIndex("porClaseYClaveYAdminSort").take(1);
+      await ctx.db.query("tiposRecurso").withIndex("porClaveYAdminSort").take(1);
+      await ctx.db.query("unidades").withIndex("porClaveYAdminSort").take(1);
+      await ctx.db.query("definicionesAtributo").withIndex("porClaveYAdminSort").take(1);
+      await ctx.db.query("atributosRecurso").withIndex("porFamiliaYTipoYDefinicionYAdminSort").take(1);
+      await ctx.db.query("opcionesAtributo").withIndex("porDefinicionYClaveYAdminSort").take(1);
+      await ctx.db.query("politicasUnidadRecurso").withIndex("porFamiliaYTipoYUnidadYAdminSort").take(1);
+      await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipoYActivoYAdminSort").take(1);
+      await ctx.db.query("politicasCompatibilidadOpciones").withIndex("porTipoYNormalizadosYDireccionYAdminSort").take(1);
+      await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPoliticaYOpcionesNormalizadasYAdminSort").take(1);
+      await ctx.db.query("reglasAtributoRecurso").withIndex("porTipoYCondicionYOpcionYAfectadoYAdminSort").take(1);
+      await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYEstadoYNumeroYAdminSort").take(1);
+    });
+  });
+});

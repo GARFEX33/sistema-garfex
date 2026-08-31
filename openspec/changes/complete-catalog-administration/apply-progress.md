@@ -237,3 +237,39 @@ The exact remaining unchecked task rows follow; they remain unchanged in `tasks.
 - [ ] After post-apply verification, confirm the lifecycle gate in `openspec/changes/complete-catalog-administration/tasks.md`; acceptance evidence is all RED/GREEN/TRIANGULATE/REFACTOR results recorded, no authored work unit exceeds 400 changed lines, and every rollback boundary remains actionable, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the lifecycle decision record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
 
 Parent-owned rows are deferred to the parent lifecycle. This executor did not run review, receipts, verification, refutation, correction, finish, settle, commit, push, or PR actions. `nextRecommended: parent-lifecycle`.
+
+# Apply progress — W2
+
+## Status and boundary
+
+- Native status: `openspec` authoritative, `applyState: ready`, change `complete-catalog-administration`; all required planning artifacts and prior progress were present.
+- `actionContext`: `repo-local`; workspace/allowed root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none. Delivery is chained `stacked-to-main`; W2 stayed below the 380-attempt/400-review-line boundary.
+- Existing `convex/` migration conventions were inspected; no migration registration target existed, so no extra registration file was changed.
+
+## W2 evidence
+
+- Added optional `adminSortId`, `definicionClave`, normalized compatibility metadata, and staged exact-order admin index families for hierarchy, units, attributes, rules, presentation, compatibility, and revisions.
+- Added internal `backfillMetadatos` with one bounded pagination call per resumable invocation, opaque table/cursor state, repeat-safe derived patches, bounded duplicate candidate reads, and deterministic code-point duplicate reports. Lifecycle, revision, business, legacy compatibility, revision-history, and snapshot fields remain unchanged.
+- W2 RED failed before the target existed; GREEN and later cycles passed. New tests cover missing/existing metadata, empty tables, resumed/repeated batches, duplicates, index coverage, and preservation.
+- W2b correction generated the version-correct `convex/tsconfig.json` with `pnpm exec convex codegen --init --typecheck enable`; the incidental generated API binding diff was restored.
+
+## TDD Cycle Evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | Focused backfill test before implementation | Expected missing-target failure |
+| GREEN | `pnpm exec vitest run convex/catalogoAdmin/lib/backfillMetadatos.test.ts` | PASS — 1 file, 2 tests |
+| TRIANGULATE | `pnpm exec vitest run` | PASS — 15 files, 134 tests |
+| TRIANGULATE | `pnpm typecheck` | PASS — `tsc --noEmit` |
+| W2b focused rerun | `pnpm exec vitest run convex/catalogoAdmin/lib/backfillMetadatos.test.ts` | PASS — 1 file, 2 tests |
+| W2b full rerun | `pnpm exec vitest run` | PASS — 15 files, 134 tests |
+| W2b root typecheck | `pnpm typecheck` | PASS — `tsc --noEmit` |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and typechecked Convex functions using `convex/tsconfig.json` |
+| Runtime/hygiene | `pnpm exec convex dev --once`; `git diff --check` | PASS — local functions ready; no whitespace errors |
+
+## Completion and remaining work
+
+- W2 RED, GREEN, TRIANGULATE, and REFACTOR are checked in `tasks.md`; only W2 implementation rows changed. Generated API output was transiently regenerated and restored.
+- Changed files: `convex/tsconfig.json`, `convex/schema.ts`, `convex/catalogoAdmin/lib/backfillMetadatos.ts`, its test, W2 task checkboxes, and this cumulative record. The generated API binding was incidental and restored. Rollback is limited to W2 backfill/tests, the generated Convex config, and safe W2 schema metadata/index cleanup; stored business/history data remains.
+- W3 is next; its exact unchecked `- [ ] **RED** — Add pagination tests...` row and all later implementation rows remain in `tasks.md`. Parent-owned lifecycle rows remain unchanged and deferred. This executor did not review, commit, push, PR, or run lifecycle actions; `nextRecommended: parent-lifecycle`.
+- Native W2 attempt settlement returned `complete`; no delivery or review gate was performed.
