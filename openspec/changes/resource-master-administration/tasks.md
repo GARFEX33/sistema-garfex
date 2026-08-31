@@ -10,18 +10,18 @@ Strict TDD remains RED → GREEN → TRIANGULATE → REFACTOR. Every pending aut
 
 ## Historical evidence preservation
 
-W0, WU1, WU2a, WU2b, and WU2c are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU3 is next.
+W0, WU1, WU2a, WU2b, WU2c, WU3a, and WU3b are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU4 is next.
 
 ## Review Workload Forecast
 
 | Field | Value |
 |---|---|
-| Pending authored estimate | Approximately 1,240 additions + deletions; generated declarations separate |
-| 400-line budget risk | High across the stack; low per current unit |
+| Pending authored estimate | Approximately 905 additions + deletions after completed WU3a/WU3b; generated declarations separate |
+| 400-line budget risk | High across the stack; low per current unit; WU3a ~319 and WU3b ~152, no exception |
 | Delivery | `auto-chain`, stacked-to-main |
-| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3 → WU4 → WU5 → WU6 → WU7 → WU8 → WU9 |
-| Pending implementation rows | 28 |
-| Completed implementation rows | 20 |
+| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 → WU5 → WU6 → WU7 → WU8 → WU9 |
+| Pending implementation rows | 24 |
+| Completed implementation rows | 28 |
 | Parent rows | 2 pending |
 
 Decision needed before apply: No
@@ -75,18 +75,27 @@ Decision needed before apply: No
 - [x] **TRIANGULATE** — Exercise all eight supported lifecycle/Type/scope combinations against schema prefix coverage, empty/populated scope repair, global/organization rows, legacy output, and optional bounded obsolete-field cleanup if deployment audit requires it; prove no Unit/sort dependency and no catalog-admin pagination change; full Vitest/typecheck/codegen/runtime-or-N/A; estimate 40 lines. <!-- sdd-owner: implementation -->
 - [x] **REFACTOR** — Keep Resource scope derivation small, Resource backfill responsibility limited to `adminScopeKey`, and the centralized value limit imported by future units; remove temporary cleanup code only after rollout evidence permits; rollback reverts WU2c cleanup only; estimate 20 lines. <!-- sdd-owner: implementation -->
 
-### WU3 — Native paginated Resource summary list
+### WU3a — Native paginated Resource summary query and tests
 
-**Dependency:** WU2c complete and corrected indexes ready. **End state:** `listarRecursosResumen` returns native `PaginationResult<ResourceSummary>` and is directly usable by `usePaginatedQuery`. **Allowed edit surfaces:** `convex/catalogoAdmin/recursos.ts`, Resource validators/summary helper, focused Resource admin tests, generated declarations.
+**Dependency:** WU2c complete and corrected indexes ready. **End state:** `listarRecursosResumen` returns native `PaginationResult<ResourceSummary>` with native pagination behavior proven by focused tests. **Allowed edit surfaces:** `convex/catalogoAdmin/recursos.ts`, Resource validators/summary helper, focused Resource admin tests, and generated declarations. Historical WU3 query/test accounting: approximately 319 authored changed lines, below the 400-line budget; generated declarations are separate.
 
-- [ ] **RED** — Add failing tests for `paginationOptsValidator`, native result shape, all eight lifecycle/Type/scope combinations, native multi-page traversal, no Unit argument, no values, no `.collect()`/query `.filter()`, and direct paginated-query typing; do not add custom cursor mismatch tests; estimate 35 lines. <!-- sdd-owner: implementation -->
-- [ ] **GREEN** — Register the list query, select the equality-prefix-valid index branch, call `.paginate(args.paginationOpts)` once, project only the native page, and return native pagination metadata unchanged; no `AdminPage`, cursor codec, plan/order token, cache, or accumulator; estimate 75 lines. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE** — Traverse 1,000+ unchanged Resources with several native page sizes and every filter combination, proving exact coverage, termination, zero value loads, and generated `usePaginatedQuery` compatibility; full verification and runtime-or-N/A; estimate 30 lines. <!-- sdd-owner: implementation -->
-- [ ] **REFACTOR** — Keep index-branch selection and page projection small and statically separated from detail/value loading; rollback removes only list export/helper/tests; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add failing tests for `paginationOptsValidator`, native result shape, all eight lifecycle/Type/scope combinations, native multi-page traversal, no Unit argument, no values, and no `.collect()`/query `.filter()`; do not add custom cursor mismatch tests; estimate 55 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Register the list query, select the equality-prefix-valid index branch, call `.paginate(args.paginationOpts)` once, project only the native page, and return native pagination metadata unchanged; no `AdminPage`, cursor codec, plan/order token, cache, or accumulator; estimate 90 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Traverse 1,000+ unchanged Resources with several native page sizes and every filter combination, proving exact coverage, termination, zero value loads, and native result compatibility; full verification and runtime-or-N/A; estimate 130 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Keep index-branch selection and page projection small and statically separated from detail/value loading; rollback removes only list export/helper/tests; estimate 44 lines. <!-- sdd-owner: implementation -->
+
+### WU3b — Real native React hook and generated consumer contract
+
+**Dependency:** WU3a complete. **End state:** the consumer compiles the installed `convex/react` `usePaginatedQuery` directly against the generated list reference, essential filters, native status/load-more result, and every Resource summary field; no local hook imitation or parallel DTO exists. **Allowed edit surfaces:** `contract-tests/resource-admin-consumer.ts`, `contract-tests/tsconfig.json`, generated declarations through the Convex CLI, and change evidence. Historical WU3b consumer/generated/task/evidence accounting: approximately 152 authored changed lines, below the 400-line budget; generated declarations remain source-derived and separate.
+
+- [x] **RED** — Replace the local hook declaration with the installed `convex/react` import and retain a compile-time failure while the Resource summary field assertion is intentionally incompatible; focused command `pnpm typecheck:consumer`; estimate 30 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Use the real `usePaginatedQuery` with generated `listarRecursosResumen`, lifecycle/Type/scope filters, `initialNumItems`, native `results`/`status`/`loadMore`, and generated Resource summary fields; estimate 40 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Run consumer typecheck, focused WU3 tests, full tests/typecheck, source-derived codegen with hash stability, and diff checks without changing the Resource query/test or generated declaration content; estimate 52 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Keep the fixture limited to direct generated references and installed hook types, with no adapter, DTO, cache, accumulator, Unit filter, or backend implementation import; rollback removes only the consumer correction and evidence metadata; estimate 30 lines. <!-- sdd-owner: implementation -->
 
 ### WU4 — Native paginated full-text Resource search
 
-**Dependency:** WU3 and corrected search index readiness. **End state:** `buscarRecursosResumen` uses native search `.paginate()` with essential equality filters and relevance-order regression coverage. **Allowed edit surfaces:** Resource admin query/summary helper/tests and generated declarations.
+**Dependency:** WU3a and WU3b, plus corrected search index readiness. **End state:** `buscarRecursosResumen` uses native search `.paginate()` with essential equality filters and relevance-order regression coverage. **Allowed edit surfaces:** Resource admin query/summary helper/tests and generated declarations.
 
 - [ ] **RED** — Add failing tests for NFC/trim/collapsed-whitespace normalization, blank rejection, lifecycle/Type/scope search filters, no Unit argument, repeated equal-relevance native traversal, no values, and no collect/sort fallback; omit cursor binding and token/version tests; estimate 35 lines. <!-- sdd-owner: implementation -->
 - [ ] **GREEN** — Register search with native pagination args/result validator, `withSearchIndex("buscar")`, supplied equality filters, and `.paginate(args.paginationOpts)`; return native relevance pages without cursor wrappers, runtime version/order tokens, fallback sorting, cache, or accumulator; estimate 70 lines. <!-- sdd-owner: implementation -->
@@ -131,7 +140,7 @@ Decision needed before apply: No
 
 ### WU9 — Generated native React contract and regressions
 
-**Dependency:** WU3–WU8. **End state:** package/generated exposure and a consumer fixture use native paginated query references directly; legacy contracts remain protected. **Allowed edit surfaces:** package/static export config only as required, `contract-tests/resource-admin-consumer.ts`, consumer config/docs, focused regressions, CLI-generated declarations, change evidence.
+**Dependency:** WU3a, WU3b, and WU4–WU8. **End state:** package/generated exposure and a consumer fixture use native paginated query references directly; legacy contracts remain protected. **Allowed edit surfaces:** package/static export config only as required, `contract-tests/resource-admin-consumer.ts`, consumer config/docs, focused regressions, CLI-generated declarations, change evidence.
 
 - [ ] **RED** — Add a consumer fixture using generated references, `FunctionArgs`, `FunctionReturnType`, `Id<"recursos">`, direct `usePaginatedQuery` list/search calls, native results/status/load-more, detail, seven functions, dispositions, and `AdminErrorData`; assert no Unit/token/DTO/adapter/cache; estimate 25 lines. <!-- sdd-owner: implementation -->
 - [ ] **GREEN** — Add only required package exposure and regenerate through Convex codegen; make the fixture compile without backend imports, manual DTOs, page adapters, or duplicated validation; estimate 40 authored lines. <!-- sdd-owner: implementation -->
@@ -141,4 +150,4 @@ Decision needed before apply: No
 ## Parent-owned post-apply gates
 
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
-- [ ] After verification, confirm all 48 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 52 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->

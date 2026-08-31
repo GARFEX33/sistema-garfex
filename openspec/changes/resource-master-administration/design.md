@@ -4,7 +4,7 @@
 
 Implement the additive `api.catalogoAdmin.recursos` surface with native Convex pagination, search, reactivity, generated types, atomic mutations, and optimistic concurrency control. Custom Resource code exists only for GARFEX business rules and projections.
 
-The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, and WU2b receipts remain historical truth. Completed WU2c corrects WU1 before WU3; WU3 is next.
+The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, WU2b, WU3a, and WU3b receipts remain historical truth. Completed WU2c corrects WU1 before WU3a; WU3a and WU3b are complete, and WU4 is next.
 
 Existing custom catalog-admin pagination remains outside this Resource rescope. No catalog-admin query, cursor, page result, cache, or consumer is authorized for rewrite here.
 
@@ -318,14 +318,21 @@ Every pending unit follows RED → GREEN → TRIANGULATE → REFACTOR and remain
 - legacy Resource tests remain unchanged;
 - one production `MAX_RESOURCE_VALUES` definition is asserted/imported.
 
-### WU3 native list
+### WU3a native list
 
 - native args/returns validators;
 - all eight lifecycle/Type/scope combinations;
 - native page sizes and continuation over 1,000+ unchanged Resources;
 - no duplicates/omissions and termination;
-- no `.collect()`, post-index `.filter()`, values, custom cursor tests, or Unit argument;
-- direct generated paginated query shape.
+- no `.collect()`, post-index `.filter()`, values, custom cursor tests, or Unit argument.
+
+### WU3b native React consumer contract
+
+- the installed `convex/react` `usePaginatedQuery`, not a local imitation;
+- generated `listarRecursosResumen` reference with essential lifecycle/Type/scope filters;
+- `initialNumItems`, native `results`, status, `loadMore`, and every Resource summary field;
+- source-derived generated declarations and stable generated hashes;
+- no adapter, DTO, cache, accumulator, Unit filter, or backend implementation import.
 
 ### WU4 native search
 
@@ -376,11 +383,12 @@ Full verification:
 1. Preserve W0/WU1/WU2a/WU2b receipts.
 2. WU2c audited deployment state, stopped obsolete sort writes, corrected Resource indexes/search filters, repaired scope metadata, and safely retained obsolete Resource sort metadata as inert rollout residue where deployment absence could not be proven.
 3. Wait for corrected indexes/search index to become ready and complete scope repair.
-4. Deploy WU3 native list.
-5. Deploy WU4 native search.
-6. Deploy WU5–WU8 detail and mutations.
-7. Generate and expose WU9 consumer contract.
-8. Run full legacy and native consumer verification.
+4. Deploy WU3a native list.
+5. Validate WU3b's source-derived generated consumer contract against the installed React hook.
+6. Deploy WU4 native search.
+7. Deploy WU5–WU8 detail and mutations.
+8. Generate and expose WU9 consumer contract.
+9. Run full legacy and native consumer verification.
 
 ### Rollback
 
@@ -400,17 +408,18 @@ Full verification:
 | WU2a | Complete history | WU1 | recorded | contracts/projections/detail helpers |
 | WU2b | Complete history | WU2a | recorded | validation/mapping seam |
 | WU2c | Complete | WU2b | 180 | Resource schema/backfill/write correction and focused tests |
-| WU3 | Pending | WU2c | 155 | native list export/tests |
-| WU4 | Pending | WU3 | 145 | native search export/tests |
+| WU3a | Complete history | WU2c | ~319 | native list query/tests |
+| WU3b | Complete history | WU3a | ~152 | direct installed React hook/generated consumer contract/evidence |
+| WU4 | Pending | WU3a + WU3b | 145 | native search export/tests |
 | WU5 | Pending | WU2a, WU2c | 120 | detail export/integration tests |
 | WU6 | Pending | WU2b, WU5 | 175 | create export/orchestration/tests |
 | WU7 | Pending | WU6 | 210 | update export/orchestration/tests |
 | WU8 | Pending | WU7 | 145 | lifecycle exports/tests |
-| WU9 | Pending | WU3–WU8 | 110 authored | generated consumer fixture/package exposure/docs |
+| WU9 | Pending | WU3a, WU3b, WU4–WU8 | 110 authored | generated consumer fixture/package exposure/docs |
 
-Pending forecast is approximately 1,240 authored changed lines. Every pending unit is under 400; split before review if any approaches 350. Generated declarations are tracked separately.
+Pending forecast after completing WU3a/WU3b is approximately 905 authored changed lines. WU3a query/tests are accounted at approximately 319 authored lines and WU3b consumer/generated/task/evidence at approximately 152 authored lines; each remains below 400 with no exception. Generated declarations are tracked separately.
 
-There are 48 implementation-owned TDD rows after adding WU2c: 20 completed rows and 28 pending rows. Two parent-owned gates remain pending, for 50 total task rows.
+There are 52 implementation-owned TDD rows after splitting WU3 into WU3a/WU3b: 28 completed rows and 24 pending rows. Two parent-owned gates remain pending, for 54 total task rows: 28 checked and 26 unchecked.
 
 ## 13. Remaining product decisions
 
