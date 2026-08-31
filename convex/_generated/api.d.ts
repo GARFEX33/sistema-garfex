@@ -869,7 +869,14 @@ export declare const api: {
                 | "COMPATIBILITY_RELATION_INVALID"
                 | "ALLOWLIST_EMPTY"
                 | "TYPE_KEY_AMBIGUOUS"
-                | "CATALOG_LIMIT_EXCEEDED";
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
               count?: number;
               detail?: string;
               entity?:
@@ -1054,7 +1061,14 @@ export declare const api: {
                 | "COMPATIBILITY_RELATION_INVALID"
                 | "ALLOWLIST_EMPTY"
                 | "TYPE_KEY_AMBIGUOUS"
-                | "CATALOG_LIMIT_EXCEEDED";
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
               count?: number;
               detail?: string;
               entity?:
@@ -1236,7 +1250,14 @@ export declare const api: {
                 | "COMPATIBILITY_RELATION_INVALID"
                 | "ALLOWLIST_EMPTY"
                 | "TYPE_KEY_AMBIGUOUS"
-                | "CATALOG_LIMIT_EXCEEDED";
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
               count?: number;
               detail?: string;
               entity?:
@@ -1401,7 +1422,14 @@ export declare const api: {
                 | "COMPATIBILITY_RELATION_INVALID"
                 | "ALLOWLIST_EMPTY"
                 | "TYPE_KEY_AMBIGUOUS"
-                | "CATALOG_LIMIT_EXCEEDED";
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
               count?: number;
               detail?: string;
               entity?:
@@ -1583,7 +1611,14 @@ export declare const api: {
                 | "COMPATIBILITY_RELATION_INVALID"
                 | "ALLOWLIST_EMPTY"
                 | "TYPE_KEY_AMBIGUOUS"
-                | "CATALOG_LIMIT_EXCEEDED";
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
               count?: number;
               detail?: string;
               entity?:
@@ -1740,7 +1775,14 @@ export declare const api: {
               | "COMPATIBILITY_RELATION_INVALID"
               | "ALLOWLIST_EMPTY"
               | "TYPE_KEY_AMBIGUOUS"
-              | "CATALOG_LIMIT_EXCEEDED";
+              | "CATALOG_LIMIT_EXCEEDED"
+              | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+              | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+              | "RESOURCE_ATTRIBUTE_DUPLICATE"
+              | "RESOURCE_REQUIRED_VALUE_MISSING"
+              | "RESOURCE_NON_FINITE_NUMBER"
+              | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+              | "RESOURCE_VALUE_TYPE_INVALID";
             count?: number;
             detail?: string;
             entity?:
