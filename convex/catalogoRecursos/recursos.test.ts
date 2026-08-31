@@ -80,6 +80,16 @@ describe("recursos", () => {
     expect(await t.query(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id })).toMatchObject({ nombre: "Bomba visible", valores: expect.arrayContaining([expect.objectContaining({ atributoRecursoId: f.color })]) });
   });
 
+  it("escribe metadatos administrativos y mantiene la proyección legacy explícita", async () => {
+    const t = convexTest(schema, modules); const f = await seedFixture(t);
+    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
+    expect(Object.keys(creado).sort()).toEqual(["_creationTime", "_id", "activo", "identificadorTecnico", "nombre", "revision", "tipoRecursoId", "unidadId", "valores"].sort());
+    const stored = await t.run(async ctx => ctx.db.get(creado._id));
+    expect(stored).toMatchObject({ adminSortId: creado._id, adminScopeKey: "GLOBAL" });
+    const searchable = await t.run(async ctx => ctx.db.query("recursos").withSearchIndex("buscar", (q: any) => q.search("nombre", "Bomba").eq("tipoRecursoId", f.tipo).eq("unidadId", f.unidad).eq("activo", true).eq("adminScopeKey", "GLOBAL")).take(1));
+    expect(searchable.map(row => row._id)).toEqual([creado._id]);
+  });
+
   it("no usa el nombre para identidad y rechaza duplicados", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
     await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
