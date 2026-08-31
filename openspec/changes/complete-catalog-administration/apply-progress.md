@@ -943,3 +943,54 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Final full run: `pnpm exec vitest run` — PASS, 27 files / 186 tests.
 - Final contract/runtime run: `pnpm exec convex codegen --typecheck enable && pnpm exec convex dev --once && pnpm typecheck && git diff --check` — PASS; local functions ready, `tsc --noEmit` passed, diff clean.
 - Re-read persisted tasks: W12 implementation rows are visibly `- [x]`; native status reports `taskProgress.completed: 57`, `pending: 18`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`. Later implementation and parent lifecycle rows remain, so this phase returns `parent-lifecycle`.
+
+# Apply progress — W13
+
+## Status consumed and workload boundary
+
+- Native status was consumed before editing: `openspec` authoritative, `changeName: complete-catalog-administration`, `applyState: ready`; proposal, all specs, design, tasks, and cumulative apply progress were present.
+- `actionContext.mode`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Active bounded attempt was authenticated with token `sha256:b7f79ef925b7b22eb91cf0ac9a83dff2b20a199bff83a0145d0d6f26f8ed3bed`; bounds 2 attempts / 380 changed lines; delivery boundary W13 on `sdd/catalog-admin-w13`, stacked on W12.
+- Workload gate: `Decision needed before apply: No`; chained delivery `Yes`; strategy `stacked-to-main`; roadmap risk `High`, while this W13 slice remained below the 400-line boundary.
+
+## W13 implementation evidence
+
+- Added relation create/detail/list/update/activate/deactivate Convex commands with optimistic revision checks, immutable policy/option echoes, no hard delete, and transactional validation before writes.
+- Enforced endpoint ownership, symmetric reverse input acceptance, active-option requirements on activation, duplicate reservation across inactive relations, inactive-policy inertness annotations, and policy direction collision checks.
+- Added relation normalized metadata and deterministic normalized identities. Symmetric normalization orders endpoint identities and moves the corresponding option IDs together; legacy optional `politicaCompatibilidadId` and `tipoRelacion` fields are never rewritten.
+- Added relation list filters for policy/options/state with opaque cursor binding, plus pure normalized-pair helpers and bidirectional directional/symmetric evaluator coverage.
+- W13 RED, GREEN, TRIANGULATE, and REFACTOR rows are visibly `- [x]` in the persisted `tasks.md`; W14-W16 and both parent-owned lifecycle rows remain unchecked.
+
+## TDD Cycle Evidence
+
+| Cycle | Exact evidence | Result |
+|---|---|---|
+| RED | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts` before implementation | Expected failures: missing relation exports and missing normalized-pair helper. |
+| GREEN | Same focused command after relation lifecycle implementation | PASS — 2 files, 14 tests. |
+| TRIANGULATE focused | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts` | PASS — 2 files, 17 tests. |
+| TRIANGULATE regressions | `pnpm exec vitest run convex/catalogoRecursos/recursos.test.ts convex/catalogoRecursos/catalogoPublicado.test.ts` | PASS — 2 files, 48 tests. |
+| TRIANGULATE full/typecheck | `pnpm exec vitest run`; `pnpm typecheck` | PASS — 27 files, 192 tests; root `tsc --noEmit` passed. |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and TypeScript validation completed; no incidental generated diff remained. |
+| Runtime boundary | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked Convex account. |
+| REFACTOR | Endpoint-aware canonical pair normalization plus focused tests/typecheck | PASS — deterministic identities and prior policy evaluator matrix preserved. |
+| Hygiene | `git diff --check` | PASS — no output. |
+
+## Files and rollback boundary
+
+- Changed: `convex/catalogoAdmin/compatibilidad.ts`, `convex/catalogoAdmin/compatibilidad.test.ts`, `src/catalogoRecursos/dominio/compatibilidadOpciones.ts`, `src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts`, `openspec/changes/complete-catalog-administration/tasks.md`, and this cumulative progress file.
+- `convex/_generated/api.d.ts` was included in the allowed generated surface but required no new diff because the compatibility module binding already existed from W12; codegen was run normally.
+- Authored diff is 207 changed lines before the progress/task record, below the requested 380-attempt and 400-review-line limits.
+- Rollback boundary: remove W13 relation exports/tests and endpoint-aware normalization helpers, restore only the four W13 checkbox flips, and retain W12 policy APIs, stored rows, legacy optional metadata, and prior evaluator behavior. No relation, policy, revision, snapshot, stage, commit, push, PR, review, receipt, or delivery action was performed.
+
+## Remaining exact unchecked rows and deferred lifecycle
+
+- W14, W15, and W16 implementation rows remain unchecked in `tasks.md`; their exact persisted lines are unchanged.
+- Parent-owned rows remain byte-for-byte unchanged and deferred: `After apply, collect ordinary SDD status evidence... <!-- sdd-owner: parent -->` and `After post-apply verification, confirm the lifecycle gate... <!-- sdd-owner: parent -->`.
+- Native status after persistence: `taskProgress.completed: 61`, `pending: 14`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`.
+- This executor recommends `parent-lifecycle`; final verification, review, receipts, refutation, correction, validation, settle, and delivery actions remain parent-owned.
+
+## W13 final evidence amendment
+
+- Final focused run: `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts` — PASS, 2 files / 17 tests.
+- Final required boundary run: `pnpm exec vitest run && pnpm typecheck && pnpm exec convex codegen --typecheck enable && pnpm exec convex dev --once && git diff --check` — PASS, 27 files / 193 tests; root typecheck, codegen, local runtime readiness, and diff hygiene passed.
+- Re-read persisted W13 rows: all four implementation checkboxes are visibly `- [x]`; native status remains `taskProgress.completed: 61`, `pending: 14`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply` because W14-W16 and parent lifecycle rows remain.

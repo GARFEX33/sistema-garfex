@@ -2,12 +2,12 @@ import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { adminAggregateIncomplete, adminConflict, adminInvalidArgument, adminInvalidReference } from "./lib/errors";
+import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference } from "./lib/errors";
 import { applyLifecycleChange, applyRevisionedUpdate } from "./lib/revisions";
 import { adminPageValidator, changeResultValidator, createResultValidator, lifecycleFilterValidator } from "./validators";
 import { consumeCursor, createCursor, ORDERING_VERSION, validatePageSize } from "./lib/pagination";
 import { MAX_AGGREGATE_ROWS } from "./lib/cargarAgregado";
-import { politicasCompatibilidadEnConflicto, identidadSlotCompatibilidad } from "../../src/catalogoRecursos/dominio/compatibilidadOpciones";
+import { identidadParCompatibilidad, identidadParPorExtremos, politicasCompatibilidadEnConflicto, identidadSlotCompatibilidad } from "../../src/catalogoRecursos/dominio/compatibilidadOpciones";
 import { resolverAsignaciones, type AsignacionEfectiva } from "../../src/catalogoRecursos/dominio/asignacionesEfectivas";
 
 const policyMode = v.union(v.literal("ALLOWLIST"), v.literal("DENYLIST"));
@@ -16,6 +16,11 @@ const listMode = v.union(policyMode, lifecycleFilterValidator);
 const detail = v.object({
   id: v.id("politicasCompatibilidadOpciones"), tipoRecursoId: v.id("tiposRecurso"), atributoOrigenId: v.id("atributosRecurso"), atributoDestinoId: v.id("atributosRecurso"),
   modo: policyMode, direccion: direction, activo: v.boolean(), revision: v.number(), effective: v.boolean(), effectiveReasons: v.array(v.string()), normalizedIdentity: v.string(),
+});
+const relationDetail = v.object({
+  id: v.id("relacionesOpcionesAtributo"), politicaCompatibilidadId: v.optional(v.id("politicasCompatibilidadOpciones")),
+  opcionOrigenId: v.id("opcionesAtributo"), opcionDestinoId: v.id("opcionesAtributo"), activo: v.boolean(), revision: v.number(),
+  effective: v.boolean(), effectiveReasons: v.array(v.string()), normalizedIdentity: v.string(),
 });
 type Policy = Doc<"politicasCompatibilidadOpciones">;
 type Db = Pick<QueryCtx, "db">;
@@ -80,6 +85,14 @@ async function validatePolicy(ctx: MutationCtx, row: Policy, ignore?: Id<"politi
   const conflict = policies.find(candidate => candidate.activo && candidate._id !== ignore && politicasCompatibilidadEnConflicto(slot(candidate), slot(row)));
   if (conflict) adminConflict({ entity: entity(row._id), conflictKind: "compatibility-policy-slot", conflictingEntity: entity(conflict._id), normalizedIdentity: normalized(row).identity });
   if (row.modo === "ALLOWLIST" && (await relationCount(ctx, row, endpoints)) === 0) adminAggregateIncomplete({ entity: entity(row._id), violations: [{ code: "ALLOWLIST_EMPTY", entity: entity(row._id) }] });
+  const relations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPolitica", q => q.eq("politicaCompatibilidadId", row._id)).take(MAX_AGGREGATE_ROWS + 1);
+  const identities = new Map<string, Id<"relacionesOpcionesAtributo">>();
+  for (const relation of relations) {
+    const identity = relationIdentity(relation, row);
+    const previous = identities.get(identity);
+    if (previous !== undefined && previous !== relation._id) adminConflict({ entity: { kind: "relacionesOpcionesAtributo", id: relation._id }, conflictKind: "compatibility-relation-identity", conflictingEntity: { kind: "relacionesOpcionesAtributo", id: previous }, normalizedIdentity: identity });
+    identities.set(identity, relation._id);
+  }
 }
 
 async function item(ctx: Db, row: Policy) {
@@ -119,9 +132,106 @@ export const listarPoliticasCompatibilidad = query({
 
 export const actualizarPoliticaCompatibilidad = mutation({
   args: { politicaCompatibilidadId: v.id("politicasCompatibilidadOpciones"), expectedRevision: v.number(), tipoRecursoId: v.optional(v.id("tiposRecurso")), atributoOrigenId: v.optional(v.id("atributosRecurso")), atributoDestinoId: v.optional(v.id("atributosRecurso")), modo: v.optional(policyMode), direccion: v.optional(direction) }, returns: changeResultValidator(detail),
-  handler: async (ctx, args) => { const result = await applyRevisionedUpdate<Policy, typeof args, { modo?: Policy["modo"]; direccion?: Policy["direccion"] }>({ load: () => ctx.db.get(args.politicaCompatibilidadId), expectedRevision: args.expectedRevision, entity: entity(args.politicaCompatibilidadId), immutable: { tipoRecursoId: args.tipoRecursoId, atributoOrigenId: args.atributoOrigenId, atributoDestinoId: args.atributoDestinoId }, changes: args, normalize: changes => ({ ...(changes.modo === undefined ? {} : { modo: changes.modo }), ...(changes.direccion === undefined ? {} : { direccion: changes.direccion }) }), current: row => ({ ...(args.modo === undefined ? {} : { modo: row.modo }), ...(args.direccion === undefined ? {} : { direccion: row.direccion }) }), validate: async next => { await validatePolicy(ctx, next, next._id); }, patch: next => { const n = normalized(next); return ctx.db.patch(next._id, { modo: next.modo, direccion: next.direccion, atributoOrigenIdNormalizado: n.origin, atributoDestinoIdNormalizado: n.destination, revision: next.revision }); } }); return { disposition: result.disposition, item: await item(ctx, result.item) }; },
+  handler: async (ctx, args) => { const result = await applyRevisionedUpdate<Policy, typeof args, { modo?: Policy["modo"]; direccion?: Policy["direccion"] }>({ load: () => ctx.db.get(args.politicaCompatibilidadId), expectedRevision: args.expectedRevision, entity: entity(args.politicaCompatibilidadId), immutable: { tipoRecursoId: args.tipoRecursoId, atributoOrigenId: args.atributoOrigenId, atributoDestinoId: args.atributoDestinoId }, changes: args, normalize: changes => ({ ...(changes.modo === undefined ? {} : { modo: changes.modo }), ...(changes.direccion === undefined ? {} : { direccion: changes.direccion }) }), current: row => ({ ...(args.modo === undefined ? {} : { modo: row.modo }), ...(args.direccion === undefined ? {} : { direccion: row.direccion }) }), validate: async next => { await validatePolicy(ctx, next, next._id); }, patch: async next => { const n = normalized(next); await ctx.db.patch(next._id, { modo: next.modo, direccion: next.direccion, atributoOrigenIdNormalizado: n.origin, atributoDestinoIdNormalizado: n.destination, revision: next.revision }); await reindexRelations(ctx, next); } }); return { disposition: result.disposition, item: await item(ctx, result.item) }; },
 });
 
 async function lifecycle(ctx: MutationCtx, args: { politicaCompatibilidadId: Id<"politicasCompatibilidadOpciones">; expectedRevision: number }, active: boolean) { const result = await applyLifecycleChange<Policy>({ load: () => ctx.db.get(args.politicaCompatibilidadId), expectedRevision: args.expectedRevision, entity: entity(args.politicaCompatibilidadId), targetActive: active, validate: next => validatePolicy(ctx, next), patch: next => { const n = normalized(next); return ctx.db.patch(next._id, { activo: next.activo, atributoOrigenIdNormalizado: n.origin, atributoDestinoIdNormalizado: n.destination, revision: next.revision }); } }); return { disposition: result.disposition, item: await item(ctx, result.item) }; }
 export const activarPoliticaCompatibilidad = mutation({ args: { politicaCompatibilidadId: v.id("politicasCompatibilidadOpciones"), expectedRevision: v.number() }, returns: changeResultValidator(detail), handler: (ctx, args) => lifecycle(ctx, args, true) });
 export const desactivarPoliticaCompatibilidad = mutation({ args: { politicaCompatibilidadId: v.id("politicasCompatibilidadOpciones"), expectedRevision: v.number() }, returns: changeResultValidator(detail), handler: (ctx, args) => lifecycle(ctx, args, false) });
+
+type Relation = Doc<"relacionesOpcionesAtributo">;
+const relationEntity = (id: Id<"relacionesOpcionesAtributo">) => ({ kind: "relacionesOpcionesAtributo" as const, id });
+function relationIdentity(row: Pick<Relation, "opcionOrigenId" | "opcionDestinoId" | "opcionOrigenIdNormalizada" | "opcionDestinoIdNormalizada">, policy: Pick<Policy, "direccion" | "atributoOrigenId" | "atributoDestinoId">): string {
+  if (row.opcionOrigenIdNormalizada !== undefined && row.opcionDestinoIdNormalizada !== undefined) return `${policy.direccion === "SYMMETRIC" ? "S" : "D"}|${row.opcionOrigenIdNormalizada}|${row.opcionDestinoIdNormalizada}`;
+  return identidadParCompatibilidad(String(row.opcionOrigenId), "", String(row.opcionDestinoId), "", policy.direccion);
+}
+
+async function reindexRelations(ctx: MutationCtx, policy: Policy) {
+  const relations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPolitica", q => q.eq("politicaCompatibilidadId", policy._id)).take(MAX_AGGREGATE_ROWS + 1);
+  for (const relation of relations) {
+    const identity = relationIdentity(relation, policy).split("|");
+    await ctx.db.patch(relation._id, { opcionOrigenIdNormalizada: identity[1], opcionDestinoIdNormalizada: identity[2] });
+  }
+}
+
+async function validateRelation(ctx: MutationCtx, row: Pick<Relation, "politicaCompatibilidadId" | "opcionOrigenId" | "opcionDestinoId" | "activo">, ignore?: Id<"relacionesOpcionesAtributo">) {
+  if (!row.politicaCompatibilidadId) adminInvalidReference({ entityKind: "relacionesOpcionesAtributo", field: "politicaCompatibilidadId", reason: "relation requires an owning policy" });
+  const policy = await ctx.db.get(row.politicaCompatibilidadId!);
+  if (!policy) adminInvalidReference({ entityKind: "relacionesOpcionesAtributo", field: "politicaCompatibilidadId", reference: { kind: "politicasCompatibilidadOpciones", id: row.politicaCompatibilidadId! }, reason: "policy does not exist" });
+  const endpoints = await validateEndpoints(ctx, policy!, false);
+  if (row.activo && policy!.activo) await validateEndpoints(ctx, policy!, true);
+  const origin = await ctx.db.get(row.opcionOrigenId); const destination = await ctx.db.get(row.opcionDestinoId);
+  const normal = origin?.definicionAtributoId === endpoints.originDefinition._id && destination?.definicionAtributoId === endpoints.destinationDefinition._id;
+  const reversed = policy!.direccion === "SYMMETRIC" && origin?.definicionAtributoId === endpoints.destinationDefinition._id && destination?.definicionAtributoId === endpoints.originDefinition._id;
+  if (!normal && !reversed) adminInvalidReference({ entityKind: "relacionesOpcionesAtributo", field: "opcionOrigenId", reference: { kind: "opcionesAtributo", id: row.opcionOrigenId }, reason: "options are outside the policy endpoints" });
+  if (row.activo && (!origin!.activo || !destination!.activo)) adminInvalidReference({ entityKind: "relacionesOpcionesAtributo", field: "opcionOrigenId", reason: "active relation requires active options" });
+  const identity = normal
+    ? identidadParPorExtremos(String(policy!.atributoOrigenId), String(row.opcionOrigenId), String(policy!.atributoDestinoId), String(row.opcionDestinoId), policy!.direccion)
+    : identidadParPorExtremos(String(policy!.atributoDestinoId), String(row.opcionOrigenId), String(policy!.atributoOrigenId), String(row.opcionDestinoId), policy!.direccion);
+  const relations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPolitica", q => q.eq("politicaCompatibilidadId", row.politicaCompatibilidadId!)).take(MAX_AGGREGATE_ROWS + 1);
+  const duplicate = relations.find(candidate => candidate._id !== ignore && relationIdentity(candidate, policy!) === identity);
+  if (duplicate) adminDuplicateKey({ entityKind: "relacionesOpcionesAtributo", scope: String(row.politicaCompatibilidadId), normalizedIdentity: identity });
+  return { policy: policy!, identity };
+}
+
+async function relationItem(ctx: Db, row: Relation) {
+  const policy = row.politicaCompatibilidadId ? await ctx.db.get(row.politicaCompatibilidadId) : null;
+  const reasons: string[] = [];
+  if (!row.activo) reasons.push("INACTIVE");
+  if (!policy) reasons.push("POLICY_MISSING");
+  const origin = await ctx.db.get(row.opcionOrigenId); const destination = await ctx.db.get(row.opcionDestinoId);
+  if (!origin || !origin.activo) reasons.push("ORIGIN_OPTION_INACTIVE");
+  if (!destination || !destination.activo) reasons.push("DESTINATION_OPTION_INACTIVE");
+  if (policy) {
+    if (!policy.activo) reasons.push("POLICY_INACTIVE");
+    const owner = await assignments(ctx, policy.tipoRecursoId);
+    const originAssignment = [...owner.chosen.values()].find(candidate => candidate._id === policy.atributoOrigenId);
+    const destinationAssignment = [...owner.chosen.values()].find(candidate => candidate._id === policy.atributoDestinoId);
+    const originDefinition = originAssignment ? owner.definitions.get(String(originAssignment.definicionAtributoId)) : undefined;
+    const destinationDefinition = destinationAssignment ? owner.definitions.get(String(destinationAssignment.definicionAtributoId)) : undefined;
+    if (!originAssignment || !destinationAssignment || !originAssignment.activo || !destinationAssignment.activo) reasons.push("ENDPOINT_INACTIVE");
+    if (origin && originDefinition && origin.definicionAtributoId !== originDefinition._id) reasons.push("ORIGIN_OPTION_OUTSIDE_ENDPOINT");
+    if (destination && destinationDefinition && destination.definicionAtributoId !== destinationDefinition._id) reasons.push("DESTINATION_OPTION_OUTSIDE_ENDPOINT");
+    if (!originDefinition?.activo || !destinationDefinition?.activo) reasons.push("DEFINITION_INACTIVE");
+    if (!owner.type.activo || !owner.family.activo || !owner.clazz.activo) reasons.push("HIERARCHY_INACTIVE");
+  }
+  return { id: row._id, politicaCompatibilidadId: row.politicaCompatibilidadId, opcionOrigenId: row.opcionOrigenId, opcionDestinoId: row.opcionDestinoId, activo: row.activo, revision: row.revision, effective: row.activo && reasons.length === 0, effectiveReasons: reasons, normalizedIdentity: policy ? relationIdentity(row, policy) : `LEGACY|${row.opcionOrigenIdNormalizada ?? row.opcionOrigenId}|${row.opcionDestinoIdNormalizada ?? row.opcionDestinoId}` };
+}
+
+export const crearRelacionCompatibilidad = mutation({
+  args: { politicaCompatibilidadId: v.id("politicasCompatibilidadOpciones"), opcionOrigenId: v.id("opcionesAtributo"), opcionDestinoId: v.id("opcionesAtributo"), activo: v.optional(v.boolean()) },
+  returns: createResultValidator(relationDetail),
+  handler: async (ctx, args) => {
+    const active = args.activo ?? false; const checked = await validateRelation(ctx, { ...args, activo: active });
+    const id = await ctx.db.insert("relacionesOpcionesAtributo", { politicaCompatibilidadId: args.politicaCompatibilidadId, opcionOrigenId: args.opcionOrigenId, opcionDestinoId: args.opcionDestinoId, activo: active, revision: 1 });
+    const [_, origin, destination] = checked.identity.split("|");
+    await ctx.db.patch(id, { adminSortId: id, opcionOrigenIdNormalizada: origin, opcionDestinoIdNormalizada: destination });
+    return { disposition: "CREATED" as const, item: await relationItem(ctx, (await ctx.db.get(id))!) };
+  },
+});
+export const obtenerRelacionCompatibilidad = query({ args: { relacionCompatibilidadId: v.id("relacionesOpcionesAtributo") }, returns: v.union(relationDetail, v.null()), handler: async (ctx, args) => { const row = await ctx.db.get(args.relacionCompatibilidadId); return row ? relationItem(ctx, row) : null; } });
+
+const relationContext = (mode: "ALL" | "ACTIVE" | "INACTIVE", filters: unknown) => ({ mode, plan: "porPoliticaYOpcionesNormalizadasYAdminSort", filters, order: ORDERING_VERSION });
+export const listarRelacionesCompatibilidad = query({
+  args: { politicaCompatibilidadId: v.optional(v.id("politicasCompatibilidadOpciones")), opcionOrigenId: v.optional(v.id("opcionesAtributo")), opcionDestinoId: v.optional(v.id("opcionesAtributo")), opcionId: v.optional(v.id("opcionesAtributo")), estado: v.optional(lifecycleFilterValidator), cursor: v.optional(v.union(v.string(), v.null())), pageSize: v.optional(v.number()) },
+  returns: adminPageValidator(relationDetail), handler: async (ctx, args) => {
+    const lifecycle = args.estado ?? "ALL"; const filters = { politicaCompatibilidadId: args.politicaCompatibilidadId ?? null, opcionOrigenId: args.opcionOrigenId ?? null, opcionDestinoId: args.opcionDestinoId ?? null, opcionId: args.opcionId ?? null };
+    const contextValue = relationContext(lifecycle, filters); const cursor = await consumeCursor(args.cursor ?? null, contextValue);
+    const page = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPoliticaYOpcionesNormalizadasYAdminSort", q => args.politicaCompatibilidadId === undefined ? q : q.eq("politicaCompatibilidadId", args.politicaCompatibilidadId)).order("asc").paginate({ numItems: validatePageSize(args.pageSize), cursor });
+    const rows = (page.page as Relation[]).filter(row => (lifecycle === "ALL" || row.activo === (lifecycle === "ACTIVE")) && (args.opcionOrigenId === undefined || row.opcionOrigenId === args.opcionOrigenId) && (args.opcionDestinoId === undefined || row.opcionDestinoId === args.opcionDestinoId) && (args.opcionId === undefined || row.opcionOrigenId === args.opcionId || row.opcionDestinoId === args.opcionId));
+    return { items: await Promise.all(rows.map(row => relationItem(ctx, row))), continuationCursor: page.isDone ? null : await createCursor(page.continueCursor, contextValue), isExhausted: page.isDone };
+  },
+});
+
+export const actualizarRelacionCompatibilidad = mutation({
+  args: { relacionCompatibilidadId: v.id("relacionesOpcionesAtributo"), expectedRevision: v.number(), politicaCompatibilidadId: v.optional(v.id("politicasCompatibilidadOpciones")), opcionOrigenId: v.optional(v.id("opcionesAtributo")), opcionDestinoId: v.optional(v.id("opcionesAtributo")) },
+  returns: changeResultValidator(relationDetail),
+  handler: async (ctx, args) => { const result = await applyRevisionedUpdate<Relation, typeof args, Record<string, never>>({ load: () => ctx.db.get(args.relacionCompatibilidadId), expectedRevision: args.expectedRevision, entity: relationEntity(args.relacionCompatibilidadId), immutable: { politicaCompatibilidadId: args.politicaCompatibilidadId, opcionOrigenId: args.opcionOrigenId, opcionDestinoId: args.opcionDestinoId }, changes: args, normalize: () => ({}), current: () => ({}), validate: async next => { await validateRelation(ctx, next, next._id); }, patch: next => ctx.db.patch(next._id, { revision: next.revision }) }); return { disposition: result.disposition, item: await relationItem(ctx, result.item) }; },
+});
+
+async function relationLifecycle(ctx: MutationCtx, args: { relacionCompatibilidadId: Id<"relacionesOpcionesAtributo">; expectedRevision: number }, active: boolean) {
+  const result = await applyLifecycleChange<Relation>({ load: () => ctx.db.get(args.relacionCompatibilidadId), expectedRevision: args.expectedRevision, entity: relationEntity(args.relacionCompatibilidadId), targetActive: active, validate: async next => { await validateRelation(ctx, next, next._id); }, patch: next => ctx.db.patch(next._id, { activo: next.activo, revision: next.revision }) });
+  return { disposition: result.disposition, item: await relationItem(ctx, result.item) };
+}
+export const activarRelacionCompatibilidad = mutation({ args: { relacionCompatibilidadId: v.id("relacionesOpcionesAtributo"), expectedRevision: v.number() }, returns: changeResultValidator(relationDetail), handler: (ctx, args) => relationLifecycle(ctx, args, true) });
+export const desactivarRelacionCompatibilidad = mutation({ args: { relacionCompatibilidadId: v.id("relacionesOpcionesAtributo"), expectedRevision: v.number() }, returns: changeResultValidator(relationDetail), handler: (ctx, args) => relationLifecycle(ctx, args, false) });
