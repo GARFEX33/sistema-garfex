@@ -3,9 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.24.0",
+  "exports": {
+    "./convex-api": {
+      "types": "./convex/_generated/api.d.ts",
+      "default": "./convex/_generated/api.js"
+    },
+    "./convex-data-model": {
+      "types": "./convex/_generated/dataModel.d.ts"
+    },
+    "./catalog-admin-errors": {
+      "types": "./convex/catalogoAdmin/validators.ts"
+    }
+  },
   "scripts": {
     "dev": "convex dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:consumer": "tsc -p contract-tests/tsconfig.json --noEmit"
   },
   "dependencies": {
     "convex": "^1.45.0",

@@ -1026,3 +1026,40 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Rollback boundary: remove the W15 admin publication module/tests and compiler integration, restore only W15 checkbox flips, and retain all historical rows, snapshots, legacy public reads, and prior admin slices.
 - Remaining exact unchecked implementation rows: W16 RED, W16 GREEN, W16 TRIANGULATE, and W16 REFACTOR. Deferred parent rows remain byte-for-byte unchanged: `After apply, collect ordinary SDD status evidence... <!-- sdd-owner: parent -->` and `After post-apply verification, confirm the lifecycle gate... <!-- sdd-owner: parent -->`.
 - Produced status: `taskProgress.completed: 69`, `pending: 6`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; parent lifecycle remains required. No review, receipt, verify actor, correction, validation, commit, push, PR, or delivery action was performed.
+
+## W16 — static generated contract and separate consumer
+
+- Status consumed: authoritative OpenSpec; `applyState: ready`; `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none. Active attempt continued with token `sha256:0e9f328b097a1f9e0cf50c8c385071d0f4fc64ca2aa6fbe3ac72c5654537408c`; bounds 2 attempts / 380 changed lines; stacked-to-main W16 boundary.
+- Review workload gate: W16 delivery decision was resolved by the parent prompt as chained `stacked-to-main`; the W16 authored estimate remained below the 400-line review limit. Generated output is derived and excluded from authored-line counting.
+- RED: added `contract-tests/catalog-admin-consumer.ts` and `contract-tests/tsconfig.json`; `pnpm exec tsc -p contract-tests/tsconfig.json --noEmit` failed as expected because the three package subpaths did not yet exist.
+- GREEN: added static `codegen.staticApi`, `codegen.staticDataModel`, and `fileType: "js/dts"` in `convex.json`; added package exports and `typecheck:consumer`; regenerated `convex/_generated/api.d.ts` and `dataModel.d.ts` only through `pnpm exec convex codegen --typecheck enable`. Static output contains typed `FunctionReference`s and a schema-independent data model.
+- TRIANGULATE: the fixture covers representative calls in all seven `api.catalogoAdmin.*` modules, `FunctionArgs`, `FunctionReturnType`, pagination/cursors, publish `CREATED|UNCHANGED`, generated table IDs, and discriminated `AdminErrorData` narrowing. No backend function is executed by the fixture.
+- REFACTOR: added `contract-tests/README.md` documenting pinned Git/private-registry consumption, direct generated imports, and the contract update workflow; no DTO, SDK business layer, or frontend validation was introduced.
+
+### W16 TDD Cycle Evidence
+
+| Cycle | Exact evidence | Result |
+|---|---|---|
+| RED | `pnpm exec tsc -p contract-tests/tsconfig.json --noEmit` before exports | Expected FAIL — unresolved `sistema-garfex/convex-api`, `convex-data-model`, and `catalog-admin-errors` subpaths. |
+| GREEN | `pnpm typecheck:consumer`; `pnpm typecheck` | PASS — standalone fixture and root `tsc --noEmit`. |
+| TRIANGULATE | `pnpm exec convex codegen --typecheck enable`; `pnpm exec vitest run` | PASS — generated bindings/typecheck; 29 files / 205 tests. |
+| Runtime boundary | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked Convex account. |
+| REFACTOR | final consumer typecheck and generated-diff inspection | PASS — package imports remain static and generated files contain no backend source imports. |
+| Hygiene | `git diff --check` | PASS — no output. |
+
+### W16 completed tasks and persisted checkboxes
+
+- W16 RED, GREEN, TRIANGULATE, and REFACTOR are visibly marked `- [x]` in `tasks.md`; only these four implementation rows were changed.
+- Parent-owned lifecycle rows remain unchanged and deferred: `After apply, collect ordinary SDD status evidence... <!-- sdd-owner: parent -->` and `After post-apply verification, confirm the lifecycle gate... <!-- sdd-owner: parent -->`.
+
+### W16 files, cleanliness, and rollback
+
+- Authored files changed: `convex.json`, `package.json`, `contract-tests/catalog-admin-consumer.ts`, `contract-tests/tsconfig.json`, `contract-tests/README.md`, the W16 task checkbox rows, and this cumulative progress record. Derived files changed by normal codegen: `convex/_generated/api.d.ts` and `convex/_generated/dataModel.d.ts`.
+- Generated API/data-model output is static: `api.d.ts` imports only Convex type utilities and `dataModel.d.ts` has no schema-source import. Existing public API entries remain in the generated tree.
+- `git diff --check` passed after runtime/codegen; no generated formatting or incidental source diff was found. The generated snapshot is intentionally large and excluded from authored-line budget per the task/design contract.
+- Rollback boundary: remove the W16 package exports, `convex.json`, consumer fixture/config/docs, and derived generated output only by rerunning normal codegen with static settings removed; retain all backend functions, catalog rows, public compatibility, revisions, and snapshots. No review, receipt, verify actor, correction, validation, settle, commit, push, PR, or delivery action was performed.
+
+### W16 status produced
+
+- Native status after persistence: `taskProgress.completed: 73`, `pending: 2`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; the two pending rows are parent-owned lifecycle actions.
+- This executor recommends `parent-lifecycle`; parent-owned verification/status evidence and lifecycle decisions remain deferred.
