@@ -758,3 +758,57 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Parent-owned rows remain deferred unchanged: `- [ ] After apply, collect ordinary SDD status evidence ... <!-- sdd-owner: parent -->` and `- [ ] After post-apply verification, confirm the lifecycle gate ... <!-- sdd-owner: parent -->`.
 - Current native status after persistence: `taskProgress.completed: 45`, `taskProgress.pending: 30`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; this executor returns `parent-lifecycle`.
 - No review, receipt, refutation, correction, validation actor, delivery gate, commit, stage, push, or PR action was started by this executor; the required native attempt settlement completed with state `complete`.
+
+# Apply progress — W10
+
+## Status consumed and workload boundary
+
+- Native status: `spec-driven`, `openspec` authoritative, `applyState: ready`, change `complete-catalog-administration`.
+- `actionContext`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Parent token `sha256:b42dcbebbddef30ca8fdfff4811e4d7a53e7e3618568e79e3d9787a9ebf8827e` authenticated W10 with 2 attempts and 380 changed-line bounds.
+- Workload gate resolved: decision `No`; chained delivery `Yes`, `stacked-to-main`; W10 stayed below the 400-line boundary.
+
+## TDD Cycle Evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | W10 focused tests before implementation | Expected missing-module/API failures |
+| GREEN | `pnpm exec vitest run src/catalogoRecursos/dominio/reglasCondicionales.test.ts convex/catalogoAdmin/reglas.test.ts` | PASS — 2 files, 5 tests |
+| TRIANGULATE | Focused rules/resource/aggregate tests plus typecheck | PASS — 5 files, 11 tests; `tsc --noEmit` passed |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — retained generated `catalogoAdmin/reglas` binding |
+| Runtime | `pnpm exec convex dev --once` | PASS — local functions ready on port 3210; no linked account |
+| REFACTOR | `pnpm exec vitest run && pnpm typecheck` | PASS — 25 files, 176 tests; typecheck passed |
+| Hygiene | `git diff --check` | PASS — no output |
+
+## W10 implementation and checkbox evidence
+
+- Added rule lifecycle/read commands, immutable identity, selected Type references, option ownership, duplicate inactive reservation, cursor/filter reads, effective annotations, and structured conflicts.
+- Added pure raw-presence evaluation, CONDITIONAL optional baseline, deterministic one-pass order, co-fire conflict detection, same-result support, inactive filtering, and cycle safety.
+- Wired rule evaluation into resource validation and rule violations into bounded Type aggregate loading.
+- W10 RED, GREEN, TRIANGULATE, and REFACTOR are visibly `- [x]` in `tasks.md`; W11 onward and parent rows remain unchanged.
+
+## Files and rollback boundary
+
+- Changed: `convex/catalogoAdmin/reglas.ts`, both W10 tests, `src/catalogoRecursos/dominio/reglasCondicionales.ts`, `validarRecurso.ts`, `validarRecurso.test.ts`, `convex/catalogoAdmin/lib/cargarAgregado.ts`, `validacionAgregado.ts`, and generated `convex/_generated/api.d.ts`.
+- Rollback removes W10 rule modules/tests and reverts only W10 evaluator, aggregate, resource-validation, violation-code, and generated-binding changes; W9 behavior and stored rows remain.
+- No hard-delete or derived-applicability dependency was introduced.
+
+## Remaining exact unchecked rows
+
+- [ ] W11 implementation rows — exact persisted lines remain in `tasks.md`.
+- [ ] W12 implementation rows — exact persisted lines remain in `tasks.md`.
+- [ ] W13 implementation rows — exact persisted lines remain in `tasks.md`.
+- [ ] W14 implementation rows — exact persisted lines remain in `tasks.md`.
+- [ ] W15 implementation rows — exact persisted lines remain in `tasks.md`.
+- [ ] W16 implementation rows — exact persisted lines remain in `tasks.md`.
+
+## Deferred parent lifecycle actions
+
+- [ ] After apply, collect ordinary SDD status evidence ... <!-- sdd-owner: parent -->
+- [ ] After post-apply verification, confirm the lifecycle gate ... <!-- sdd-owner: parent -->
+
+## Status produced
+
+- W10 implementation tasks are complete; later implementation rows and parent lifecycle rows remain pending.
+- Native status remains `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; this executor recommends `parent-lifecycle`.
+- No review, receipt, verification actor, correction, validation, commit, stage, push, PR, or delivery gate was started.
