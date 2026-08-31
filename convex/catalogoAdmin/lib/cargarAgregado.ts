@@ -4,6 +4,7 @@ import { validarAgregado, type AggregateViolation, type ResultadoAgregado } from
 import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../../src/catalogoRecursos/dominio/unidadesEfectivas";
 import { resolverAsignaciones, validarCompletitudAsignaciones } from "../../../src/catalogoRecursos/dominio/asignacionesEfectivas";
 import { validarReglasCondicionales, type ReglaCondicional } from "../../../src/catalogoRecursos/dominio/reglasCondicionales";
+import { validarEstructuraPresentacion } from "../../../src/catalogoRecursos/dominio/presentacionCanonica";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -63,11 +64,22 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const toDomain = (policy: typeof allPolicies[number]): PoliticaUnidadEfectiva => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal, unidadActiva: unitActivity.get(policy.unidadId) === true });
   const resolution = resolverUnidadesEfectivas({ familia: familyRows.map(toDomain), tipo: typeRows.map(toDomain), tipoEfectivo: effective });
   const principalUnits = resolution.selected.map(policy => ({ active: policy.activo, principal: policy.principal, unitActive: policy.unidadActiva }));
+  const selectedById = new Map(selectedAssignments.map(assignment => [assignment.id, assignment]));
+  const presentationPolicies = presentations.map(policy => {
+    const violations: AggregateViolation[] = [];
+    const structure = validarEstructuraPresentacion({ tokens: policy.tokens as never[], separador: policy.separador });
+    if (structure) violations.push({ code: "PRESENTATION_TOKEN_INVALID", detail: structure });
+    if (policy.activo) for (const token of policy.tokens) if (token.tipo === "ATTRIBUTE_VALUE") {
+      const assignment = selectedById.get(String(token.atributoRecursoId));
+      if (!assignment || !assignment.activo || assignment.aplicabilidad === "FORBIDDEN" || assignment.aplicabilidad === "NOT_APPLICABLE" || !definitions.get(assignment.definicionId)?.activo) violations.push({ code: "PRESENTATION_TOKEN_INVALID", detail: "token does not reference an effective value-bearing assignment" });
+    }
+    return { active: policy.activo, tokenCount: policy.tokens.length, violations };
+  });
   const result = validarAgregado({
     effective,
     hierarchy: { typeId: type._id, familyId: family._id, classId: clase._id, familyOfTypeId: type.familiaRecursoId, classOfFamilyId: family.claseRecursoId },
     principalUnits,
-    presentationPolicies: presentations.map(policy => ({ active: policy.activo, tokenCount: policy.tokens.length })),
+    presentationPolicies,
   });
   return { effective, ...result };
 }

@@ -55,4 +55,20 @@ describe("presentación canónica", () => {
       new Map(),
     )).toEqual({ ok: false, error: "NOMBRE_VACIO" });
   });
+
+  it("preserva el orden semántico y normaliza NFC, nombres de opción y símbolos", () => {
+    expect(renderizarPresentacionCanonica(
+      { tipoNombre: "Cafe\u0301  ", tokens: [{ tipo: "TYPE_NAME" }, { tipo: "ATTRIBUTE_VALUE", atributoClave: "B" }, { tipo: "LITERAL", texto: " final " }, { tipo: "ATTRIBUTE_VALUE", atributoClave: "A" }], separador: "  /  " },
+      new Map<string, string | { tipoDato: "OPCION"; valor: string; opcionNombre: string }>([["A", " uno "], ["B", { tipoDato: "OPCION", valor: "id", opcionNombre: "  Té   verde " }]]),
+    )).toEqual({ ok: true, nombre: "Café / Té verde / final / uno" });
+  });
+
+  it("omite todo valor opcional y rechaza una política estructuralmente vacía", () => {
+    expect(renderizarPresentacionCanonica(
+      policy([{ tipo: "TYPE_NAME" }, { tipo: "ATTRIBUTE_VALUE", atributoClave: "OPTIONAL" }, { tipo: "LITERAL", texto: "final" }]), new Map(),
+    )).toEqual({ ok: true, nombre: "Cable · final" });
+    expect(renderizarPresentacionCanonica(
+      { tipoNombre: " ", tokens: [{ tipo: "TYPE_NAME" }], separador: "-" }, new Map(),
+    )).toEqual({ ok: false, error: "POLITICA_INVALIDA" });
+  });
 });
