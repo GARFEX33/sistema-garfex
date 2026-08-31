@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as catalogoAdmin_atributos from "../catalogoAdmin/atributos.js";
 import type * as catalogoAdmin_jerarquia from "../catalogoAdmin/jerarquia.js";
 import type * as catalogoAdmin_lib_backfillMetadatos from "../catalogoAdmin/lib/backfillMetadatos.js";
 import type * as catalogoAdmin_lib_cargarAgregado from "../catalogoAdmin/lib/cargarAgregado.js";
@@ -30,6 +31,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "catalogoAdmin/atributos": typeof catalogoAdmin_atributos;
   "catalogoAdmin/jerarquia": typeof catalogoAdmin_jerarquia;
   "catalogoAdmin/lib/backfillMetadatos": typeof catalogoAdmin_lib_backfillMetadatos;
   "catalogoAdmin/lib/cargarAgregado": typeof catalogoAdmin_lib_cargarAgregado;
