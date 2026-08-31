@@ -84,3 +84,52 @@ All other unchecked implementation rows, beginning with W1, remain deferred to l
 
 - W0 implementation-owned task progress: 4 W0 rows complete; later implementation work remains.
 - `nextRecommended`: `parent-lifecycle` for this delegated apply result; parent-owned post-apply lifecycle gates remain pending.
+
+# Apply progress — W1a
+
+## Status consumed
+
+- Native status: `spec-driven`, `openspec` authoritative, `applyState: ready`, `changeName: complete-catalog-administration`.
+- Active attempt: `sha256:132a7ed2f7b5c7fefa2c616a54fe5371180b28c84e3770296504c467b58e0950`; objective `W1a-admin-error-contracts`; max attempt changes `220`.
+- `actionContext`: `repo-local`; workspace/allowed root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Workload gate: decision `No`; chained delivery `Yes`, strategy `stacked-to-main`; W1a remains below the 400-line review budget.
+- Strict TDD is active. W1b revision/concurrency work is explicitly pending and is not claimed here.
+
+## W1a recovery and persisted checkboxes
+
+- W1a is complete: its four `RED`, `GREEN`, `TRIANGULATE`, and `REFACTOR` rows are `- [x]` in `tasks.md`.
+- W1b revision/concurrency helper rows remain `- [ ]`; downstream W2–W16 rows remain unchanged.
+- W0 history above is preserved. No application/test file was edited, staged, unstaged, deleted, or committed by this recovery.
+
+## TDD Cycle Evidence
+
+| Cycle/evidence | Exact command | Result |
+|---|---|---|
+| Independent focused verification | `pnpm exec vitest run convex/catalogoAdmin/lib/errors.test.ts` | PASS — 1 file, 12 tests. |
+| Full suite | `pnpm exec vitest run` | PASS — 13 files, 121 tests. |
+| Typecheck | `pnpm typecheck` | PASS — `tsc --noEmit`. |
+| Hygiene | `git diff --check` | PASS — no output. |
+| Runtime boundary | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account. |
+
+The Vitest commands emitted the existing Vite `configLoader: native` warning; it did not affect results.
+
+## W1a implementation evidence
+
+- `validators.ts` contains inferred entity references, lifecycle/page/result validators, 16 fixed violation codes, and the closed 11-code `AdminErrorData` union.
+- `lib/errors.ts` contains fixed-code constructors with validated safe contexts and presentation-only messages.
+- W1b files `lib/revisions.ts` and `lib/revisions.test.ts` are absent from this slice and remain pending.
+- Staged W1a source/test files are unchanged: `validators.ts`, `lib/errors.ts`, and `lib/errors.test.ts` (158 authored lines total).
+- `pnpm exec convex dev --once` temporarily regenerated `convex/_generated/api.d.ts`; it differed only by W1a module imports, was restored without touching the index, and no generated diff remains. No other generated or application file changed unexpectedly.
+
+## Files, boundary, and rollback
+
+- Allowed artifact edits: `tasks.md` and this `apply-progress.md` only.
+- W1a implementation files were not edited in this attempt; no schema, entity command, publication, auth, seed, hard-delete, or unrelated behavior was added.
+- Recovery artifact changes are compacted to keep the attempt under 220 changed lines; W1a source remains within the 400-authored-line review budget.
+- Rollback: remove the three additive W1a source/test files and restore only the W1a checkbox flips; leave W1b and all downstream work untouched.
+
+## Remaining work and status produced
+
+- Exact next implementation slice: W1b revision/concurrency helpers (`lib/revisions.ts` and `lib/revisions.test.ts`), all four rows unchecked in `tasks.md`.
+- W2–W16 implementation rows and both parent-owned lifecycle rows remain deferred; parent-owned rows are preserved byte-for-byte.
+- `nextRecommended`: `parent-lifecycle` for this apply result. This executor did not run review, receipt, refutation, correction, validation, finish, or settle actions.
