@@ -4,7 +4,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { resourceSummaryValidator, type ResourceSummary } from "./resourceValidators";
-import { classificationStatusFromReferences, projectResourceSummary } from "./lib/recursoResumen";
+import { adminInvalidArgument } from "./lib/errors";
+import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
 import { lifecycleFilterValidator } from "./validators";
 
 const resourceScopeValidator = v.union(
@@ -51,11 +52,30 @@ function resourceIndexQuery(ctx: QueryCtx, args: ResourceListArgs) {
     : ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", (q) => q.eq("adminScopeKey", key).eq("tipoRecursoId", typeId).eq("activo", active));
 }
 
+function resourceSearchQuery(ctx: QueryCtx, args: ResourceListArgs, searchText: string) {
+  const lifecycle = args.lifecycle ?? "ALL";
+  const active = lifecycle === "ACTIVE" ? true : lifecycle === "INACTIVE" ? false : undefined;
+  const typeId = args.tipoRecursoId;
+  const key = scopeKey(args.scope ?? { kind: "ALL" });
+
+  return ctx.db.query("recursos").withSearchIndex("buscar", (q) => {
+    let search = q.search("nombre", searchText);
+    if (typeId !== undefined) search = search.eq("tipoRecursoId", typeId);
+    if (active !== undefined) search = search.eq("activo", active);
+    if (key !== undefined) search = search.eq("adminScopeKey", key);
+    return search;
+  });
+}
+
 async function summaryForResource(ctx: QueryCtx, resource: Doc<"recursos">): Promise<ResourceSummary> {
   const type = await ctx.db.get(resource.tipoRecursoId);
   const family = type === null ? null : await ctx.db.get(type.familiaRecursoId);
   const clazz = family === null ? null : await ctx.db.get(family.claseRecursoId);
   return projectResourceSummary(resource, classificationStatusFromReferences(resource, { type, family, clazz }));
+}
+
+function projectResourcePage(ctx: QueryCtx, page: Doc<"recursos">[]): Promise<ResourceSummary[]> {
+  return Promise.all(page.map((resource) => summaryForResource(ctx, resource)));
 }
 
 export const listarRecursosResumen = query({
@@ -70,7 +90,29 @@ export const listarRecursosResumen = query({
     const page = await resourceIndexQuery(ctx, args).paginate(args.paginationOpts);
     return {
       ...page,
-      page: await Promise.all(page.page.map((resource) => summaryForResource(ctx, resource))),
+      page: await projectResourcePage(ctx, page.page),
+    };
+  },
+});
+
+export const buscarRecursosResumen = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    searchText: v.string(),
+    lifecycle: v.optional(lifecycleFilterValidator),
+    tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    scope: v.optional(resourceScopeValidator),
+  },
+  returns: paginationResultValidator(resourceSummaryValidator),
+  handler: async (ctx, args): Promise<PaginationResult<ResourceSummary>> => {
+    const searchText = normalizeResourceSearchText(args.searchText);
+    if (searchText.length === 0) {
+      adminInvalidArgument({ field: "searchText", reason: "must not be blank after normalization" });
+    }
+    const page = await resourceSearchQuery(ctx, args, searchText).paginate(args.paginationOpts);
+    return {
+      ...page,
+      page: await projectResourcePage(ctx, page.page),
     };
   },
 });

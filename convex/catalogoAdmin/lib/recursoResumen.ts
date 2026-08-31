@@ -4,6 +4,10 @@ import type { ResourceClassificationStatus, ResourceSummary } from "../resourceV
 
 export type ResourceDoc = Doc<"recursos">;
 
+export function normalizeResourceSearchText(text: string): string {
+  return text.normalize("NFC").trim().replace(/\s+/gu, " ");
+}
+
 export function resourceClassificationStatus(input: {
   classId?: string;
   familyId?: string;

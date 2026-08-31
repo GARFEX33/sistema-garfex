@@ -2211,6 +2211,47 @@ export declare const api: {
       >;
     };
     recursos: {
+      buscarRecursosResumen: FunctionReference<
+        "query",
+        "public",
+        {
+          lifecycle?: "ALL" | "ACTIVE" | "INACTIVE";
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          scope?:
+            | { kind: "ALL" }
+            | { kind: "GLOBAL" }
+            | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+          searchText: string;
+          tipoRecursoId?: Id<"tiposRecurso">;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{
+            activo: boolean;
+            classificationStatus: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            id: Id<"recursos">;
+            identificadorTecnico: string;
+            nombre: string;
+            organizacionId?: Id<"organizaciones">;
+            revision: number;
+            tipoRecursoId: Id<"tiposRecurso">;
+            unidadId: Id<"unidades">;
+          }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
       listarRecursosResumen: FunctionReference<
         "query",
         "public",
