@@ -75,4 +75,24 @@ describe("administración de definiciones y opciones", () => {
     await expect(t.mutation(api.catalogoAdmin.atributos.desactivarOpcionAtributo, { opcionAtributoId: option.item.id, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED" } });
     expect(option2.item.effective).toBe(true);
   });
+
+  it("administra asignaciones con identidad, ownership y precedence", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "D", nombre: "D", tipoDato: "TEXTO", activo: true });
+    const family = await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 2 });
+    expect(family.item).toMatchObject({ activo: false, revision: 1, selection: "SELECTED" });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 1, activo: true })).resolves.toMatchObject({ disposition: "CREATED" });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 1, activo: true })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+    const page = await t.query(api.catalogoAdmin.atributos.listarAsignacionesAtributo, { tipoRecursoId: ids.tipo, cursor: null, pageSize: 10 });
+    expect(page.items.map(item => item.selection)).toEqual(["SHADOWED", "SELECTED"]);
+  });
+
+  it("requires options before an effective OPCION assignment can activate", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "O", nombre: "O", tipoDato: "OPCION", activo: true });
+    const assignment = await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1 });
+    await expect(t.mutation(api.catalogoAdmin.atributos.activarAsignacionAtributo, { atributoRecursoId: assignment.item.id, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+  });
 });

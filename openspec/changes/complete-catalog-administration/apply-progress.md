@@ -709,3 +709,52 @@ Parent-owned rows remain deferred byte-for-byte to the parent lifecycle. `nextRe
 
 - Native status after checkbox persistence: `taskProgress.completed: 41`, `taskProgress.pending: 34`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`.
 - This delegated apply result recommends `parent-lifecycle`; the executor did not create/approve receipts, launch review/refutation/correction/validation actors, settle the active attempt, or perform delivery actions.
+
+# Apply progress — W9
+
+## Status consumed and workload boundary
+
+- Native status was consumed before editing: `openspec` authoritative, `applyState: ready`, change `complete-catalog-administration`, `actionContext.mode: repo-local`, workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- The parent token `sha256:2bc4e76ebc889b527a44d65cad63db741a4c73e1b88f6e87eebfadb9802a8004` was authenticated for W9 with 2 attempts and 380 changed-line bounds; no size exception was used.
+- Workload gate was resolved by the parent: `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, roadmap `400-line budget risk: High`; this W9 slice stayed below the 380-attempt/400-authored-line boundary at approximately 220 authored additions/deletions including new files.
+
+## TDD Cycle Evidence
+
+| Cycle | Exact evidence | Result |
+|---|---|---|
+| RED | `pnpm exec vitest run src/catalogoRecursos/dominio/asignacionesEfectivas.test.ts convex/catalogoAdmin/atributos.test.ts` before implementation | Expected failures: missing pure module and assignment exports. |
+| GREEN | Same focused command after pure resolver and assignment commands | PASS — 2 files, 7 tests. |
+| GREEN typecheck | `pnpm typecheck` | PASS — `tsc --noEmit`. |
+| TRIANGULATE | `pnpm exec vitest run src/catalogoRecursos/dominio/asignacionesEfectivas.test.ts src/catalogoRecursos/dominio/validarRecurso.test.ts convex/catalogoAdmin/atributos.test.ts convex/catalogoAdmin/lib/cargarAgregado.test.ts src/catalogoRecursos/dominio/validacionAgregado.test.ts` | PASS — 5 files, 15 tests. |
+| TRIANGULATE full | `pnpm exec vitest run` | PASS — 23 files, 170 tests. |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings/typecheck completed; no generated diff was required because the existing module binding already covered the additive module. |
+| Runtime | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account. |
+| REFACTOR | Reused the pure selection/order/projection helpers in resource validation and aggregate loading; focused and full evidence remained green. | PASS. |
+| Hygiene | `git diff --check` | PASS — no output. |
+
+A final post-settlement focused rerun after the narrow active-option scan correction also passed: 5 files/15 tests, `pnpm typecheck`, full 23-file/170-test suite, and `git diff --check`.
+
+## W9 implementation and persisted task updates
+
+- Added the pure Family/Type resolver, selected/shadowed/suppressed diagnostics, deterministic `orden`/definition-key/assignment-ID ordering, value-bearing projection, identity projection, conditional optional baseline, and active option completeness helper in `src/catalogoRecursos/dominio/asignacionesEfectivas.ts` with focused tests.
+- Added assignment create/detail/list/update/activate/deactivate commands to `convex/catalogoAdmin/atributos.ts`, including immutable ownership/definition references, duplicate reservation across inactive rows, bounded indexed pagination, applicability and effective annotations, and atomic option-set validation.
+- Updated domain resource validation to select Type assignments before filtering and use `Map.has` for required/forbidden checks, covering `false`, `0`, and empty string; aggregate loading now validates effective option assignment completeness.
+- Updated `src/catalogoRecursos/dominio/validacionAgregado.ts` with assignment violation codes needed by the aggregate seam.
+- W9 RED, GREEN, TRIANGULATE, and REFACTOR rows are visibly `- [x]` in the persisted `tasks.md`; W10 onward and both parent-owned rows remain unchecked and unchanged.
+
+## Files changed and rollback boundary
+
+- `convex/catalogoAdmin/atributos.ts`, `convex/catalogoAdmin/atributos.test.ts`.
+- `src/catalogoRecursos/dominio/asignacionesEfectivas.ts`, `src/catalogoRecursos/dominio/asignacionesEfectivas.test.ts`.
+- `src/catalogoRecursos/dominio/validarRecurso.ts`, `src/catalogoRecursos/dominio/validarRecurso.test.ts`.
+- `convex/catalogoAdmin/lib/cargarAgregado.ts`, `src/catalogoRecursos/dominio/validacionAgregado.ts`.
+- `openspec/changes/complete-catalog-administration/tasks.md` and this cumulative progress record.
+- No changes were staged, committed, pushed, or reviewed; the parent token was settled with passed evidence after runtime completion, and no generated file was hand-edited.
+- Rollback is the W9 boundary: remove the assignment exports/tests and pure resolver/tests, revert only the W9 aggregate/resource-validation seam changes, and restore the four W9 checkbox flips; retain W8 definitions/options and all stored rows.
+
+## Remaining tasks and deferred lifecycle actions
+
+- The exact next unchecked implementation row is: `- [ ] **RED** — Add pure/Convex tests for false/zero/empty-string presence, conditional optional baseline, foreign assignment/option, self-target rejection, exact duplicate inactive identity, contradictory co-active rules, same-result rules, A→B/B→A cycle safety, and inert drafts; ... <!-- sdd-owner: implementation -->` in `tasks.md` (W10); all W10–W16 rows remain there byte-for-byte.
+- Parent-owned rows remain deferred unchanged: `- [ ] After apply, collect ordinary SDD status evidence ... <!-- sdd-owner: parent -->` and `- [ ] After post-apply verification, confirm the lifecycle gate ... <!-- sdd-owner: parent -->`.
+- Current native status after persistence: `taskProgress.completed: 45`, `taskProgress.pending: 30`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; this executor returns `parent-lifecycle`.
+- No review, receipt, refutation, correction, validation actor, delivery gate, commit, stage, push, or PR action was started by this executor; the required native attempt settlement completed with state `complete`.
