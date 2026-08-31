@@ -1,6 +1,7 @@
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { validarAgregado, type AggregateViolation, type ResultadoAgregado } from "../../../src/catalogoRecursos/dominio/validacionAgregado";
+import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../../src/catalogoRecursos/dominio/unidadesEfectivas";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -40,9 +41,14 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const presentations = await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
   const bounded = [limitarFilas(familyPolicies), limitarFilas(typePolicies), limitarFilas(presentations)];
   if (bounded.some(result => result.exceeded)) return { effective, status: "INVALID", violations: [limitViolation("aggregate fan-out exceeds the bounded limit")] };
-  const policies = [...familyPolicies, ...typePolicies].filter(policy => policy.activo && (policy.tipoRecursoId === undefined || policy.tipoRecursoId === typeId));
-  if (policies.length === 0 && presentations.length === 0 && familyPolicies.length === 0 && typePolicies.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
-  const principalUnits = await Promise.all(policies.map(async policy => ({ active: policy.activo, principal: policy.principal, unitActive: Boolean((await ctx.db.get(policy.unidadId))?.activo) })));
+  const familyRows = familyPolicies.filter(policy => policy.tipoRecursoId === undefined);
+  const typeRows = typePolicies;
+  if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
+  const allPolicies = [...familyRows, ...typeRows];
+  const unitActivity = new Map(await Promise.all([...new Set(allPolicies.map(policy => policy.unidadId))].map(async id => [id, Boolean((await ctx.db.get(id))?.activo)] as const)));
+  const toDomain = (policy: typeof allPolicies[number]): PoliticaUnidadEfectiva => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal, unidadActiva: unitActivity.get(policy.unidadId) === true });
+  const resolution = resolverUnidadesEfectivas({ familia: familyRows.map(toDomain), tipo: typeRows.map(toDomain), tipoEfectivo: effective });
+  const principalUnits = resolution.selected.map(policy => ({ active: policy.activo, principal: policy.principal, unitActive: policy.unidadActiva }));
   const result = validarAgregado({
     effective,
     hierarchy: { typeId: type._id, familyId: family._id, classId: clase._id, familyOfTypeId: type.familiaRecursoId, classOfFamilyId: family.claseRecursoId },
