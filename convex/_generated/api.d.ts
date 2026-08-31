@@ -8,6 +8,12 @@
  * @module
  */
 
+import type * as catalogoAdmin_jerarquia from "../catalogoAdmin/jerarquia.js";
+import type * as catalogoAdmin_lib_backfillMetadatos from "../catalogoAdmin/lib/backfillMetadatos.js";
+import type * as catalogoAdmin_lib_errors from "../catalogoAdmin/lib/errors.js";
+import type * as catalogoAdmin_lib_pagination from "../catalogoAdmin/lib/pagination.js";
+import type * as catalogoAdmin_lib_revisions from "../catalogoAdmin/lib/revisions.js";
+import type * as catalogoAdmin_validators from "../catalogoAdmin/validators.js";
 import type * as catalogoRecursos_catalogo from "../catalogoRecursos/catalogo.js";
 import type * as catalogoRecursos_catalogoPublicado from "../catalogoRecursos/catalogoPublicado.js";
 import type * as catalogoRecursos_catalogoPublicadoValidators from "../catalogoRecursos/catalogoPublicadoValidators.js";
@@ -22,6 +28,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "catalogoAdmin/jerarquia": typeof catalogoAdmin_jerarquia;
+  "catalogoAdmin/lib/backfillMetadatos": typeof catalogoAdmin_lib_backfillMetadatos;
+  "catalogoAdmin/lib/errors": typeof catalogoAdmin_lib_errors;
+  "catalogoAdmin/lib/pagination": typeof catalogoAdmin_lib_pagination;
+  "catalogoAdmin/lib/revisions": typeof catalogoAdmin_lib_revisions;
+  "catalogoAdmin/validators": typeof catalogoAdmin_validators;
   "catalogoRecursos/catalogo": typeof catalogoRecursos_catalogo;
   "catalogoRecursos/catalogoPublicado": typeof catalogoRecursos_catalogoPublicado;
   "catalogoRecursos/catalogoPublicadoValidators": typeof catalogoRecursos_catalogoPublicadoValidators;
