@@ -12,9 +12,9 @@ const plans = [
 type Row = { _id: string; [key: string]: unknown };
 type PlanCursor = { plan: number; cursor: string | null };
 
-export type ResourceMetadataSource = { _id: string; organizacionId?: string };
-export function deriveResourceMetadata(source: ResourceMetadataSource): { adminSortId: string; adminScopeKey: string } {
-  return { adminSortId: source._id, adminScopeKey: source.organizacionId === undefined ? "GLOBAL" : `ORG:${source.organizacionId}` };
+export type ResourceMetadataSource = { organizacionId?: string };
+export function deriveResourceMetadata(source: ResourceMetadataSource): { adminScopeKey: string } {
+  return { adminScopeKey: source.organizacionId === undefined ? "GLOBAL" : `ORG:${source.organizacionId}` };
 }
 type DuplicateReport = { table: string; identity: string; ids: string[] };
 
@@ -44,7 +44,7 @@ function sortedPair(left: string, right: string): [string, string] {
 
 export function metadataPatch(table: string, row: Row, definitionKey?: string, policy?: Row): Record<string, string | undefined> {
   const patch: Record<string, string | undefined> = table === "recursos"
-    ? deriveResourceMetadata({ _id: row._id, organizacionId: row.organizacionId as string | undefined })
+    ? deriveResourceMetadata({ organizacionId: row.organizacionId as string | undefined })
     : { adminSortId: row._id };
   if (table === "atributosRecurso") patch.definicionClave = definitionKey;
   if (table === "politicasCompatibilidadOpciones") {
@@ -68,7 +68,6 @@ function identity(table: string, row: Row, patch: Record<string, string | undefi
   if (table === "atributosRecurso" && patch.definicionClave) return [String(row.familiaRecursoId), String(row.tipoRecursoId ?? ""), patch.definicionClave].join("|");
   if (table === "politicasCompatibilidadOpciones" && patch.atributoOrigenIdNormalizado && patch.atributoDestinoIdNormalizado) return [String(row.tipoRecursoId), patch.atributoOrigenIdNormalizado, patch.atributoDestinoIdNormalizado, String(row.direccion)].join("|");
   if (table === "relacionesOpcionesAtributo" && patch.opcionOrigenIdNormalizada && patch.opcionDestinoIdNormalizada) return [String(row.politicaCompatibilidadId ?? ""), patch.opcionOrigenIdNormalizada, patch.opcionDestinoIdNormalizada].join("|");
-  if (table === "recursos") return `${patch.adminScopeKey}|${String(row.identificadorTecnico)}`;
   return null;
 }
 
@@ -108,7 +107,7 @@ export const backfillMetadatos = internalMutation({
       if (table === "relacionesOpcionesAtributo" && row.politicaCompatibilidadId) policy = (await db.get(row.politicaCompatibilidadId)) ?? undefined;
       const patch = metadataPatch(table, row, definitionKey, policy);
       prepared.push({ row, patch });
-      const duplicateCandidates = await candidatesForDuplicateIdentity(db, table, row);
+      const duplicateCandidates = table === "recursos" ? [] : await candidatesForDuplicateIdentity(db, table, row);
       for (const candidate of duplicateCandidates) {
         const candidateDefinitionKey = table === "atributosRecurso" ? (await db.get(candidate.definicionAtributoId))?.clave : undefined;
         const candidatePolicy = table === "relacionesOpcionesAtributo" && candidate.politicaCompatibilidadId
@@ -122,7 +121,7 @@ export const backfillMetadatos = internalMutation({
       }
       processed += 1;
     }
-    reports.push(...duplicateReports(table, prepared));
+    if (table !== "recursos") reports.push(...duplicateReports(table, prepared));
     const nextState = page.isDone ? state.plan + 1 : state.plan;
     return { processed, updated, nextCursor: nextState >= plans.length ? null : encodeCursor({ plan: nextState, cursor: page.isDone ? null : page.continueCursor }), duplicateReports: reports.sort(reportOrder) };
   },
@@ -133,15 +132,6 @@ async function candidatesForDuplicateIdentity(db: any, table: string, row: Row):
     .filter(candidate => String(candidate.tipoRecursoId ?? "") === String(row.tipoRecursoId ?? ""));
   if (table === "politicasCompatibilidadOpciones") return await db.query(table).withIndex("porTipo", (q: any) => q.eq("tipoRecursoId", row.tipoRecursoId)).take(101) as Row[];
   if (table === "relacionesOpcionesAtributo" && row.politicaCompatibilidadId) return await db.query(table).withIndex("porPolitica", (q: any) => q.eq("politicaCompatibilidadId", row.politicaCompatibilidadId)).take(101) as Row[];
-  if (table === "recursos") {
-    const candidates = row.organizacionId === undefined
-      ? await db.query(table).withIndex("porIdentificadorTecnico", (q: any) => q.eq("identificadorTecnico", row.identificadorTecnico)).take(101)
-      : await db.query(table).withIndex("porOrganizacionYIdentificadorTecnico", (q: any) => q.eq("organizacionId", row.organizacionId).eq("identificadorTecnico", row.identificadorTecnico)).take(101);
-    const scoped: Row[] = [];
-    for (const candidate of candidates as Row[])
-      if (String(candidate.organizacionId ?? "") === String(row.organizacionId ?? "")) scoped.push(candidate);
-    return scoped;
-  }
   return [];
 }
 
