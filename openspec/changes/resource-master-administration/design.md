@@ -371,7 +371,7 @@ Focused tests use `pnpm exec vitest run <test-file>`. Final verification is:
 
 ## 13. Review-safe stacked work units
 
-The canonical split is W0 plus WU1–WU9. W0 records planning/runtime metadata evidence and is not a product PR; WU1–WU9 are the behavior units below.
+The canonical split is W0 plus WU1, WU2a, WU2b, and WU3–WU9. W0 records planning/runtime metadata evidence and is not a product PR; WU1, WU2a, WU2b, and WU3–WU9 are the behavior units below.
 
 Delivery is a linear stacked-to-main chain. During review, each child targets its immediate predecessor; after the predecessor merges, it is retargeted/rebased so only its own work unit remains. Every PR body states start state, end state, dependency, follow-up, exclusions, focused test result, runtime result or N/A, authored line count, and rollback boundary. No `size:exception` is planned.
 
@@ -379,21 +379,22 @@ Delivery is a linear stacked-to-main chain. During review, each child targets it
 |---:|---|---|---:|---|---|
 | W0 | Planning/runtime metadata evidence; no product behavior | Approved design/specs | 12 | Repository capability and configuration evidence | Remove only planning evidence |
 | 1 | Optional Resource metadata, explicit legacy projection, 16 list indexes, search filter fields, resumable backfill | Completed catalog admin stack | 190 | schema/backfill tests and all legacy Resource tests | Revert schema/backfill and legacy projection before any admin read ships; retain data if already backfilled |
-| 2 | Resource validators, summary projection, diagnostics, and structured domain mapping | WU1 | 180 | pure validator/projection/error tests | Remove only Resource admin contract/helper files and added violation literals |
-| 3 | Indexed summary list with every filter plan and bound cursors | WU2 and completed backfill | 175 | multi-page/plan/cursor/no-value-load tests | Remove list export and planner; metadata/indexes may remain inert |
+| 2a | Resource validators, value-free summary, detail contracts/projections, and effective/inert/broken diagnostics | WU1 | 190 | validator/summary/detail projection and boundary tests | Remove only Resource contract/projection/diagnostic files and added violation literals; no data changes |
+| 2b | Non-throwing Resource validation seam, complete domain-to-ADMIN mapping, bounded-context ConvexError coverage, and legacy wrapper preservation | WU2a | 190 | validation seam, eight ADMIN context/ConvexError, and legacy regression tests | Remove only validation seam/mapping files and narrow legacy seam; preserve the legacy wrapper/messages |
+| 3 | Indexed summary list with every filter plan and bound cursors | WU2a and WU2b plus completed backfill | 175 | multi-page/plan/cursor/no-value-load tests | Remove list export and planner; metadata/indexes may remain inert |
 | 4 | Convex 1.45.0 native search and traversal gate | WU3 | 190 | equal-relevance traversal, cursor binding, no-value-load tests | Remove search export and plan; ordinary list remains |
-| 5 | Direct detail and 200/201 bounded value loader | WU2 | 145 | detail/null/inert/value-query-count tests | Remove detail export and detail loader only |
-| 6 | Atomic create with organization, identity, alias, and rollback behavior | WU2 and WU5 helpers | 210 | create validation/duplicate/alias/value-failure tests | Remove admin create; no stored rows are deleted |
+| 5 | Direct detail and 200/201 bounded value loader | WU2a | 145 | detail/null/inert/value-query-count tests | Remove detail export and detail loader only |
+| 6 | Atomic create with organization, identity, alias, and rollback behavior | WU2b and WU5 helpers | 210 | create validation/duplicate/alias/value-failure tests | Remove admin create; no stored rows are deleted |
 | 7 | Revision-first update and immutable classification/ownership | WU6 | 240 | stale/no-op/identity/replacement/rollback tests | Remove admin update; create/read data remains valid |
 | 8 | Activation/deactivation and current effective-catalog integration | WU7 | 170 | lifecycle/idempotence/inert activation/no-cascade tests | Remove lifecycle exports; reads/create/update remain |
 | 9 | Generated API fixture, full legacy regression, rollout documentation | WU1–WU8 | 130 authored, generated output excluded | codegen, complete tests, both typechecks, deployment smoke or N/A | Remove fixture/docs and generated additions only after reverting API exports |
 
-Each unit starts from a compiling predecessor and ends with its own behavior and tests. If a unit reaches 350 authored additions plus deletions, split it before review; no unit may exceed 400.
+Each unit starts from a compiling predecessor and ends with its own behavior and tests. The original combined WU2 product/tests correction was 415 authored lines. The user selected the WU2a/WU2b split; no size exception applies. Each slice forecasts below 400 authored lines and has its own rollback boundary. If any unit reaches 350 authored additions plus deletions, split it before review; no unit may exceed 400.
 
 Chain diagram used in each PR, marking the current node with `📍`:
 
 ```text
-main ← WU1 ← WU2 ← WU3 ← WU4 ← WU5 ← WU6 ← WU7 ← WU8 ← WU9
+main ← WU1 ← WU2a ← WU2b ← WU3 ← WU4 ← WU5 ← WU6 ← WU7 ← WU8 ← WU9
 ```
 
 ## 14. Rollback and compatibility

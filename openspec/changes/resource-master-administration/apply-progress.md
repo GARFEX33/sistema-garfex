@@ -181,3 +181,60 @@ WU1 implementation rows are complete. WU2–WU9 implementation rows and both par
 - [ ] **REFACTOR** — Keep package exports limited to generated Convex API/data-model/error types, document pinned/private-package consumption and native relevance search ordering without adding an SDK/DTO layer, and preserve exact legacy Resource contracts; focused command `pnpm typecheck:consumer`; full boundary `pnpm exec vitest run && pnpm typecheck`, `pnpm typecheck:consumer`, codegen, runtime command or exact N/A record, and `git diff --check`; rollback reverts only WU9 documentation/export cleanup; authored estimate: 20 lines, generated declaration lines tracked separately and excluded from authored budget. <!-- sdd-owner: implementation -->
 - [ ] After apply, collect status evidence over `convex/catalogoAdmin/**`, `convex/schema.ts`, `src/catalogoRecursos/**`, `convex/_generated/*`, `contract-tests/**`, and this change directory using `sdd-verify`, `pnpm exec vitest run`, `pnpm typecheck`, `pnpm typecheck:consumer`, `git diff --check`, and `git status --short`; record each focused/full/runtime result and generated-versus-authored line accounting in `openspec/changes/resource-master-administration/apply-progress.md`; rollback boundary is the evidence record only; authored estimate: 0 lines. <!-- sdd-owner: parent -->
 - [ ] After post-apply verification, confirm the lifecycle gate in `openspec/changes/resource-master-administration/tasks.md`: all RED/GREEN/TRIANGULATE/REFACTOR rows have evidence, every authored work-unit diff remains below 400 lines, generated declarations are separately identified, legacy APIs remain protected, the selected search branch is the only branch implemented, and every rollback boundary is actionable; focused command `git diff --check`; full boundary `pnpm exec vitest run && pnpm typecheck` plus `pnpm typecheck:consumer` and codegen; rollback boundary is the lifecycle decision record only; authored estimate: 0 lines. <!-- sdd-owner: parent -->
+
+## WU2 Apply Evidence — `WU2-resource-contract-helpers`
+
+### Structured status consumed and produced
+
+- Native status was authoritative OpenSpec status: `applyState: ready`, `nextRecommended: apply`, proposal/specs/design/tasks/apply-progress present, `verifyReport` missing, and no blocked reasons. Action context was `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex`, with the workspace root allowed; no edit-root warning occurred.
+- The acquired native runtime authority was active ordinal 5 for `WU2-resource-contract-helpers`, with evidence goal `Add Resource admin validators, value-free summaries, bounded detail contracts, diagnostics, and structured error mapping`, maximum 2 attempts and 380 changed lines. No second acquire was performed; the parent-held attempt was continued.
+- Workload gate: `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, `400-line budget risk: High`; parent context authorized only the WU2 `auto-chain` slice. WU3 was not started.
+- After checkbox persistence, native status reports 12 of 42 implementation rows complete, 30 remaining, `applyState: ready`, and `verify`/`archive` blocked pending later implementation and parent lifecycle work. Only the four WU2 implementation rows were changed; all WU3–WU9 and parent-owned unchecked lines remain in `tasks.md`.
+
+### Scope and strict TDD evidence
+
+- RED focused command: `pnpm exec vitest run convex/catalogoAdmin/lib/recursoResumen.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoAdmin/resourceValidators.test.ts` — intentionally failed in all 4 suites because the helper modules did not yet exist.
+- GREEN focused command: the same four-file command — 4 files, 17 tests passed.
+- TRIANGULATE focused command: `pnpm exec vitest run convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoAdmin/lib/recursoResumen.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts convex/catalogoRecursos/recursos.test.ts` — 4 files, 54 tests passed, including protected legacy Resource scenarios and inactive/missing reference, value-boundary, mapping, and safe-context counterexamples.
+- REFACTOR focused command: the four helper test files — 4 files, 18 tests passed; `pnpm typecheck` passed.
+- Full boundary: `pnpm exec vitest run && pnpm typecheck && pnpm exec convex codegen --typecheck enable && git diff --check` — 33 files, 225 tests passed; typecheck, codegen, and diff check passed. Codegen changed only derived `convex/_generated/api.d.ts` violation unions (48 additions, 6 deletions); it was not hand-edited.
+- Runtime boundary: `pnpm exec convex dev --once` returned `A local backend is still running on port 3210`; no runtime evidence is claimed, and the active user Convex dev process was not stopped or altered.
+
+### Implementation and accounting
+
+- Added inferred Resource value/input/ownership/classification/summary/detail/diagnostic validators with `MAX_RESOURCE_VALUES = 200`; summaries contain no `valores`, and detail references are nullable.
+- Added value-free summary projection and `EFFECTIVE`/`INERT`/`BROKEN_REFERENCE` hierarchy status, summary-dependent detail assembly, and one indexed bounded value-loader seam using `take(MAX_RESOURCE_VALUES + 1)` with coded `RESOURCE_VALUE_LIMIT_EXCEEDED` state data.
+- Added the non-throwing bounded `evaluarRecurso` seam beside the unchanged Spanish throwing `validarRecurso` wrapper and centralized all listed domain-failure-to-validated-`ADMIN_*` mapping without parsing legacy messages. Added the seven Resource violation literals plus the two requested limit/search literals.
+- Changed surfaces were limited to WU2 helper/tests, shared `convex/catalogoAdmin/validators.ts`, the narrow `convex/catalogoRecursos/validacionRecurso.ts` seam, CLI-generated `convex/_generated/api.d.ts`, and WU2 task/evidence metadata. No admin endpoint, WU3 work, branch, stage, commit, or destructive runtime operation was added.
+- Authored additions plus deletions: 324 lines (302 helper/test lines, 14 shared/legacy seam lines, 8 WU2 checkbox lines), below the 380-attempt and 400-review budgets. Generated accounting is separate: 48 additions and 6 deletions. Rollback boundary: remove only WU2 Resource helper/violation/test changes and the narrow non-throwing seam; retain stored data and all legacy behavior.
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| WU2 RED | ✅ 4 expected missing-module failures | ✅ 17 focused tests | ✅ Counterexample coverage added | ✅ Focused rerun passed |
+| WU2 GREEN | ✅ Contract failure established | ✅ Validators, projections, loader, seam, mapping implemented | ✅ 200/201 boundary and mappings exercised | ✅ Typecheck passed |
+| WU2 TRIANGULATE | ✅ Boundary tests drove implementation | ✅ 54-test legacy/projection run passed | ✅ Inactive/missing references and safe data passed | ✅ Full boundary passed |
+| WU2 REFACTOR | ✅ Legacy behavior protected | ✅ Focused suite passed | ✅ Summary has no detail/value-loader dependency | ✅ Full Vitest, typecheck, codegen, diff check passed |
+
+### Remaining work
+
+WU2a and WU2b implementation rows are complete. WU3–WU9 implementation rows and both parent-owned lifecycle rows remain unchecked and deferred; no WU3 work was started. Their exact unchecked task lines remain in the cumulative receipt above and in `tasks.md`.
+
+## WU2 Correction Evidence — `WU2-resource-contract-correction`
+
+- Structured status consumed: authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, all required proposal/spec/design/tasks/apply-progress artifacts present, no blocked reasons; action context `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex` with the workspace root allowed. Active correction authority was ordinal 6, token `sha256:92c368ed83512fbb100e4664759a9d72997b625e2fdadb91e58aa89d679503b7`, work unit `WU2-resource-contract-correction`, max 480 changed lines. Workload gate remained `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, `400-line budget risk: High`; only the authorized correction slice was applied.
+- Corrected missing Type classification fallback in `recursoResumen.ts`: missing Type now necessarily yields `BROKEN_REFERENCE` with `MISSING_REFERENCE`; effective and inert branches remain covered. Added focused counterexamples for missing Type/Family/Class and all three summary states.
+- Completed the Resource-specific closed mapping seam in `recursoValidacion.ts` for `ADMIN_NOT_FOUND`, `ADMIN_INVALID_REFERENCE`, `ADMIN_INVALID_STATE`, `ADMIN_AGGREGATE_INCOMPLETE`, `ADMIN_DUPLICATE_KEY`, `ADMIN_CONFLICT`, `ADMIN_IMMUTABLE_FIELD`, and `ADMIN_INVALID_ARGUMENT`. The throw seam delegates to the existing validated admin error boundary; no endpoint behavior or legacy wrapper/message changed.
+- Persisted WU2 task rows were already `[x]` and remain checked; WU3 was not started. Changed correction surfaces: `convex/catalogoAdmin/lib/recursoResumen.ts`, `convex/catalogoAdmin/lib/recursoResumen.test.ts`, `convex/catalogoAdmin/lib/recursoValidacion.ts`, and `convex/catalogoAdmin/lib/recursoValidacion.test.ts`. No DB query-count/detail-loader tests were added.
+- Strict-TDD evidence: RED produced 18 expected failures for missing-reference and absent mapping seams; GREEN passed the four focused suites with 38 tests; TRIANGULATE covered each mapping output through `ConvexError.data` and missing-reference counterexamples; REFACTOR centralized domain mapping through the Resource seam.
+- Verification: four focused suites passed (4 files, 38 tests); legacy `convex/catalogoRecursos/recursos.test.ts` passed (38 tests); full Vitest passed (33 files, 245 tests); `pnpm typecheck` passed; Convex codegen with `--typecheck enable` passed twice; generated `api.d.ts` and `dataModel.d.ts` hashes were stable across both runs (`30803f5755a017c53c98e773f1ce44138cd7c0271e859b7d97a8abee5a208891` and `3ce2d765a69bf3f2186d5951f1647f53f0d6f6746f464a510afbb84515b84bd2`); `git diff --check` passed. Runtime/dev was not started or mutated.
+- Correction diff is 110 authored additions/deletions before this evidence append; generated declarations had no correction drift. No commit, branch, or staging operation was performed. Next action is `parent-lifecycle`; verify remains blocked until all later implementation rows and parent review gates are complete.
+
+## WU2 Split Decision — `WU2a-resource-contracts` and `WU2b-resource-validation`
+
+- The corrected combined WU2 product/tests change measured 415 authored lines. The user selected the split into WU2a and WU2b; no size exception was granted.
+- WU2a is the completed validator/value-free summary/detail/diagnostics slice: `resourceValidators*`, `recursoResumen*`, and `recursoDetalle*`, with shared violation-validator additions where required. Its forecast is below 400 authored lines; rollback removes only those contracts/projections/diagnostics and their focused tests/violation additions.
+- WU2b is the completed non-throwing validation seam and complete domain-to-ADMIN mapping slice: `recursoValidacion*`, the narrow `catalogoRecursos/validacionRecurso.ts` seam, shared/derived contract updates, and focused tests. Its forecast is below 400 authored lines; rollback removes only that seam/mapping and focused tests while preserving the legacy wrapper and Spanish messages.
+- WU2a focused commands were the Resource validator, summary, and detail suites; WU2b focused commands were the Resource validation seam plus legacy validation/Resource suites. Existing evidence is retained above; no additional test execution is claimed by this record.
+- Dependencies now read WU1 → WU2a → WU2b → WU3; WU3 depends on both WU2 slices, WU5 on WU2a, and WU6 on WU2b plus WU5. Parent gates remain unchecked.
