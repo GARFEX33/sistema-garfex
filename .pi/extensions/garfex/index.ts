@@ -1,13 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { createResourceDataSource } from "./convexClient";
 import { ResourceBrowser } from "./ui";
-import type { ResourceDataSource, ResourceQuery } from "./types";
+import type { ResourceBrowserDataSource, ResourceQuery } from "./types";
 
 const MAIN_MENU = ["Catálogo de Recursos", "Salir"];
 const CATALOG_MENU = ["Listar recursos", "Buscar recursos", "Volver"];
 
 async function openBrowser(ctx: ExtensionContext, query: ResourceQuery): Promise<void> {
-  let source: ResourceDataSource;
+  let source: ResourceBrowserDataSource;
   try {
     source = createResourceDataSource();
   } catch (error) {

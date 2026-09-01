@@ -1,31 +1,33 @@
 import { query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 
 const clase = v.object({
-  id: v.string(),
+  id: v.id("clasesRecurso"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
 });
 
 const familia = v.object({
-  id: v.string(),
-  claseRecursoId: v.string(),
+  id: v.id("familiasRecurso"),
+  claseRecursoId: v.id("clasesRecurso"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
 });
 
 const tipo = v.object({
-  id: v.string(),
-  familiaRecursoId: v.string(),
+  id: v.id("tiposRecurso"),
+  familiaRecursoId: v.id("familiasRecurso"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
 });
 
 const unidad = v.object({
-  id: v.string(),
+  id: v.id("unidades"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
@@ -48,35 +50,51 @@ const aplicabilidad = v.union(
   v.literal("NOT_APPLICABLE"),
 );
 
+const unidadAtributo = v.object({
+  id: v.id("unidades"),
+  clave: v.string(),
+  nombre: v.string(),
+  simbolo: v.union(v.string(), v.null()),
+});
+
 const atributo = v.object({
-  id: v.string(),
-  definicionAtributoId: v.string(),
+  id: v.id("atributosRecurso"),
+  definicionAtributoId: v.id("definicionesAtributo"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
   tipoDato,
-  unidadId: v.optional(v.string()),
+  unidadId: v.optional(v.id("unidades")),
+  unidad: v.union(unidadAtributo, v.null()),
   participaIdentidad: v.boolean(),
   aplicabilidad,
   orden: v.number(),
 });
 
 const opcion = v.object({
-  id: v.string(),
-  definicionAtributoId: v.string(),
+  id: v.id("opcionesAtributo"),
+  definicionAtributoId: v.id("definicionesAtributo"),
   clave: v.string(),
   nombre: v.string(),
   descripcion: v.optional(v.string()),
 });
 
 const regla = v.object({
-  id: v.string(),
-  tipoRecursoId: v.string(),
+  id: v.id("reglasAtributoRecurso"),
+  tipoRecursoId: v.id("tiposRecurso"),
   atributoCondicion: atributo,
   opcionCondicion: v.optional(opcion),
   atributoAfectado: atributo,
   aplicabilidad,
 });
+
+async function unidadDeDefinicion(ctx: QueryCtx, unidadId: Id<"unidades"> | undefined) {
+  if (!unidadId) return null;
+  const registro = await ctx.db.get(unidadId);
+  return registro
+    ? { id: registro._id, clave: registro.clave, nombre: registro.nombre, simbolo: registro.simbolo ?? null }
+    : null;
+}
 
 export const consultarClases = query({
   args: {},
@@ -214,6 +232,7 @@ export const consultarAtributosAplicables = query({
           descripcion: definicion.descripcion,
           tipoDato: definicion.tipoDato,
           unidadId: definicion.unidadId,
+          unidad: await unidadDeDefinicion(ctx, definicion.unidadId),
           participaIdentidad: registro.participaIdentidad,
           aplicabilidad: registro.aplicabilidad,
           orden: registro.orden,
@@ -275,6 +294,7 @@ export const obtenerReglasValidacion = query({
           descripcion: condicionDefinicion.descripcion,
           tipoDato: condicionDefinicion.tipoDato,
           unidadId: condicionDefinicion.unidadId,
+          unidad: await unidadDeDefinicion(ctx, condicionDefinicion.unidadId),
           participaIdentidad: condicion.participaIdentidad,
           aplicabilidad: condicion.aplicabilidad,
           orden: condicion.orden,
@@ -296,6 +316,7 @@ export const obtenerReglasValidacion = query({
           descripcion: afectadoDefinicion.descripcion,
           tipoDato: afectadoDefinicion.tipoDato,
           unidadId: afectadoDefinicion.unidadId,
+          unidad: await unidadDeDefinicion(ctx, afectadoDefinicion.unidadId),
           participaIdentidad: afectado.participaIdentidad,
           aplicabilidad: afectado.aplicabilidad,
           orden: afectado.orden,
