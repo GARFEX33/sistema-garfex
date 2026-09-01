@@ -1,6 +1,8 @@
 import { api, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { eliminarAliasesRecurso } from "./identidadesRecurso";
 
 const keys = {
   clase: "DEMO_MATERIAL",
@@ -10,7 +12,9 @@ const keys = {
   calibre: "DEMO_CALIBRE",
   material: "DEMO_MATERIAL",
   doce: "DEMO_12",
+  catorce: "DEMO_14",
   cobre: "DEMO_COBRE",
+  aluminio: "DEMO_ALUMINIO",
 };
 const identidad = "v1|DEMO_MATERIAL|DEMO_CONDUCTORES|DEMO_CABLE|DEMO_CALIBRE=DEMO_12|DEMO_MATERIAL=DEMO_COBRE";
 
@@ -48,33 +52,39 @@ export const sembrar = internalMutation({
     for (const definicionId of definicionIds) {
       opcionRows.push(...await ctx.db.query("opcionesAtributo").withIndex("porDefinicion", q => q.eq("definicionAtributoId", definicionId)).collect());
     }
-    const opcionIds = new Set(opcionRows.filter(o => o.clave === keys.doce || o.clave === keys.cobre).map(o => o._id));
+    const opcionIds = new Set(opcionRows.map(o => o._id));
     const atributos = [];
     for (const familiaId of familiaIds) {
       atributos.push(...await ctx.db.query("atributosRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", familiaId)).collect());
     }
     const atributoIds = new Set(atributos.map(a => a._id));
     for (const tipoId of tipoIds) {
-      const reglas = await ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", tipoId)).collect();
+      for (const politica of await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", tipoId)).collect()) await ctx.db.delete(politica._id);
+          const reglas = await ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", tipoId)).collect();
       for (const regla of reglas) await ctx.db.delete(regla._id);
     }
+    const relationIds = new Set<Id<"relacionesOpcionesAtributo">>();
     for (const opcionId of opcionIds) {
-      for (const relacion of await ctx.db.query("relacionesOpcionesAtributo").withIndex("porOrigen", q => q.eq("opcionOrigenId", opcionId)).collect()) await ctx.db.delete(relacion._id);
-      for (const relacion of await ctx.db.query("relacionesOpcionesAtributo").withIndex("porDestino", q => q.eq("opcionDestinoId", opcionId)).collect()) await ctx.db.delete(relacion._id);
+      for (const relacion of await ctx.db.query("relacionesOpcionesAtributo").withIndex("porOrigen", q => q.eq("opcionOrigenId", opcionId)).collect()) relationIds.add(relacion._id);
+      for (const relacion of await ctx.db.query("relacionesOpcionesAtributo").withIndex("porDestino", q => q.eq("opcionDestinoId", opcionId)).collect()) relationIds.add(relacion._id);
     }
+    for (const relationId of relationIds) await ctx.db.delete(relationId);
     for (const tipoId of tipoIds) {
       for (const politica of await ctx.db.query("politicasUnidadRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", tipoId)).collect()) await ctx.db.delete(politica._id);
     }
     for (const familiaId of familiaIds) {
       for (const politica of await ctx.db.query("politicasUnidadRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", familiaId)).collect()) await ctx.db.delete(politica._id);
     }
-    const recursos = await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", q => q.eq("identificadorTecnico", identidad)).collect();
+    const recursos = tipoIds.size === 1
+      ? await ctx.db.query("recursos").withIndex("porTipo", q => q.eq("tipoRecursoId", [...tipoIds][0])).collect()
+      : [];
     for (const recurso of recursos) {
+      await eliminarAliasesRecurso(ctx, recurso._id);
       for (const valor of await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", recurso._id)).collect()) await ctx.db.delete(valor._id);
       await ctx.db.delete(recurso._id);
     }
     for (const atributoId of atributoIds) await ctx.db.delete(atributoId);
-    for (const opcion of opcionRows) if (opcion.clave === keys.doce || opcion.clave === keys.cobre) await ctx.db.delete(opcion._id);
+    for (const opcion of opcionRows) await ctx.db.delete(opcion._id);
     for (const definicion of [...definiciones, ...definicionesMaterial]) await ctx.db.delete(definicion._id);
     for (const tipo of tipos) await ctx.db.delete(tipo._id);
     for (const familia of familias) await ctx.db.delete(familia._id);
@@ -90,8 +100,11 @@ export const sembrar = internalMutation({
     const materialDefinicionId = await ctx.db.insert("definicionesAtributo", { clave: keys.material, nombre: "Demo sintética: material", tipoDato: "OPCION", activo: true, revision: 1 });
     const calibreAtributoId = await ctx.db.insert("atributosRecurso", { familiaRecursoId, tipoRecursoId, definicionAtributoId: calibreDefinicionId, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, revision: 1 });
     const materialAtributoId = await ctx.db.insert("atributosRecurso", { familiaRecursoId, tipoRecursoId, definicionAtributoId: materialDefinicionId, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 2, activo: true, revision: 1 });
+     await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId, tokens: [{ tipo: "TYPE_NAME" }, { tipo: "ATTRIBUTE_VALUE", atributoRecursoId: calibreAtributoId }, { tipo: "ATTRIBUTE_VALUE", atributoRecursoId: materialAtributoId }], separador: " · ", activo: true, revision: 1 });
     const doceOpcionId = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: calibreDefinicionId, clave: keys.doce, nombre: "Demo sintética: 12", activo: true, revision: 1 });
+    await ctx.db.insert("opcionesAtributo", { definicionAtributoId: calibreDefinicionId, clave: keys.catorce, nombre: "Demo sintética: 14", activo: true, revision: 1 });
     const cobreOpcionId = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: materialDefinicionId, clave: keys.cobre, nombre: "Demo sintética: cobre", activo: true, revision: 1 });
+    await ctx.db.insert("opcionesAtributo", { definicionAtributoId: materialDefinicionId, clave: keys.aluminio, nombre: "Demo sintética: aluminio", activo: true, revision: 1 });
     return { claseRecursoId, familiaRecursoId, tipoRecursoId, unidadId, calibreDefinicionId, materialDefinicionId, calibreAtributoId, materialAtributoId, doceOpcionId, cobreOpcionId };
   },
 });
@@ -115,11 +128,13 @@ export const comprobar = internalAction({
     consultas: { clases: number; familias: number; tipos: number; unidades: number; atributos: number; opciones: number; reglas: number };
   }> => {
     const seeded = await ctx.runMutation(internal.catalogoRecursos.datosDemo.sembrar, {});
+    const organizacionId = await ctx.runMutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "DEMO_GARFEX", nombre: "Demo Gárfex" });
+    await ctx.runMutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId });
     const valores = [
       { atributoRecursoId: seeded.calibreAtributoId, valor: keys.doce, opcionAtributoId: seeded.doceOpcionId },
       { atributoRecursoId: seeded.materialAtributoId, valor: keys.cobre, opcionAtributoId: seeded.cobreOpcionId },
     ];
-    const creado = await ctx.runMutation(api.catalogoRecursos.recursos.crearRecurso, { claseRecursoId: seeded.claseRecursoId, familiaRecursoId: seeded.familiaRecursoId, tipoRecursoId: seeded.tipoRecursoId, unidadId: seeded.unidadId, nombre: "Demo sintética: cable", descripcion: "No es un dato real de catálogo", valores });
+    const creado = await ctx.runMutation(api.catalogoRecursos.recursos.crearRecurso, { organizacionId, claseRecursoId: seeded.claseRecursoId, familiaRecursoId: seeded.familiaRecursoId, tipoRecursoId: seeded.tipoRecursoId, unidadId: seeded.unidadId, nombre: "Demo sintética: cable", descripcion: "No es un dato real de catálogo", valores });
     const obtenido = await ctx.runQuery(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id });
     const desactivado = await ctx.runMutation(api.catalogoRecursos.recursos.desactivarRecurso, { recursoId: creado._id, revisionEsperada: creado.revision });
     const durante = await ctx.runQuery(api.catalogoRecursos.recursos.obtenerRecurso, { recursoId: creado._id });

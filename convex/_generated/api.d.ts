@@ -9,6 +9,7 @@
  */
 
 import type * as catalogoRecursos_catalogo from "../catalogoRecursos/catalogo.js";
+import type * as catalogoRecursos_catalogoPublicado from "../catalogoRecursos/catalogoPublicado.js";
 import type * as catalogoRecursos_catalogoPublicadoValidators from "../catalogoRecursos/catalogoPublicadoValidators.js";
 import type * as catalogoRecursos_datosDemo from "../catalogoRecursos/datosDemo.js";
 import type * as catalogoRecursos_identidadesRecurso from "../catalogoRecursos/identidadesRecurso.js";
@@ -23,6 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "catalogoRecursos/catalogo": typeof catalogoRecursos_catalogo;
+  "catalogoRecursos/catalogoPublicado": typeof catalogoRecursos_catalogoPublicado;
   "catalogoRecursos/catalogoPublicadoValidators": typeof catalogoRecursos_catalogoPublicadoValidators;
   "catalogoRecursos/datosDemo": typeof catalogoRecursos_datosDemo;
   "catalogoRecursos/identidadesRecurso": typeof catalogoRecursos_identidadesRecurso;
