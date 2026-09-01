@@ -273,3 +273,65 @@ Parent-owned rows are deferred to the parent lifecycle. This executor did not ru
 - Changed files: `convex/tsconfig.json`, `convex/schema.ts`, `convex/catalogoAdmin/lib/backfillMetadatos.ts`, its test, W2 task checkboxes, and this cumulative record. The generated API binding was incidental and restored. Rollback is limited to W2 backfill/tests, the generated Convex config, and safe W2 schema metadata/index cleanup; stored business/history data remains.
 - W3 is next; its exact unchecked `- [ ] **RED** — Add pagination tests...` row and all later implementation rows remain in `tasks.md`. Parent-owned lifecycle rows remain unchanged and deferred. This executor did not review, commit, push, PR, or run lifecycle actions; `nextRecommended: parent-lifecycle`.
 - Native W2 attempt settlement returned `complete`; no delivery or review gate was performed.
+
+# Apply progress — W3
+
+## Status consumed
+
+- Native status: `spec-driven`, `openspec` authoritative, `applyState: ready`; proposal, eight specs, design, tasks, and cumulative progress were present.
+- Active attempt: `sha256:4adb290d57bd55e1de58480b7ef8dc5c1b18dfbd8cb7c1f1f78051501e8a8baf`; W3 bounds are 2 attempts and 380 changed lines. The parent token was authenticated with a matching acquire; no second attempt was opened.
+- `actionContext`: `repo-local`; workspace root and allowed root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Workload gate: decision needed `No`; chained delivery `Yes`, strategy `stacked-to-main`; W3 is the assigned slice and remains below the 400-line branch budget.
+
+## TDD Cycle Evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | Added the two W3 focused test files, then ran `pnpm exec vitest run convex/catalogoAdmin/lib/pagination.test.ts convex/catalogoAdmin/jerarquia.test.ts` before implementation | Expected failure: missing pagination module and admin hierarchy module |
+| GREEN | Implemented cursor helpers and Class detail/list reads; focused command | PASS — 2 files, 5 tests |
+| TRIANGULATE | Added lifecycle/filter/order cursor-binding, sparse-page, deterministic key/ID traversal, and missing-detail assertions; focused command | PASS — 2 files, 5 tests |
+| TRIANGULATE full | `pnpm exec vitest run` | PASS — 17 files, 139 tests |
+| TRIANGULATE typecheck | `pnpm typecheck` | PASS — `tsc --noEmit` |
+| TRIANGULATE codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and Convex functions typechecked |
+| TRIANGULATE runtime | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked Convex account |
+| REFACTOR | Replaced locale-sensitive cursor canonicalization with code-point ordering and reran focused/full evidence | PASS — no behavior regressions |
+| Hygiene | `git diff --check` | PASS — no whitespace errors |
+
+## W3 implementation evidence
+
+- `lib/pagination.ts` provides a base64url envelope `{ v, plan, filtersHash, order, cursor }`; the SHA-256 binding covers canonical filters, lifecycle mode, selected plan, and ordering version. It rejects malformed or reused cursors with `ADMIN_INVALID_ARGUMENT` and validates page sizes 1–100 with default 25.
+- `jerarquia.ts` exposes read-only `obtenerClase` and `listarClases`. The list uses `porClaveYAdminSort` for `ALL`, `porActivoYClaveYAdminSort` for state modes, and native bounded `.withIndex(...).order(...).paginate(...)`; no new `.filter()` or unbounded `.collect()` path was added.
+- Class details expose stored lifecycle/revision and `effective`/`effectiveReasons`; missing direct IDs return `null`. Tests prove default ALL visibility, state filtering, sparse pages, cursor mismatch rejection, and complete deterministic traversal.
+- W3 is read-only; no mutations, deletion, schema edits, or unrelated public API changes were introduced.
+
+## Completed tasks and persisted checkbox updates
+
+- W3 RED, GREEN, TRIANGULATE, and REFACTOR are marked `- [x]` in `tasks.md`.
+- W0–W2 history and parent-owned rows were preserved. The generated `convex/_generated/api.d.ts` update is legitimate derived output for the new public `catalogoAdmin.jerarquia` references; it was produced by codegen and not hand-edited.
+
+## Files and rollback boundary
+
+- Changed: `convex/catalogoAdmin/lib/pagination.ts`, `convex/catalogoAdmin/lib/pagination.test.ts`, `convex/catalogoAdmin/jerarquia.ts`, `convex/catalogoAdmin/jerarquia.test.ts`, generated `convex/_generated/api.d.ts`, W3 task checkboxes, and this cumulative record.
+- Authored implementation remains within the W3 380-line attempt bound and the complete branch diff remains below 400 changed lines.
+- Rollback: remove the W3 pagination/detail/list helpers and tests, restore only the four W3 checkbox flips, and regenerate the Convex bindings after removing the W3 public module. Retain W2 metadata/indexes; no stored catalog/history rows are affected.
+
+## Remaining tasks and deferred lifecycle actions
+
+The next exact unchecked implementation rows are W4 and remain unchanged:
+
+- [ ] **RED** — Add failing Convex tests for Class create at revision 1, duplicate/immutable key, stale update, parent activation with one invalid descendant, active descendant/resource blockers, inactive blockers ignored, and same-state no-op; evidence is focused RED failures, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove only W4 test additions, estimate 24 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement only Class commands and indexed blocker/descendant validation in `convex/catalogoAdmin/jerarquia.ts`; acceptance evidence is all W4 scenarios passing with unchanged stored rows after failures and no cascade/delete, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove Class command exports and W4-specific loader code while preserving W3 reads, estimate 44 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Add transaction tests for multiple descendants, inert active descendants, active resources, stale-before-blocker checks, and public-read compatibility; acceptance evidence is focused/full pass, `pnpm typecheck`, codegen, and runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts convex/catalogoRecursos/catalogo.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove only W4 Class command/test changes, estimate 14 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Extract only Class-specific blocker predicates and keep the module thin over shared revisions/errors; acceptance evidence is unchanged error data and full regression pass, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback revert W4 refactor, estimate 8 authored lines. <!-- sdd-owner: implementation -->
+
+All later implementation rows W5–W16 remain unchecked in `tasks.md`. Parent-owned lifecycle rows remain deferred byte-for-byte:
+
+- [ ] After apply, collect ordinary SDD status evidence by running `sdd-verify`, `pnpm exec vitest run`, `pnpm typecheck`, `git diff --check`, and `git status --short` over `convex/catalogoAdmin/**`, `convex/schema.ts`, `src/catalogoRecursos/**`, `convex/_generated/*`, and `contract-tests/**`; acceptance evidence is the recorded command/status output, including runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the verification/status record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+- [ ] After post-apply verification, confirm the lifecycle gate in `openspec/changes/complete-catalog-administration/tasks.md`; acceptance evidence is all RED/GREEN/TRIANGULATE/REFACTOR results recorded, no authored work unit exceeds 400 changed lines, and every rollback boundary remains actionable, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the lifecycle decision record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+
+No review, receipt, verification actor, refutation, correction, settle, commit, push, PR, or delivery gate was started. `nextRecommended: parent-lifecycle`.
+
+## Status produced
+
+- W3 implementation-owned task progress: 4 W3 rows complete; W4–W16 implementation work remains.
+- Parent lifecycle actions remain deferred; parent owns review/verify/settle/delivery.
