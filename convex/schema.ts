@@ -69,8 +69,10 @@ export default defineSchema({
   })
     .index("porFamilia", ["familiaRecursoId"])
     .index("porFamiliaYUnidad", ["familiaRecursoId", "unidadId"])
+        .index("porFamiliaYTipoYUnidad", ["familiaRecursoId", "tipoRecursoId", "unidadId"])
     .index("porTipo", ["tipoRecursoId"])
-    .index("porTipoYUnidad", ["tipoRecursoId", "unidadId"]),
+    .index("porTipoYUnidad", ["tipoRecursoId", "unidadId"])
+    .index("porUnidad", ["unidadId"]),
 
   definicionesAtributo: defineTable({
     ...identificacionCatalogo,
@@ -81,7 +83,7 @@ export default defineSchema({
       v.literal("OPCION"),
     ),
     unidadId: v.optional(v.id("unidades")),
-  }).index("porClave", ["clave"]),
+  }).index("porClave", ["clave"]).index("porUnidad", ["unidadId"]),
 
   atributosRecurso: defineTable({
     familiaRecursoId: v.id("familiasRecurso"),
@@ -95,6 +97,7 @@ export default defineSchema({
     .index("porFamilia", ["familiaRecursoId"])
     .index("porDefinicion", ["definicionAtributoId"])
     .index("porFamiliaYDefinicion", ["familiaRecursoId", "definicionAtributoId"])
+        .index("porFamiliaYTipoYDefinicion", ["familiaRecursoId", "tipoRecursoId", "definicionAtributoId"])
     .index("porTipo", ["tipoRecursoId"])
     .index("porTipoYDefinicion", ["tipoRecursoId", "definicionAtributoId"]),
 
@@ -169,6 +172,7 @@ export default defineSchema({
     .index("porTipo", ["tipoRecursoId"])
     .index("porActivo", ["activo"])
         .index("porTipoYActivo", ["tipoRecursoId", "activo"])
+    .index("porUnidad", ["unidadId"])
     .searchIndex("buscar", {
       searchField: "nombre",
       filterFields: ["tipoRecursoId", "activo"],

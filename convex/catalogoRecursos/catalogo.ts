@@ -1,5 +1,5 @@
-import { query } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 
@@ -79,6 +79,20 @@ const opcion = v.object({
   descripcion: v.optional(v.string()),
 });
 
+const identificacionArgs = {
+  clave: v.string(),
+  nombre: v.string(),
+  descripcion: v.optional(v.string()),
+};
+const resultadoClaseCreada = v.object({ id: v.id("clasesRecurso"), revision: v.number() });
+const resultadoFamiliaCreada = v.object({ id: v.id("familiasRecurso"), revision: v.number() });
+const resultadoTipoCreado = v.object({ id: v.id("tiposRecurso"), revision: v.number() });
+const resultadoUnidadCreada = v.object({ id: v.id("unidades"), revision: v.number() });
+const resultadoPoliticaUnidadCreada = v.object({ id: v.id("politicasUnidadRecurso"), revision: v.number() });
+const resultadoDefinicionCreada = v.object({ id: v.id("definicionesAtributo"), revision: v.number() });
+const resultadoAtributoCreado = v.object({ id: v.id("atributosRecurso"), revision: v.number() });
+const resultadoOpcionCreada = v.object({ id: v.id("opcionesAtributo"), revision: v.number() });
+
 const regla = v.object({
   id: v.id("reglasAtributoRecurso"),
   tipoRecursoId: v.id("tiposRecurso"),
@@ -95,6 +109,166 @@ async function unidadDeDefinicion(ctx: QueryCtx, unidadId: Id<"unidades"> | unde
     ? { id: registro._id, clave: registro.clave, nombre: registro.nombre, simbolo: registro.simbolo ?? null }
     : null;
 }
+
+async function exigirClaseActiva(ctx: MutationCtx, claseRecursoId: Id<"clasesRecurso">) {
+  const clase = await ctx.db.get(claseRecursoId);
+  if (!clase?.activo) throw new Error("Clase inexistente o inactiva");
+  return clase;
+}
+
+async function exigirFamiliaActiva(ctx: MutationCtx, familiaRecursoId: Id<"familiasRecurso">) {
+  const familia = await ctx.db.get(familiaRecursoId);
+  if (!familia?.activo) throw new Error("Familia inexistente o inactiva");
+  await exigirClaseActiva(ctx, familia.claseRecursoId);
+  return familia;
+}
+
+async function exigirTipoActivo(ctx: MutationCtx, tipoRecursoId: Id<"tiposRecurso">) {
+  const tipo = await ctx.db.get(tipoRecursoId);
+  if (!tipo?.activo) throw new Error("Tipo inexistente o inactivo");
+  await exigirFamiliaActiva(ctx, tipo.familiaRecursoId);
+  return tipo;
+}
+
+async function exigirUnidadActiva(ctx: MutationCtx, unidadId: Id<"unidades">) {
+  const unidad = await ctx.db.get(unidadId);
+  if (!unidad?.activo) throw new Error("Unidad inexistente o inactiva");
+  return unidad;
+}
+
+async function exigirDefinicionActiva(ctx: MutationCtx, definicionAtributoId: Id<"definicionesAtributo">) {
+  const definicion = await ctx.db.get(definicionAtributoId);
+  if (!definicion?.activo) throw new Error("Definición de atributo inexistente o inactiva");
+  return definicion;
+}
+
+export const crearClaseRecurso = mutation({
+  args: identificacionArgs,
+  returns: resultadoClaseCreada,
+  handler: async (ctx, args) => {
+    const existente = await ctx.db.query("clasesRecurso").withIndex("porClave", (q) => q.eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de clase duplicada");
+    const id = await ctx.db.insert("clasesRecurso", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const crearFamiliaRecurso = mutation({
+  args: { ...identificacionArgs, claseRecursoId: v.id("clasesRecurso") },
+  returns: resultadoFamiliaCreada,
+  handler: async (ctx, args) => {
+    await exigirClaseActiva(ctx, args.claseRecursoId);
+    const existente = await ctx.db.query("familiasRecurso").withIndex("porClaseYClave", (q) => q.eq("claseRecursoId", args.claseRecursoId).eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de familia duplicada en la clase");
+    const id = await ctx.db.insert("familiasRecurso", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const crearTipoRecurso = mutation({
+  args: { ...identificacionArgs, familiaRecursoId: v.id("familiasRecurso") },
+  returns: resultadoTipoCreado,
+  handler: async (ctx, args) => {
+    await exigirFamiliaActiva(ctx, args.familiaRecursoId);
+    const existente = await ctx.db.query("tiposRecurso").withIndex("porFamiliaYClave", (q) => q.eq("familiaRecursoId", args.familiaRecursoId).eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de tipo duplicada en la familia");
+    const id = await ctx.db.insert("tiposRecurso", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const crearUnidad = mutation({
+  args: { ...identificacionArgs, simbolo: v.optional(v.string()) },
+  returns: resultadoUnidadCreada,
+  handler: async (ctx, args) => {
+    const existente = await ctx.db.query("unidades").withIndex("porClave", (q) => q.eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de unidad duplicada");
+    const id = await ctx.db.insert("unidades", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const asignarUnidadPermitida = mutation({
+  args: {
+    familiaRecursoId: v.id("familiasRecurso"),
+    tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    unidadId: v.id("unidades"),
+    principal: v.boolean(),
+  },
+  returns: resultadoPoliticaUnidadCreada,
+  handler: async (ctx, args) => {
+    const familia = await exigirFamiliaActiva(ctx, args.familiaRecursoId);
+    if (args.tipoRecursoId !== undefined) {
+      const tipo = await exigirTipoActivo(ctx, args.tipoRecursoId);
+      if (tipo.familiaRecursoId !== familia._id) throw new Error("El tipo no pertenece a la familia");
+    }
+    await exigirUnidadActiva(ctx, args.unidadId);
+    const existente = args.tipoRecursoId === undefined
+      ? await ctx.db.query("politicasUnidadRecurso")
+          .withIndex("porFamiliaYTipoYUnidad", (q) => q.eq("familiaRecursoId", familia._id).eq("tipoRecursoId", undefined).eq("unidadId", args.unidadId))
+          .first()
+      : await ctx.db.query("politicasUnidadRecurso").withIndex("porTipoYUnidad", (q) => q.eq("tipoRecursoId", args.tipoRecursoId!).eq("unidadId", args.unidadId)).first();
+    if (existente) throw new Error("Asignación de unidad duplicada");
+    const id = await ctx.db.insert("politicasUnidadRecurso", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const crearDefinicionAtributo = mutation({
+  args: { ...identificacionArgs, tipoDato, unidadId: v.optional(v.id("unidades")) },
+  returns: resultadoDefinicionCreada,
+  handler: async (ctx, args) => {
+    const existente = await ctx.db.query("definicionesAtributo").withIndex("porClave", (q) => q.eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de definición de atributo duplicada");
+    if (args.unidadId !== undefined) await exigirUnidadActiva(ctx, args.unidadId);
+    const id = await ctx.db.insert("definicionesAtributo", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const asignarAtributo = mutation({
+  args: {
+    familiaRecursoId: v.id("familiasRecurso"),
+    tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    definicionAtributoId: v.id("definicionesAtributo"),
+    aplicabilidad,
+    participaIdentidad: v.boolean(),
+    orden: v.number(),
+  },
+  returns: resultadoAtributoCreado,
+  handler: async (ctx, args) => {
+    const familia = await exigirFamiliaActiva(ctx, args.familiaRecursoId);
+    if (args.tipoRecursoId !== undefined) {
+      const tipo = await exigirTipoActivo(ctx, args.tipoRecursoId);
+      if (tipo.familiaRecursoId !== familia._id) throw new Error("El tipo no pertenece a la familia");
+    }
+    await exigirDefinicionActiva(ctx, args.definicionAtributoId);
+    const existente = args.tipoRecursoId === undefined
+      ? await ctx.db.query("atributosRecurso")
+          .withIndex("porFamiliaYTipoYDefinicion", (q) => q.eq("familiaRecursoId", familia._id).eq("tipoRecursoId", undefined).eq("definicionAtributoId", args.definicionAtributoId))
+          .first()
+      : await ctx.db.query("atributosRecurso").withIndex("porTipoYDefinicion", (q) => q.eq("tipoRecursoId", args.tipoRecursoId!).eq("definicionAtributoId", args.definicionAtributoId)).first();
+    if (existente) throw new Error("Asignación de atributo duplicada");
+    const id = await ctx.db.insert("atributosRecurso", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
+
+export const crearOpcionAtributo = mutation({
+  args: {
+    definicionAtributoId: v.id("definicionesAtributo"),
+    ...identificacionArgs,
+  },
+  returns: resultadoOpcionCreada,
+  handler: async (ctx, args) => {
+    const definicion = await exigirDefinicionActiva(ctx, args.definicionAtributoId);
+    if (definicion.tipoDato !== "OPCION") throw new Error("Sólo una definición OPCION admite opciones");
+    const existente = await ctx.db.query("opcionesAtributo").withIndex("porDefinicionYClave", (q) => q.eq("definicionAtributoId", args.definicionAtributoId).eq("clave", args.clave)).first();
+    if (existente) throw new Error("Clave de opción duplicada en la definición");
+    const id = await ctx.db.insert("opcionesAtributo", { ...args, activo: true, revision: 1 });
+    return { id, revision: 1 };
+  },
+});
 
 export const consultarClases = query({
   args: {},
