@@ -209,3 +209,203 @@ Before the search work can merge or become a dependency for later work, an integ
 
 If native traversal fails this gate, the search work is blocked. It requires an explicit design/specification revision before implementation proceeds; no technical-identity/adminSortId fallback, collection, or silent in-memory sorting is permitted.
 
+## 7. Bounded detail loading
+
+Define `MAX_RESOURCE_VALUES = 200`, matching the completed aggregate row bound.
+
+`loadResourceValuesBounded(ctx, recursoId)` performs exactly one query:
+
+```text
+valoresAtributoRecurso
+  .withIndex("porRecurso", recursoId)
+  .take(MAX_RESOURCE_VALUES + 1)
+```
+
+- 0–200 rows are returned in the detail.
+- 201 rows cause `ADMIN_INVALID_STATE` with field `valores`, reason `RESOURCE_VALUE_LIMIT_EXCEEDED`, and safe limit context in the reason/violations.
+- Values are never truncated.
+- The loader is called once only by direct detail and by mutations that need the stored aggregate; list/search cannot import it.
+
+Tests prove the no-value-load property in two ways: a dependency-boundary test rejects any `valoresAtributoRecurso` access from the summary executor, and executor tests use a DB proxy that throws/counts when that table is queried. Detail tests assert exactly one indexed value query and the 200/201 boundary.
+
+## 8. Effective and inert diagnostics
+
+The stored Resource is always the inspection root. Diagnostics use the completed resolvers:
+
+1. Resolve stored Type → Family → Class documents.
+2. Call `resolverJerarquiaEfectiva` for exact hierarchy reasons.
+3. For detail and mutation validation, call `cargarAgregado` for current bounded aggregate status and coded violations.
+4. For create, update, and activation, require effective hierarchy and a `VALID` aggregate before Resource-value validation.
+5. Then run the existing pure Resource validator against a bounded snapshot to validate Unit, selected assignments, rules, definitions, options, and values.
+
+The administrative snapshot loader replaces each potentially growing `.collect()` with the relevant index and `.take(MAX_AGGREGATE_ROWS + 1)`. It returns a tagged limit failure before calling the pure validator when any relation exceeds 200 rows; the admin mapper emits `ADMIN_INVALID_STATE` with a `CATALOG_LIMIT_EXCEEDED` violation. The existing public wrapper keeps its current behavior and messages; only the new admin seam opts into this bounded result contract.
+
+Summary computes hierarchy status only, preventing aggregate fan-out per list row. Detail may compute full aggregate diagnostics because it addresses one Resource. An inactive or currently inert Resource remains readable. After revision and immutable-field checks, an update constructs and completely validates the proposed current effective aggregate; only a valid candidate may return `UNCHANGED`. An invalid or inert aggregate fails even when the input is semantically identical; every material update and every activation validates current effectiveness.
+
+## 9. Structured validation mapping without legacy changes
+
+Refactor `convex/catalogoRecursos/validacionRecurso.ts` to expose a non-throwing, bounded evaluation result used by admin code. Keep the existing `validarRecurso` wrapper and its `mensajes` table unchanged, so legacy functions continue throwing the same Spanish text.
+
+The admin mapper uses this mapping:
+
+| Existing domain failure | Administrative failure |
+|---|---|
+| `JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA` | `ADMIN_INVALID_REFERENCE` with the inspected missing/inactive classification or Unit field |
+| `JERARQUIA_INVALIDA` | `ADMIN_INVALID_REFERENCE`, field `classification`, reason `RESOURCE_HIERARCHY_INVALID` |
+| `UNIDAD_NO_PERMITIDA` | `ADMIN_INVALID_REFERENCE`, field `unidadId`, reason `RESOURCE_UNIT_NOT_ALLOWED` |
+| `ATRIBUTO_NO_APLICABLE` | `ADMIN_INVALID_REFERENCE`, field `valores.atributoRecursoId`, reason `RESOURCE_ATTRIBUTE_NOT_APPLICABLE` |
+| `DEFINICION_INEXISTENTE` | `ADMIN_INVALID_REFERENCE`, field `definicionAtributoId`, reason `RESOURCE_DEFINITION_MISSING` |
+| `OPCION_INVALIDA` | `ADMIN_INVALID_REFERENCE`, field `opcionAtributoId`, reason `RESOURCE_OPTION_INVALID` |
+| `ATRIBUTO_REPETIDO` | `ADMIN_INVALID_STATE` with violation `RESOURCE_ATTRIBUTE_DUPLICATE` |
+| `ATRIBUTO_REQUERIDO_AUSENTE` | `ADMIN_INVALID_STATE` with violation `RESOURCE_REQUIRED_VALUE_MISSING` |
+| `NUMERO_NO_FINITO` | `ADMIN_INVALID_STATE` with violation `RESOURCE_NON_FINITE_NUMBER` |
+| `ATRIBUTO_PROHIBIDO` | `ADMIN_INVALID_STATE` with violation `RESOURCE_ATTRIBUTE_FORBIDDEN` |
+| `TIPO_DE_VALOR_INVALIDO` | `ADMIN_INVALID_STATE` with violation `RESOURCE_VALUE_TYPE_INVALID` |
+
+Add those Resource violation literals plus `RESOURCE_VALUE_LIMIT_EXCEEDED` and `RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED` to the shared violation validator. Existing error variants are not renamed or removed.
+
+Other exact mappings are:
+
+- missing commanded Resource → `ADMIN_NOT_FOUND`;
+- stale revision → `ADMIN_STALE_REVISION`;
+- duplicate derived identity → `ADMIN_DUPLICATE_KEY` with normalized identity and `global` or organization scope;
+- alias collision → `ADMIN_CONFLICT` with `conflictKind: "resource-alias"`;
+- classification, ownership, active-state echo, direct technical identity, or prohibited organization-owned identity drift → `ADMIN_IMMUTABLE_FIELD`;
+- missing/inactive organization → `ADMIN_INVALID_REFERENCE`;
+- invalid/inert aggregate → `ADMIN_INVALID_STATE` with existing aggregate violations;
+- invalid cursor/page size/search text → `ADMIN_INVALID_ARGUMENT`.
+
+Admin code never catches an arbitrary Spanish `Error` and parses its message.
+
+## 10. Atomic write algorithms
+
+Every command is one Convex mutation transaction. There are no actions, external I/O calls, or compensating writes.
+
+### 10.1 Create
+
+1. Normalize name/description and reject blank name.
+2. Reject more than 200 proposed values before catalog fan-out.
+3. Resolve and verify the supplied Class → Family → Type ownership.
+4. For organization ownership, load the organization and require it to exist and be active.
+5. Load the completed effective aggregate and run bounded Resource evaluation.
+6. Derive `identificadorTecnico` using the existing identity domain function.
+7. Query exactly one ownership-aware identity index with `.take(1)`; do not filter by active state, so inactive duplicates conflict.
+8. Query the exact organization/version/identity alias key when applicable.
+9. Insert `recursos` with `activo: true`, revision 1, identity version 1 for organization ownership, and both admin metadata fields.
+10. Insert all validated value rows.
+11. Insert the versioned alias for organization ownership.
+12. Return `CREATED` with a summary projected from the committed candidate.
+
+The duplicate and alias index reads are in the same transaction as writes. Convex optimistic concurrency retries a racing equivalent transaction; after retry, the losing transaction observes the conflict. Any thrown validation, insert, or alias error rolls back steps 9–11.
+
+### 10.2 Update: revision-first order
+
+1. Directly load the Resource; missing returns `ADMIN_NOT_FOUND`.
+2. Validate positive `expectedRevision` and compare it immediately. A mismatch returns `ADMIN_STALE_REVISION` before no-op detection, immutable checks, catalog loading, duplicate checks, or business validation.
+3. Resolve stored classification and compare every supplied immutable echo. Reject ownership/Type/Class/Family differences and any supplied `identificadorTecnico` or `activo`.
+4. Load stored values once with the 201-row guard; merge optional mutable replacements into a complete candidate. Normalize values into assignment-ID order for semantic comparison.
+5. Require at most 200 candidate values, validate the current effective aggregate, and run bounded complete Resource validation for the complete candidate.
+6. Only after candidate validation succeeds, if normalized mutable fields and values equal stored state, return `UNCHANGED` at the existing revision.
+7. Derive the candidate identity. If organization-owned and it differs from the stored identity, return `ADMIN_IMMUTABLE_FIELD` for `identificadorTecnico`.
+8. Query the appropriate identity index with `.take(2)`, including inactive rows; ignore only the current Resource ID and reject any other match. Two rows are required because the current Resource may be the first indexed result. Global Resources may adopt a new non-conflicting derived identity.
+9. Complete all checks before writing. Delete the bounded old value rows, insert all replacement rows, and patch the Resource once with mutable fields, derived identity, healed metadata, and `revision + 1`.
+10. Do not create, delete, transfer, or reactivate alias rows during normal update.
+11. Return `UPDATED` with the new summary.
+
+Any error in step 9 aborts the Convex transaction and restores the old fields, revision, values, and aliases.
+
+### 10.3 Lifecycle
+
+Both commands load the Resource and compare revision before same-state handling.
+
+- Same target state after a current revision returns `UNCHANGED` and does not increment revision.
+- Deactivation patches only `activo: false` and `revision + 1`. Values, aliases, identity, ownership, classification, catalog rows, revisions, and snapshots are untouched.
+- Activation loads the bounded stored values, validates current effective aggregate and complete Resource state, re-derives identity, checks organization identity immutability and ownership-aware duplicates, then patches `activo: true`, healed metadata, and `revision + 1`.
+- Failed activation leaves the Resource inactive.
+- No hard-delete function exists.
+
+## 11. Validator and generated consumer organization
+
+- Keep common lifecycle, page, result, entity, violation, and `AdminErrorData` validators in `convex/catalogoAdmin/validators.ts`.
+- Put Resource-specific validators in `convex/catalogoAdmin/resourceValidators.ts` and derive TypeScript types with `Infer`; do not create hand-written duplicate DTOs.
+- `convex/catalogoAdmin/recursos.ts` imports those validators for every registered args/returns declaration.
+- Convex code generation exposes the new references in `convex/_generated/api.*` and Resource metadata in the generated data model.
+- Add `contract-tests/resource-admin-consumer.ts` and include it in `contract-tests/tsconfig.json`. The fixture must use `api.catalogoAdmin.recursos`, `FunctionArgs`, `FunctionReturnType`, `Id<"recursos">`, page cursors, diagnostics, all seven functions, result disposition narrowing, and exported `AdminErrorData`.
+- The fixture imports from package exports only. It must not import backend implementation modules or define parallel DTOs.
+
+## 12. Strict test strategy
+
+Every work unit follows RED → GREEN → TRIANGULATE → REFACTOR:
+
+1. **RED:** add the smallest focused failing test and record the exact focused command/failure.
+2. **GREEN:** implement only enough behavior to pass it.
+3. **TRIANGULATE:** add at least one counterexample or boundary case that would pass a hard-coded implementation.
+4. **REFACTOR:** extract the named boundary, rerun the focused test, then run the complete verification set.
+
+A red commit is not merged; RED/GREEN evidence is recorded in the work-unit receipt. Tests remain in the same work unit as behavior.
+
+Required coverage:
+
+- pure projection and diagnostic tests for effective, inert, and broken references;
+- all 16 list plans, page-size boundaries, cursor binding changes, and complete traversal of 1,000+ Resources;
+- DB-proxy proof that list/search issue zero value-table queries;
+- native Convex 1.45.0 repeated equal-relevance traversal and cursor-binding tests;
+- detail value-load count and 200/201 behavior;
+- each domain failure mapping to validated `ConvexError.data`;
+- stale-before-no-op/immutable/validation behavior;
+- global and organization duplicate checks against active and inactive rows;
+- alias conflict and injected value-write failure rollback;
+- update replacement rollback preserving old fields, revision, values, and aliases;
+- immutable classification/ownership and organization identity drift;
+- lifecycle idempotence, deactivation preservation, and current-catalog activation;
+- unchanged generated legacy signatures/returns and exact protected Spanish messages;
+- external consumer type narrowing for every new function.
+
+Focused tests use `pnpm exec vitest run <test-file>`. Final verification is:
+
+- `pnpm exec vitest run`
+- `pnpm typecheck`
+- `pnpm typecheck:consumer`
+- `pnpm exec convex codegen --typecheck enable`
+- `pnpm exec convex dev --once` when a deployment is available; otherwise record `N/A — no deployment available`.
+
+## 13. Review-safe stacked work units
+
+The canonical split is W0 plus WU1–WU9. W0 records planning/runtime metadata evidence and is not a product PR; WU1–WU9 are the behavior units below.
+
+Delivery is a linear stacked-to-main chain. During review, each child targets its immediate predecessor; after the predecessor merges, it is retargeted/rebased so only its own work unit remains. Every PR body states start state, end state, dependency, follow-up, exclusions, focused test result, runtime result or N/A, authored line count, and rollback boundary. No `size:exception` is planned.
+
+| # | Work unit and end state | Prior dependency | Forecast authored changes | Verification with unit | Independent rollback boundary |
+|---:|---|---|---:|---|---|
+| W0 | Planning/runtime metadata evidence; no product behavior | Approved design/specs | 12 | Repository capability and configuration evidence | Remove only planning evidence |
+| 1 | Optional Resource metadata, explicit legacy projection, 16 list indexes, search filter fields, resumable backfill | Completed catalog admin stack | 190 | schema/backfill tests and all legacy Resource tests | Revert schema/backfill and legacy projection before any admin read ships; retain data if already backfilled |
+| 2 | Resource validators, summary projection, diagnostics, and structured domain mapping | WU1 | 180 | pure validator/projection/error tests | Remove only Resource admin contract/helper files and added violation literals |
+| 3 | Indexed summary list with every filter plan and bound cursors | WU2 and completed backfill | 175 | multi-page/plan/cursor/no-value-load tests | Remove list export and planner; metadata/indexes may remain inert |
+| 4 | Convex 1.45.0 native search and traversal gate | WU3 | 190 | equal-relevance traversal, cursor binding, no-value-load tests | Remove search export and plan; ordinary list remains |
+| 5 | Direct detail and 200/201 bounded value loader | WU2 | 145 | detail/null/inert/value-query-count tests | Remove detail export and detail loader only |
+| 6 | Atomic create with organization, identity, alias, and rollback behavior | WU2 and WU5 helpers | 210 | create validation/duplicate/alias/value-failure tests | Remove admin create; no stored rows are deleted |
+| 7 | Revision-first update and immutable classification/ownership | WU6 | 240 | stale/no-op/identity/replacement/rollback tests | Remove admin update; create/read data remains valid |
+| 8 | Activation/deactivation and current effective-catalog integration | WU7 | 170 | lifecycle/idempotence/inert activation/no-cascade tests | Remove lifecycle exports; reads/create/update remain |
+| 9 | Generated API fixture, full legacy regression, rollout documentation | WU1–WU8 | 130 authored, generated output excluded | codegen, complete tests, both typechecks, deployment smoke or N/A | Remove fixture/docs and generated additions only after reverting API exports |
+
+Each unit starts from a compiling predecessor and ends with its own behavior and tests. If a unit reaches 350 authored additions plus deletions, split it before review; no unit may exceed 400.
+
+Chain diagram used in each PR, marking the current node with `📍`:
+
+```text
+main ← WU1 ← WU2 ← WU3 ← WU4 ← WU5 ← WU6 ← WU7 ← WU8 ← WU9
+```
+
+## 14. Rollback and compatibility
+
+- Stop new administrative use by reverting the affected additive function work unit; never delete Resource data as rollback.
+- Failed mutations require no repair because Convex commits the whole mutation or none of it.
+- Successful administrative writes remain valid ordinary Resource rows if the admin API is reverted.
+- Revert a shared validation extraction immediately if a protected public Resource test or Spanish error changes.
+- Keep optional backfilled metadata when removing indexes would create deployment risk; it is inert and excluded from legacy projections.
+- Do not change catalog publication revisions or snapshots during rollout or rollback.
+- No consumer migration is required until a consumer explicitly adopts the generated `catalogoAdmin.recursos` references.
+
+## 15. Explicit exclusions
+
+This design creates no Bandeja or XML behavior, auth/role/permission check, seed capability, UI, hard delete, cascade, publication operation, classification migration, organization transfer, or replacement public Resource API. It does not rename, remove, or alter any existing public Resource function.
