@@ -10,10 +10,11 @@ export type ResourceRequest =
   | { kind: "list"; args: { activo: true } }
   | { kind: "search"; args: { texto: string; activo: true } };
 
+export function resourceRequest(query: { kind: "list" }): Extract<ResourceRequest, { kind: "list" }>;
+export function resourceRequest(query: { kind: "search"; text: string }): Extract<ResourceRequest, { kind: "search" }>;
 export function resourceRequest(query: ResourceQuery): ResourceRequest {
-  return query.kind === "list"
-    ? { kind: "list", args: { activo: true } }
-    : { kind: "search", args: { texto: query.text, activo: true } };
+  if (query.kind === "list") return { kind: "list", args: { activo: true } };
+  return { kind: "search", args: { texto: query.text, activo: true } };
 }
 
 export function detailRequest(resourceId: ResourceId): { recursoId: ResourceId } {

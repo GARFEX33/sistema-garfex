@@ -4,18 +4,19 @@ import { api } from "../../../convex/_generated/api";
 import { createResourceDataSource, detailRequest, getConvexUrl, resourceRequest } from "./convexClient";
 import garfexExtension, { runGarfexMenus } from "./index";
 import { ResourceBrowser } from "./ui";
+import { fakeId } from "./testFixtures";
 import { stateAfterLoad, type Resource, type ResourceDetail, type ResourceQuery } from "./types";
 
-const resource = { _id: "r1", _creationTime: 0, tipoRecursoId: "t1", unidadId: "u1", identificadorTecnico: "R1", nombre: "Bomba visible", activo: true, revision: 1, valores: [] } satisfies Resource;
+const resource = { _id: fakeId<"recursos">("r1"), _creationTime: 0, tipoRecursoId: fakeId<"tiposRecurso">("t1"), unidadId: fakeId<"unidades">("u1"), identificadorTecnico: "R1", nombre: "Bomba visible", activo: true, revision: 1, valores: [] } satisfies Resource;
 const detail = {
-  id: "r1", identificadorTecnico: "R1", nombre: "Bomba visible", descripcion: "Descripción enriquecida", activo: true, revision: 3,
-  clase: { id: "c1", clave: "EQUIPO", nombre: "Equipo", activo: true, revision: 1 },
-  familia: { id: "f1", clave: "BOMBA", nombre: "Bomba", activo: true, revision: 1 },
-  tipo: { id: "t1", clave: "CENTRIFUGA", nombre: "Centrífuga", activo: true, revision: 1 },
-  unidad: { id: "u1", clave: "UN", nombre: "Unidad", simbolo: "u", activo: true, revision: 1 },
+  id: fakeId<"recursos">("r1"), identificadorTecnico: "R1", nombre: "Bomba visible", descripcion: "Descripción enriquecida", activo: true, revision: 3,
+  clase: { id: fakeId<"clasesRecurso">("c1"), clave: "EQUIPO", nombre: "Equipo", activo: true, revision: 1 },
+  familia: { id: fakeId<"familiasRecurso">("f1"), clave: "BOMBA", nombre: "Bomba", activo: true, revision: 1 },
+  tipo: { id: fakeId<"tiposRecurso">("t1"), clave: "CENTRIFUGA", nombre: "Centrífuga", activo: true, revision: 1 },
+  unidad: { id: fakeId<"unidades">("u1"), clave: "UN", nombre: "Unidad", simbolo: "u", activo: true, revision: 1 },
   atributos: [
-    { id: "a1", clave: "COLOR", nombre: "Color", tipoDato: "OPCION", aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, valor: "rojo", opcion: { id: "o1", clave: "ROJO", nombre: "Rojo", activo: true, revision: 1 }, unidad: null },
-    { id: "a2", clave: "PESO", nombre: "Peso", tipoDato: "NUMERO", aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 2, activo: true, valor: 42, opcion: null, unidad: { id: "u1", clave: "UN", nombre: "Unidad", simbolo: "u", activo: true, revision: 1 } },
+    { id: fakeId<"atributosRecurso">("a1"), clave: "COLOR", nombre: "Color", tipoDato: "OPCION", aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, valor: "rojo", opcion: { id: fakeId<"opcionesAtributo">("o1"), clave: "ROJO", nombre: "Rojo", activo: true, revision: 1 }, unidad: null },
+    { id: fakeId<"atributosRecurso">("a2"), clave: "PESO", nombre: "Peso", tipoDato: "NUMERO", aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 2, activo: true, valor: 42, opcion: null, unidad: { id: fakeId<"unidades">("u1"), clave: "UN", nombre: "Unidad", simbolo: "u", activo: true, revision: 1 } },
   ],
 } satisfies ResourceDetail;
 
@@ -40,16 +41,16 @@ it("gives GARFEX_CONVEX_URL precedence and reports missing config", () => {
 it("routes list and search queries without side effects", () => {
   expect(resourceRequest({ kind: "list" })).toEqual({ kind: "list", args: { activo: true } });
   expect(resourceRequest({ kind: "search", text: "bomba" })).toEqual({ kind: "search", args: { texto: "bomba", activo: true } });
-      expect(detailRequest("r1")).toEqual({ recursoId: "r1" });
+      expect(detailRequest(fakeId<"recursos">("r1"))).toEqual({ recursoId: fakeId<"recursos">("r1") });
 });
 
 it("uses exact generated references for list, search, and detail requests", async () => {
   const query = vi.fn().mockResolvedValue([]);
   const source = createResourceDataSource({ GARFEX_CONVEX_URL: "https://example" }, () => ({ query }));
-  await source.list(); await source.search("bomba"); await source.getDetail("r1");
+  await source.list(); await source.search("bomba"); await source.getDetail(fakeId<"recursos">("r1"));
   expect(query).toHaveBeenNthCalledWith(1, api.catalogoRecursos.recursos.listarRecursos, { activo: true });
   expect(query).toHaveBeenNthCalledWith(2, api.catalogoRecursos.recursos.buscarRecursos, { texto: "bomba", activo: true });
-  expect(query).toHaveBeenNthCalledWith(3, api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: "r1" });
+  expect(query).toHaveBeenNthCalledWith(3, api.catalogoRecursos.recursos.obtenerDetalleRecurso, { recursoId: fakeId<"recursos">("r1") });
 });
 
 it("represents empty and populated results as distinct view states", () => {

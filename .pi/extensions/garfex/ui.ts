@@ -1,4 +1,4 @@
-import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { stateAfterLoad, type Resource, type ResourceDataSource, type ResourceDetail, type ResourceQuery, type ViewState } from "./types";
 
@@ -7,7 +7,10 @@ export { stateAfterLoad } from "./types";
 export type ResourceKeybinding =
   | "tui.select.up" | "tui.select.down" | "tui.select.confirm" | "tui.select.cancel";
 type Tui = { requestRender(): void };
-type Keybindings = Pick<KeybindingsManager, "matches" | "getKeys">;
+type Keybindings = {
+  matches(data: string, key: string): boolean;
+  getKeys(key: string): string[];
+};
 
 function formatKey(key: string): string {
   return key.split("+").map((part) => part.length === 1 ? part.toUpperCase() : part[0]!.toUpperCase() + part.slice(1)).join("+").replace("Enter", "Enter");
@@ -24,7 +27,7 @@ export class ResourceBrowser {
   constructor(
     query: ResourceQuery,
     source: ResourceDataSource,
-    private readonly theme: Theme,
+    private readonly theme: Pick<Theme, "fg" | "bold">,
     private readonly tui: Tui,
     private readonly keybindings: Keybindings,
     private readonly done: () => void,
