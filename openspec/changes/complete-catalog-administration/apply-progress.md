@@ -503,3 +503,65 @@ The following exact unchecked task lines remain persisted and are deferred to la
 
 - Native status after checkbox persistence: `taskProgress.completed: 29`, `taskProgress.pending: 46`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`.
 - This delegated executor recommends `parent-lifecycle` for orchestration; parent-owned verification/status and lifecycle rows remain untouched.
+
+# Apply progress — W6
+
+## Status and workload boundary
+
+- Native status consumed: `openspec` authoritative; change `complete-catalog-administration`; `applyState: ready`; proposal, specs, design, tasks, and prior apply-progress present.
+- `actionContext.mode`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Active attempt continued with native token `sha256:3ec2e3282dea164d75a6913ae6dd0f64078ed0bf0313d84587a0f5669067c556`; bounds 2 attempts / 380 changed lines.
+- Workload gate consumed: decision needed `No`; chained delivery `Yes`; strategy `stacked-to-main`; roadmap risk `High`, assigned W6 slice remains below the 400-line boundary.
+
+## TDD Cycle Evidence
+
+| Cycle | Exact evidence | Result |
+|---|---|---|
+| RED | Initial focused W6 command before implementation | Expected failure: missing `crearTipo`, `cargarAgregado`, and `validarAgregado` targets; existing W3-W5 tests remained green. |
+| GREEN | `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts convex/catalogoAdmin/lib/cargarAgregado.test.ts src/catalogoRecursos/dominio/validacionAgregado.test.ts` | PASS — 3 files, 16 tests. |
+| GREEN typecheck | `pnpm typecheck` | PASS — `tsc --noEmit`. |
+| TRIANGULATE focused | W6 tests plus `convex/catalogoRecursos/catalogo.test.ts`, `recursos.test.ts`, and `catalogoPublicado.test.ts` | PASS — 6 files, 75 tests. |
+| TRIANGULATE full | `pnpm exec vitest run` | PASS — 19 files, 153 tests. |
+| TRIANGULATE/codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and TypeScript check completed. |
+| TRIANGULATE runtime | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account. |
+| REFACTOR | Bounded loader helpers, dirty-row handling, ambiguity helper, then focused/full tests and typecheck | PASS — stable status/violation output. |
+| Hygiene | `git diff --check` | PASS — no whitespace errors. |
+
+## Completed W6 tasks and persisted checkbox updates
+
+- W6 RED, GREEN, TRIANGULATE, and REFACTOR are marked `- [x]` in `tasks.md`; the persisted artifact was re-read after the final checkbox update.
+- Type administration now provides create, direct detail, bounded filtered list, mutable update, activate, and deactivate commands with revision-one creation, immutable Family/key echoes, scoped duplicate reservation, and no hard delete.
+- Active Types below inactive Class/Family branches remain stored and are reported ineffective with `NOT_EVALUATED`; inert aggregate rows are not returned by the loader.
+- Effective Type activation and parent Family/Class activation use bounded aggregate checks with coded principal-unit, inactive-unit, presentation, hierarchy, and limit violations; failures are transactional.
+- Type deactivation uses the indexed `porTipoYActivo` resource blocker; stale revision checks precede no-op, blocker, and aggregate validation.
+- Aggregate interfaces return `VALID|INVALID|NOT_EVALUATED`; bounded rows and global Type-key ambiguity support are exposed for later aggregate/publication slices.
+
+## Files changed and rollback boundary
+
+- `convex/catalogoAdmin/jerarquia.ts`
+- `convex/catalogoAdmin/jerarquia.test.ts`
+- `convex/catalogoAdmin/lib/cargarAgregado.ts`
+- `convex/catalogoAdmin/lib/cargarAgregado.test.ts`
+- `src/catalogoRecursos/dominio/validacionAgregado.ts`
+- `src/catalogoRecursos/dominio/validacionAgregado.test.ts`
+- `convex/_generated/api.d.ts` (normal codegen output only)
+- `openspec/changes/complete-catalog-administration/tasks.md`
+- `openspec/changes/complete-catalog-administration/apply-progress.md`
+- Current W6 diff is approximately 324 authored changed lines (326 including the two generated binding lines), below the 380-attempt and 400-review-line limits; no oversized split was needed.
+- Rollback boundary: remove W6 Type exports, aggregate loader/domain hook, W6 tests, and generated binding through normal codegen while retaining stored rows, Class/Family APIs, W2 metadata, and prior public behavior. No review, receipt, validation, commit, push, PR, or delivery gate was started.
+
+## Deviations
+
+- `validarComando.ts` was not created because it is outside the explicitly allowed edit surfaces; the bounded loader and pure validator provide the approved W6 hook boundary.
+- Legacy hierarchy rows with no aggregate configuration remain `NOT_EVALUATED` during parent activation to preserve W3-W5 behavior; explicit malformed/partial aggregate rows return coded invalid status and block effective activation.
+
+## Remaining tasks and deferred lifecycle actions
+
+- The next implementation row is the unchanged W7 RED row: `- [ ] **RED** — Add pure precedence tests under `src/catalogoRecursos/dominio/unidadesEfectivas.test.ts` and Convex tests under `convex/catalogoAdmin/unidades.test.ts` ... <!-- sdd-owner: implementation -->`.
+- Parent-owned rows remain byte-for-byte deferred: `- [ ] After apply, collect ordinary SDD status evidence ... <!-- sdd-owner: parent -->` and `- [ ] After post-apply verification, confirm the lifecycle gate ... <!-- sdd-owner: parent -->`.
+- All W7-W16 implementation rows remain unchecked in `tasks.md`; no parent-owned task was selected or modified.
+
+## Status produced
+
+- Native status remains `applyState: ready` because later implementation tasks remain; final verification is blocked pending parent lifecycle approval.
+- `nextRecommended: parent-lifecycle`; parent owns verification, receipts, delivery gates, and settle actions.
