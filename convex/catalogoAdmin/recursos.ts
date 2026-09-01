@@ -2,13 +2,14 @@ import { paginationOptsValidator, paginationResultValidator, type PaginationResu
 import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { MAX_RESOURCE_VALUES, resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
 import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference, adminImmutableField, adminInvalidState, adminNotFound, adminStaleRevision } from "./lib/errors";
 import { cargarAgregado } from "./lib/cargarAgregado";
 import { loadResourceValuesBounded, projectResourceDetail } from "./lib/recursoDetalle";
 import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
 import { lifecycleFilterValidator, createResultValidator, changeResultValidator } from "./validators";
+import { applyLifecycleChange } from "./lib/revisions";
 import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarRecursoAdministrativo, reemplazarValoresRecurso } from "./lib/recursoPersistencia";
 import { derivarIdentidadRecurso, validarRecursoAdministrativo, type CrearRecursoEntrada } from "../catalogoRecursos/validacionRecurso";
 import { mapResourceValidationFailure } from "./lib/recursoValidacion";
@@ -371,5 +372,79 @@ export const actualizarRecurso = mutation({
     const updated = await ctx.db.get(actual!._id);
     if (!updated) throw new Error("Resource disappeared after update");
     return { disposition: "UPDATED" as const, item: await summaryForResource(ctx, updated) };
+  },
+});
+
+async function validateResourceActivation(ctx: MutationCtx, next: Doc<"recursos">, entity: { kind: "recursos"; id: Id<"recursos"> }): Promise<void> {
+  const type = await ctx.db.get(next.tipoRecursoId);
+  const family = type ? await ctx.db.get(type.familiaRecursoId) : null;
+  const clazz = family ? await ctx.db.get(family.claseRecursoId) : null;
+  if (!type || !family || !clazz) {
+    adminInvalidReference({ entityKind: "recursos", field: "classification", reference: { kind: "tiposRecurso", id: next.tipoRecursoId }, reason: "RESOURCE_HIERARCHY_OR_UNIT_INVALID" });
+  }
+  if (next.organizacionId !== undefined) {
+    const organization = await ctx.db.get(next.organizacionId);
+    if (!organization || !organization.activo) {
+      adminInvalidReference({ entityKind: "recursos", field: "organizacionId", reference: { kind: "organizaciones", id: next.organizacionId }, reason: "RESOURCE_ORGANIZATION_MISSING_OR_INACTIVE" });
+    }
+  }
+  const storedValues = await loadResourceValuesBounded(ctx, next._id);
+  const valores = storedValues.map(({ atributoRecursoId, valor, opcionAtributoId }) => ({ atributoRecursoId, valor, ...(opcionAtributoId === undefined ? {} : { opcionAtributoId }) }));
+  const candidate: CrearRecursoEntrada = {
+    claseRecursoId: clazz!._id,
+    familiaRecursoId: family!._id,
+    tipoRecursoId: type!._id,
+    unidadId: next.unidadId,
+    nombre: next.nombre,
+    descripcion: next.descripcion,
+    valores,
+  };
+  const validation = await validarRecursoAdministrativo(ctx, candidate);
+  if (!validation.ok) throw new ConvexError(mapResourceValidationFailure(validation.code, entity));
+  await validateCurrentResourceAggregate(ctx, next.tipoRecursoId, entity);
+
+  const derivedIdentity = await derivarIdentidadRecurso(ctx, validation.value, valores);
+  if (next.organizacionId !== undefined && derivedIdentity !== next.identificadorTecnico) {
+    adminImmutableField({ entity, field: "identificadorTecnico" });
+  }
+  const duplicate = await buscarRecursoPorIdentidad(ctx, { organizacionId: next.organizacionId, identificadorTecnico: derivedIdentity, excludeRecursoId: next._id });
+  if (duplicate && duplicate._id !== next._id) adminDuplicateKey({ entityKind: "recursos", normalizedIdentity: derivedIdentity, scope: deriveScopeKey(next.organizacionId) });
+  if (next.organizacionId !== undefined) {
+    const alias = await buscarAliasExacto(ctx, { organizacionId: next.organizacionId, version: next.identidadVersion ?? 1, clave: derivedIdentity });
+    if (alias && alias.recursoId !== next._id) adminConflict({ entity, conflictKind: "resource-alias", conflictingEntity: { kind: "identidadesRecurso", id: alias._id }, normalizedIdentity: derivedIdentity });
+  }
+  next.identificadorTecnico = derivedIdentity;
+}
+
+export const activarRecurso = mutation({
+  args: { recursoId: v.id("recursos"), expectedRevision: v.number() },
+  returns: changeResultValidator(resourceSummaryValidator),
+  handler: async (ctx, args) => {
+    const entity = { kind: "recursos" as const, id: args.recursoId };
+    const result = await applyLifecycleChange<Doc<"recursos">>({
+      load: () => ctx.db.get(args.recursoId),
+      expectedRevision: args.expectedRevision,
+      entity,
+      targetActive: true,
+      validate: next => validateResourceActivation(ctx, next, entity),
+      patch: next => ctx.db.patch(next._id, { activo: true, identificadorTecnico: next.identificadorTecnico, revision: next.revision }),
+    });
+    return { disposition: result.disposition, item: await summaryForResource(ctx, result.item) };
+  },
+});
+
+export const desactivarRecurso = mutation({
+  args: { recursoId: v.id("recursos"), expectedRevision: v.number() },
+  returns: changeResultValidator(resourceSummaryValidator),
+  handler: async (ctx, args) => {
+    const entity = { kind: "recursos" as const, id: args.recursoId };
+    const result = await applyLifecycleChange<Doc<"recursos">>({
+      load: () => ctx.db.get(args.recursoId),
+      expectedRevision: args.expectedRevision,
+      entity,
+      targetActive: false,
+      patch: next => ctx.db.patch(next._id, { activo: false, revision: next.revision }),
+    });
+    return { disposition: result.disposition, item: await summaryForResource(ctx, result.item) };
   },
 });

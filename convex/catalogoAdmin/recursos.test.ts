@@ -748,3 +748,235 @@ describe("catalogoAdmin.recursos.obtenerDetalleRecurso", () => {
         expect(updateSource).not.toMatch(/catalogoRevisiones|catalogoTipoSnapshots|public/);
       });
     });
+
+    async function seedUpdatable(t: ReturnType<typeof convexTest>, organization: boolean | "FIXTURE" = false, identity = false) {
+      const fixture = await seedFixture(t);
+      await t.run(async ctx => {
+        await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: fixture.unit, principal: true, activo: true, revision: 1 });
+        await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId: fixture.typeA, tokens: [{ tipo: "TYPE_NAME" }], separador: " / ", activo: true, revision: 1 });
+        if (identity) await ctx.db.patch(fixture.attribute, { participaIdentidad: true });
+      });
+      const resourceId = await t.run(async ctx => {
+        const owner = organization ? fixture.organization : undefined;
+        const id = await ctx.db.insert("recursos", {
+          tipoRecursoId: fixture.typeA, unidadId: fixture.unit,
+          identificadorTecnico: identity ? "v1|CLASS|FAMILY|TYPE_A|PROOF=A" : "v1|CLASS|FAMILY|TYPE_A|",
+          nombre: "Resource", descripcion: "Description", activo: false, revision: 1,
+          ...(owner === undefined ? {} : { organizacionId: owner, identidadVersion: 1 }),
+          adminScopeKey: owner === undefined ? "GLOBAL" : `ORG:${owner}`,
+        });
+        if (identity) await ctx.db.insert("valoresAtributoRecurso", { recursoId: id, atributoRecursoId: fixture.attribute, valor: "A" });
+        if (owner !== undefined) await ctx.db.insert("identidadesRecurso", { organizacionId: owner, recursoId: id, version: 1, clave: identity ? "v1|CLASS|FAMILY|TYPE_A|PROOF=A" : "v1|CLASS|FAMILY|TYPE_A|", activa: true, creadaEn: 1 });
+        return id;
+      });
+      return { ...fixture, resourceId };
+    }
+
+    async function snapshot(t: ReturnType<typeof convexTest>, recursoId: Id<"recursos">) {
+      return t.run(async (ctx: MutationCtx) => ({
+        resource: await ctx.db.get(recursoId),
+        values: await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", recursoId)).collect(),
+        aliases: await ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q.eq("recursoId", recursoId)).collect(),
+      }));
+    }
+
+    async function catalogSnapshot(t: ReturnType<typeof convexTest>) {
+      return t.run(async (ctx: MutationCtx) => ({ revisions: await ctx.db.query("catalogoRevisiones").collect(), snapshots: await ctx.db.query("catalogoTipoSnapshots").collect() }));
+    }
+
+    async function completeLifecycleSnapshot(t: ReturnType<typeof convexTest>) { return t.run(async (ctx: MutationCtx) => ({ resources: await ctx.db.query("recursos").collect(), values: await ctx.db.query("valoresAtributoRecurso").collect(), aliases: await ctx.db.query("identidadesRecurso").collect(), catalog: await ctx.db.query("catalogoRevisiones").collect(), publication: await ctx.db.query("catalogoTipoSnapshots").collect() })); }
+
+    async function expectActivationFailure(t: ReturnType<typeof convexTest>, recursoId: Id<"recursos">, code: string, context: unknown) { const outcome = await t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId, expectedRevision: 1 }).then(() => null, (error: unknown) => error as { data: { code: string; context: unknown } }); expect(outcome).toMatchObject({ data: { code } }); expect(outcome?.data.context).toEqual(context); }
+
+    describe("catalogoAdmin.recursos lifecycle / WU8", () => {
+      it("loads directly and checks revision before same-state handling", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t);
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 0 })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_ARGUMENT" } });
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 9 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: true, revision: 2 } });
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 2 })).resolves.toMatchObject({ disposition: "UNCHANGED", item: { activo: true, revision: 2 } });
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+        const missing = await t.run(async ctx => { const id = await ctx.db.insert("recursos", { tipoRecursoId: fixture.typeA, unidadId: fixture.unit, identificadorTecnico: "missing", nombre: "Missing", activo: false, revision: 1 }); await ctx.db.delete(id); return id; });
+        await expect(t.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: missing, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_NOT_FOUND" } });
+      });
+
+      it("deactivates with one revision increment and preserves the aggregate", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t, "FIXTURE", true);
+        await t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 1 });
+        const before = await snapshot(t, fixture.resourceId);
+        const catalogBefore = await catalogSnapshot(t);
+        const result = await t.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: fixture.resourceId, expectedRevision: 2 });
+        expect(result).toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 3 } });
+        const after = await snapshot(t, fixture.resourceId);
+        expect(after.values).toEqual(before.values);
+        expect(after.aliases).toEqual(before.aliases);
+        expect(after.resource).toMatchObject({ tipoRecursoId: fixture.typeA, unidadId: fixture.unit, organizacionId: fixture.organization, identificadorTecnico: "v1|CLASS|FAMILY|TYPE_A|PROOF=A", activo: false, revision: 3 });
+        expect(await catalogSnapshot(t)).toEqual(catalogBefore);
+        await expect(t.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: fixture.resourceId, expectedRevision: 3 })).resolves.toMatchObject({ disposition: "UNCHANGED", item: { revision: 3 } });
+      });
+
+      it("rejects ineffective, invalid, and duplicate activation without changing final state", async () => {
+        const ineffective = convexTest(schema, modules);
+        const inert = await seedUpdatable(ineffective, "FIXTURE", true);
+        await ineffective.run(async ctx => ctx.db.patch(inert.typeA, { activo: false }));
+        const inertBefore = await snapshot(ineffective, inert.resourceId);
+        await expect(ineffective.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: inert.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE" } });
+        expect(await snapshot(ineffective, inert.resourceId)).toEqual(inertBefore);
+
+        const invalid = convexTest(schema, modules);
+        const broken = await seedUpdatable(invalid);
+        await invalid.run(async ctx => {
+          await ctx.db.patch(broken.attribute, { activo: false });
+          const presentation = await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", broken.typeA)).first();
+          if (presentation) await ctx.db.patch(presentation._id, { tokens: [{ tipo: "ATTRIBUTE_VALUE", atributoRecursoId: broken.attribute }] });
+        });
+        const invalidBefore = await snapshot(invalid, broken.resourceId);
+        await expect(invalid.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: broken.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+        expect(await snapshot(invalid, broken.resourceId)).toEqual(invalidBefore);
+
+        const duplicate = convexTest(schema, modules);
+        const candidate = await seedUpdatable(duplicate, "FIXTURE", true);
+        await duplicate.run(async ctx => ctx.db.insert("recursos", { tipoRecursoId: candidate.typeA, unidadId: candidate.unit, identificadorTecnico: "v1|CLASS|FAMILY|TYPE_A|PROOF=A", nombre: "Duplicate", activo: true, revision: 1, organizacionId: candidate.organization, identidadVersion: 1, adminScopeKey: `ORG:${candidate.organization}` }));
+        const duplicateBefore = await snapshot(duplicate, candidate.resourceId);
+        await expect(duplicate.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: candidate.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+        expect(await snapshot(duplicate, candidate.resourceId)).toEqual(duplicateBefore);
+      });
+
+      it("keeps catalog blockers limited to active Resources", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t);
+        await t.run(async ctx => {
+          await ctx.db.patch(fixture.ids.globalAActive, { activo: false });
+          await ctx.db.patch(fixture.ids.organizationAActive, { activo: false });
+        });
+        await t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 1 });
+        await expect(t.mutation(api.catalogoAdmin.jerarquia.desactivarTipo, { tipoRecursoId: fixture.typeA, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED", context: { relationKind: "active-resource" } } });
+        await t.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: fixture.resourceId, expectedRevision: 2 });
+        await expect(t.mutation(api.catalogoAdmin.jerarquia.desactivarTipo, { tipoRecursoId: fixture.typeA, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 2 } });
+      });
+
+      it("returns exact ADMIN_INVALID_STATE context and preserves the complete lifecycle snapshot", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t, "FIXTURE", true);
+        await t.run(async ctx => {
+          await ctx.db.insert("valoresAtributoRecurso", { recursoId: fixture.resourceId, atributoRecursoId: fixture.attribute, valor: "duplicate" });
+        });
+        const before = await completeLifecycleSnapshot(t);
+        await expectActivationFailure(t, fixture.resourceId, "ADMIN_INVALID_STATE", {
+          entity: { kind: "recursos", id: fixture.resourceId },
+          field: "valores",
+          reason: "RESOURCE_ATTRIBUTE_DUPLICATE",
+          violations: [{ code: "RESOURCE_ATTRIBUTE_DUPLICATE", entity: { kind: "recursos", id: fixture.resourceId }, field: "valores" }],
+        });
+        expect(await completeLifecycleSnapshot(t)).toEqual(before);
+      });
+
+      it("returns exact organization identity-drift context and preserves the complete lifecycle snapshot", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t, "FIXTURE", true);
+        const storedValue = await t.run(async ctx => ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", fixture.resourceId)).first());
+        await t.run(async ctx => ctx.db.patch(storedValue!._id, { valor: "B" }));
+        const before = await completeLifecycleSnapshot(t);
+        await expectActivationFailure(t, fixture.resourceId, "ADMIN_IMMUTABLE_FIELD", { entity: { kind: "recursos", id: fixture.resourceId }, field: "identificadorTecnico" });
+        expect(await completeLifecycleSnapshot(t)).toEqual(before);
+      });
+
+      it("returns exact alias-conflict context and preserves the complete lifecycle snapshot", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t, "FIXTURE", true);
+        await t.run(async ctx => {
+          const existingAlias = await ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q.eq("recursoId", fixture.resourceId)).first();
+          if (existingAlias) await ctx.db.delete(existingAlias._id);
+        });
+        const conflictingAlias = await t.run(async ctx => {
+          const conflictingResource = await ctx.db.insert("recursos", {
+            tipoRecursoId: fixture.typeA,
+            unidadId: fixture.unit,
+            identificadorTecnico: "different-identity",
+            nombre: "Alias owner",
+            activo: false,
+            revision: 1,
+            organizacionId: fixture.organization,
+            identidadVersion: 1,
+            adminScopeKey: `ORG:${fixture.organization}`,
+          });
+          return ctx.db.insert("identidadesRecurso", {
+            organizacionId: fixture.organization,
+            recursoId: conflictingResource,
+            version: 1,
+            clave: "v1|CLASS|FAMILY|TYPE_A|PROOF=A",
+            activa: true,
+            creadaEn: 1,
+          });
+        });
+        const before = await completeLifecycleSnapshot(t);
+        await expectActivationFailure(t, fixture.resourceId, "ADMIN_CONFLICT", {
+          entity: { kind: "recursos", id: fixture.resourceId },
+          conflictKind: "resource-alias",
+          conflictingEntity: { kind: "identidadesRecurso", id: conflictingAlias },
+          normalizedIdentity: "v1|CLASS|FAMILY|TYPE_A|PROOF=A",
+        });
+        expect(await completeLifecycleSnapshot(t)).toEqual(before);
+      });
+
+      it("allows the same technical identity in a different organization", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedUpdatable(t, "FIXTURE", true);
+        const otherOrganization = await t.run(async ctx => ctx.db.insert("organizaciones", { clave: "OTHER", nombre: "Other", activo: true, revision: 1 }));
+        const otherResource = await t.run(async ctx => {
+          const resourceId = await ctx.db.insert("recursos", {
+            tipoRecursoId: fixture.typeA,
+            unidadId: fixture.unit,
+            identificadorTecnico: "v1|CLASS|FAMILY|TYPE_A|PROOF=A",
+            nombre: "Other organization resource",
+            activo: true,
+            revision: 1,
+            organizacionId: otherOrganization,
+            identidadVersion: 1,
+            adminScopeKey: `ORG:${otherOrganization}`,
+          });
+          await ctx.db.insert("identidadesRecurso", {
+            organizacionId: otherOrganization,
+            recursoId: resourceId,
+            version: 1,
+            clave: "v1|CLASS|FAMILY|TYPE_A|PROOF=A",
+            activa: true,
+            creadaEn: 1,
+          });
+          return resourceId;
+        });
+        const result = await t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: fixture.resourceId, expectedRevision: 1 });
+        expect(result).toMatchObject({ disposition: "UPDATED", item: { id: fixture.resourceId, activo: true, revision: 2, identificadorTecnico: "v1|CLASS|FAMILY|TYPE_A|PROOF=A" } });
+        expect(await t.run(async ctx => ctx.db.get(otherResource))).toMatchObject({ organizacionId: otherOrganization, activo: true, revision: 1, identificadorTecnico: "v1|CLASS|FAMILY|TYPE_A|PROOF=A" });
+      });
+
+      it("triangulates inactive-unit, broken-reference, and stale deactivation paths", async () => {
+        const inactiveUnit = convexTest(schema, modules);
+        const unitFixture = await seedUpdatable(inactiveUnit);
+        await inactiveUnit.run(async ctx => ctx.db.patch(unitFixture.unit, { activo: false }));
+        const unitBefore = await snapshot(inactiveUnit, unitFixture.resourceId);
+        await expect(inactiveUnit.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: unitFixture.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE" } });
+        expect(await snapshot(inactiveUnit, unitFixture.resourceId)).toEqual(unitBefore);
+
+        const broken = convexTest(schema, modules);
+        const brokenFixture = await seedUpdatable(broken);
+        await broken.run(async ctx => ctx.db.delete(brokenFixture.typeA));
+        const brokenBefore = await snapshot(broken, brokenFixture.resourceId);
+        await expect(broken.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: brokenFixture.resourceId, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE" } });
+        expect(await snapshot(broken, brokenFixture.resourceId)).toEqual(brokenBefore);
+
+        const stale = convexTest(schema, modules);
+        const staleFixture = await seedUpdatable(stale);
+        await expect(stale.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: staleFixture.resourceId, expectedRevision: 9 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+        await expect(stale.mutation(api.catalogoAdmin.recursos.desactivarRecurso, { recursoId: staleFixture.resourceId, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UNCHANGED", item: { activo: false, revision: 1 } });
+      });
+
+      it("keeps lifecycle mutations thin and free of publication or transaction machinery", () => {
+        const lifecycleSource = source.slice(source.indexOf("export const activarRecurso"));
+        expect(lifecycleSource).not.toMatch(/lock|retry|compensat|cache|coordinator|catalogoRevisiones|catalogoTipoSnapshots|public/);
+        expect(lifecycleSource).toContain("targetActive: false");
+        expect(lifecycleSource).toContain("patch: next => ctx.db.patch(next._id, { activo: false, revision: next.revision })");
+      });
+    });

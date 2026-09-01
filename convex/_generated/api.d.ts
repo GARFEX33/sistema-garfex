@@ -2211,6 +2211,28 @@ export declare const api: {
       >;
     };
     recursos: {
+      activarRecurso: FunctionReference<
+        "mutation",
+        "public",
+        { expectedRevision: number; recursoId: Id<"recursos"> },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
+          item: {
+            activo: boolean;
+            classificationStatus: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            id: Id<"recursos">;
+            identificadorTecnico: string;
+            nombre: string;
+            organizacionId?: Id<"organizaciones">;
+            revision: number;
+            tipoRecursoId: Id<"tiposRecurso">;
+            unidadId: Id<"unidades">;
+          };
+        }
+      >;
       actualizarRecurso: FunctionReference<
         "mutation",
         "public",
@@ -2314,6 +2336,28 @@ export declare const api: {
         },
         {
           disposition: "CREATED";
+          item: {
+            activo: boolean;
+            classificationStatus: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            id: Id<"recursos">;
+            identificadorTecnico: string;
+            nombre: string;
+            organizacionId?: Id<"organizaciones">;
+            revision: number;
+            tipoRecursoId: Id<"tiposRecurso">;
+            unidadId: Id<"unidades">;
+          };
+        }
+      >;
+      desactivarRecurso: FunctionReference<
+        "mutation",
+        "public",
+        { expectedRevision: number; recursoId: Id<"recursos"> },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
           item: {
             activo: boolean;
             classificationStatus: {
