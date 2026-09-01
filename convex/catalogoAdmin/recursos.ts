@@ -282,6 +282,9 @@ export const actualizarRecurso = mutation({
     familiaRecursoId: v.optional(v.id("familiasRecurso")),
     tipoRecursoId: v.optional(v.id("tiposRecurso")),
     unidadId: v.optional(v.id("unidades")),
+    // Echoes are immutable read-back guards; lifecycle and identity remain server-owned.
+    activo: v.optional(v.boolean()),
+    identificadorTecnico: v.optional(v.string()),
     nombre: v.optional(v.string()),
     descripcion: v.optional(v.string()),
     valores: v.optional(v.array(resourceValueInputValidator)),
@@ -298,6 +301,8 @@ export const actualizarRecurso = mutation({
     if (actual!.revision !== args.expectedRevision) {
       adminStaleRevision({ entity, expectedRevision: args.expectedRevision, currentRevision: actual!.revision });
     }
+    if (args.activo !== undefined && args.activo !== actual!.activo) adminImmutableField({ entity, field: "activo" });
+    if (args.identificadorTecnico !== undefined && args.identificadorTecnico !== actual!.identificadorTecnico) adminImmutableField({ entity, field: "identificadorTecnico" });
 
     const tipo = await ctx.db.get(actual!.tipoRecursoId);
     const familia = tipo ? await ctx.db.get(tipo.familiaRecursoId) : null;

@@ -6,14 +6,14 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `WU6a/WU6b complete; WU7 next` |
-| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b` |
-| Current work unit | `WU6a/WU6b — corrected and split historical create slices` |
+| Apply state | `WU7a/WU7b complete; WU8 next` |
+| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, WU7b` |
+| Current work unit | `WU7b — corrected verification gaps` |
 | Delivery | `stacked-to-main` |
 | Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending parent lifecycle after WU6b` |
+| Parent decision gate | `Pending parent lifecycle after WU7b` |
 
-WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, WU5 direct bounded detail, and the corrected WU6a/WU6b slices are complete. Existing historical receipts remain preserved. WU7 is next and pending; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
+WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, WU5 direct bounded detail, the corrected WU6a/WU6b slices, and WU7a/WU7b are complete. Existing historical receipts remain preserved. WU8 is next; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
 
 OpenSpec CLI remains absent in this environment; it was not installed or used.
 
@@ -739,3 +739,49 @@ WU8, WU9, and both parent-owned lifecycle gates remain unchecked and deferred to
 - [ ] After verification, confirm all 56 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
 
 Next recommended action: `parent-lifecycle`. `sdd-apply` does not start review, refutation, correction, validation, or delivery actors and does not create or approve receipts.
+
+## WU7 correction and split evidence — `sdd-apply-wu7a-wu7b`
+
+### Structured status consumed and produced
+
+- Consumed authoritative OpenSpec status for `resource-master-administration`: `artifactStore: openspec`, `applyState: ready`, `nextRecommended: apply`, all proposal/spec/design/tasks/apply-progress artifacts present, `verifyReport` missing, and no blocked reasons.
+- Action context was `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex`; the workspace itself was the allowed edit root. CodeGraph MCP was unavailable; after confirming the existing `.codegraph/` directory, read-only filesystem inspection was used as the documented fallback.
+- Continued the parent-held native attempt with token `sha256:d54388ae374c1b30c92ca84615aa8c0d9c7780cf4bf996df83e341ac638d5ab2`; no second attempt, branch, stage, commit, runtime stop, or delivery actor was started. Final staged numstat exactly remained `39/0 convex/_generated/api.d.ts`, `12/1 recursoPersistencia.test.ts`, `19/1 recursoPersistencia.ts`, `125/1 recursos.test.ts`, `120/4 recursos.ts`, `57/0 apply-progress.md`, and `4/4 tasks.md`.
+- The workload gate was resolved by the parent delivery path: `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, and `400-line budget risk: High` for the stack but no per-slice exception. The work was split into WU7a and WU7b, both below 400 authored changed lines by the intended hunk boundaries.
+- Persisted task status now records WU7a and WU7b as checked implementation slices; WU8 depends on both and remains unchecked. Native status after the update reports 62 total rows, 52 complete, 10 pending, and `nextRecommended: apply` because parent gates remain.
+
+### WU7a — revision-first update/base replacement
+
+- Completed the thin `actualizarRecurso` mutation and `reemplazarValoresRecurso` helper. Revision is checked immediately after the direct Resource load and before no-op or business work; candidate validation precedes normalized equality; successful material updates delete/insert the bounded value set and patch the Resource exactly once with revision + 1.
+- Tests cover missing Resource, stale-first behavior, normalized no-op, mutable replacement, invalid values, exact 0/200/201 value bounds, exact persisted value candidate, and native rollback of a failed replacement. Resource/value/alias snapshots are used for failed commands.
+- Intended parent commit boundary: `convex/catalogoAdmin/recursos.ts` from `resourceValuesEqual` through the `actualizarRecurso` export, excluding the exact echo-argument/check hunk; `convex/catalogoAdmin/lib/recursoPersistencia.ts` import plus `reemplazarValoresRecurso`; `convex/catalogoAdmin/recursos.test.ts` existing WU7 fixture/update tests through the 0/200/201 test; `convex/catalogoAdmin/lib/recursoPersistencia.test.ts` replacement test; `convex/_generated/api.d.ts` generated update reference. Hunk anchors are `resourceValuesEqual`, `export const actualizarRecurso`, `reemplazarValoresRecurso`, and `actualizarRecurso / WU7`.
+- WU7a authored count: 348 changed lines (337 additions + 11 deletions) in the staged implementation/base-replacement commit; generated declarations are separate (39 additions in `convex/_generated/api.d.ts`). This is below the 400-line budget.
+
+### WU7b — immutable/order/final-state boundaries
+
+- Added optional immutable echoes only where required: `activo` and `identificadorTecnico`; existing Type, resolved Class/Family, and ownership/scope arguments remain optional echoes. Matching echoes pass; changed echoes return validated `ADMIN_IMMUTABLE_FIELD`. Lifecycle and technical identity remain server-owned and no organization alias is rewritten.
+- Corrected `convex/catalogoAdmin/recursos.test.ts` with bounded `valueSet`, catalog revision/snapshot snapshot helpers, and immutable-error helpers. Added exact mutable Unit persistence, exact 0/200/201 value sets, individual Class/Family/organization stale echoes, complete Resource/value/alias failure snapshots for inactive Unit and ineffective catalog, unchanged catalog revision/snapshot publication state across success/failure, and exact immutable `ADMIN_IMMUTABLE_FIELD` context assertions (the contract supplies only `entity` and `field`, with no `current`/`attempted` keys).
+- Intended parent commit boundary: the echo argument/check hunk in `convex/catalogoAdmin/recursos.ts` anchored at `// Echoes are immutable read-back guards`; new boundary tests in `convex/catalogoAdmin/recursos.test.ts` anchored at `accepts matching immutable echoes`; task/design/progress split reconciliation. WU8 task dependency is the `WU7a and WU7b` line.
+- WU7b authored count: 330 changed lines (292 additions + 38 deletions) in the unstaged echo/boundary/documentation commit; generated output is separate (2 additions in `convex/_generated/api.d.ts`). This is below the 400-line budget.
+
+### TDD Cycle Evidence
+
+| Slice | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| WU7a | Existing WU7 RED evidence recorded the missing generated update reference before implementation; replacement RED was exercised through the failing replacement assertion before the helper was available. | Focused update/replacement tests passed after the thin mutation/helper and generated reference were present. | Exact value sets, stale/no-op ordering, invalid candidate, persisted state, and rollback passed. | Candidate equality and replacement remain isolated without custom transaction machinery. |
+| WU7b | New verification assertions were written before the correction evidence run; existing echo/order/final-state coverage remained the safety net. | Focused tests passed with the completed mutation and bounded helpers. | The stale Class/Family/organization matrix, exact value sets, full failure snapshots, and catalog immutability cases passed. | Helpers reduced fixture/assertion repetition without changing production behavior. |
+
+### Verification and final accounting
+
+- Focused: `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoAdmin/lib/recursoPersistencia.test.ts convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoRecursos/recursos.test.ts` — 4 files, 142 tests passed.
+- Full: `pnpm exec vitest run` — 35 files, 324 tests passed.
+- Typechecks: `pnpm typecheck` passed; `pnpm typecheck:consumer` passed.
+- Codegen was not rerun per instruction; the prior stable API declaration hash remains `1666115e18721e5922f362655d37cb92fa3a60c20198d5a39afa41a26545acc5`, and generated output remains CLI-owned (41 historical additions in `convex/_generated/api.d.ts`).
+- Diff checks: `git diff --check` passed. No runtime harness was run because the user prohibited mutating/stopping active development; no runtime evidence is claimed.
+- Parent commit accounting is precise at the current index/worktree boundary: WU7a is 348 authored changed lines (337 additions + 11 deletions) plus 39 generated additions; WU7b is 330 authored changed lines (292 additions + 38 deletions) plus 2 generated additions. Both intended commits are below 400 authored changed lines; counts do not claim that the parent has committed either slice.
+- Remaining exact unchecked implementation lines are the four WU8 rows and the four WU9 rows. Parent-owned lifecycle rows remain unchecked and deferred. `next_recommended: parent-lifecycle`; no review, receipt, validation, or delivery action was started.
+
+### Rollback boundaries
+
+- WU7a rollback: remove the admin update export, bounded replacement helper, associated WU7a tests, and the generated update reference through normal codegen; preserve Resource, values, aliases, catalog, publication, snapshots, create/read behavior, and legacy APIs.
+- WU7b rollback: remove only the two echo arguments/checks, WU7b boundary tests, and split documentation; retain the WU7a update/base-replacement behavior and all stored data.
