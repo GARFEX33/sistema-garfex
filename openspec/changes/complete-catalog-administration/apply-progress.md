@@ -1011,3 +1011,18 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Rollback boundary: revert only W14 resolver/seam adapters/tests and W14 checkbox flips; retain additive admin data and APIs.
 - No review, receipt, verification actor, refutation, correction, validation, settle, commit, push, PR, or lifecycle settlement was started.
 - `nextRecommended: parent-lifecycle`; remaining W15/W16 implementation and parent lifecycle work is deferred.
+
+## W15 — explicit publication and immutable history
+
+- Status consumed: authoritative OpenSpec; `applyState: ready`; `repo-local`; allowed root `/home/garfex/PROGRAMACION/sistema-garfex`; no action-context warnings. Active attempt token: `sha256:b4268fadffde43b368ffcad748f343d898b64ffb3af81d530e0f6a2a8a38758a`; bounds 2 attempts / 380 changed lines; stacked-to-main W15 boundary.
+- RED: added publication Convex tests and canonical token/identity tests; focused run failed as expected because the admin publication module was absent.
+- GREEN: added explicit public publication, bounded compiler/aggregate validation, deterministic hash limit checks, immutable revision/snapshot persistence, and organization-owned history/direct reads.
+- TRIANGULATE: focused aggregate/publication regression passed — 6 files / 75 tests; full suite passed — 29 files / 205 tests; `pnpm typecheck` passed.
+- Codegen: `pnpm exec convex codegen --typecheck enable` passed and retained the generated `catalogoAdmin/publicacion` binding. Runtime: `pnpm exec convex dev --once` passed after stopping a stale local backend on port 3210.
+- REFACTOR: canonicalization remains independent of IDs/revisions/timestamps while token order remains semantic; publication limits use bounded reads and canonical byte limits; `git diff --check` passed.
+- Completed and persisted: W15 RED, GREEN, TRIANGULATE, and REFACTOR are visibly `- [x]` in `tasks.md`.
+- Files changed: `convex/catalogoAdmin/publicacion.ts`, its test, `convex/catalogoRecursos/catalogoPublicado.ts`, pure canonicalization test, generated `convex/_generated/api.d.ts`, and W15 task checkboxes.
+- Deviation: legacy publication error strings remain compatible while the new admin boundary maps failures to structured `ADMIN_PUBLICATION_INVALID` violations.
+- Rollback boundary: remove the W15 admin publication module/tests and compiler integration, restore only W15 checkbox flips, and retain all historical rows, snapshots, legacy public reads, and prior admin slices.
+- Remaining exact unchecked implementation rows: W16 RED, W16 GREEN, W16 TRIANGULATE, and W16 REFACTOR. Deferred parent rows remain byte-for-byte unchanged: `After apply, collect ordinary SDD status evidence... <!-- sdd-owner: parent -->` and `After post-apply verification, confirm the lifecycle gate... <!-- sdd-owner: parent -->`.
+- Produced status: `taskProgress.completed: 69`, `pending: 6`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; parent lifecycle remains required. No review, receipt, verify actor, correction, validation, commit, push, PR, or delivery action was performed.

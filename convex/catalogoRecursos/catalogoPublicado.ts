@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { canonicalizeCatalog, sha256Hex, type CanonicalCatalog, type CanonicalSnapshot } from "../../src/catalogoRecursos/dominio/catalogoPublicado";
 import { snapshotResultadoValidator, type Snapshot } from "./catalogoPublicadoValidators";
 import { resolverCatalogoEfectivo, resolverJerarquiaEfectiva } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
+import { cargarAgregado } from "../catalogoAdmin/lib/cargarAgregado";
 
 const claveArgs = { organizacionClave: v.string() };
 const revisionResultado = v.object({
@@ -20,7 +21,16 @@ type OptionDoc = Doc<"opcionesAtributo">;
 type AttributeDoc = Doc<"atributosRecurso">;
 type DefinitionDoc = Doc<"definicionesAtributo">;
 
-type BuiltCatalog = { snapshots: SnapshotEntry[]; hash: string };
+export const MAX_PUBLICATION_TYPES = 200;
+export const MAX_PUBLICATION_ROWS = 8_000;
+export const MAX_CANONICAL_BYTES = 8 * 1024 * 1024;
+
+function boundedRows<T>(rows: T[]): T[] {
+  if (rows.length > MAX_PUBLICATION_ROWS) throw new Error("CATALOG_LIMIT_EXCEEDED");
+  return rows;
+}
+
+export type BuiltCatalog = { snapshots: SnapshotEntry[]; hash: string };
 
 function compareCodePoints(left: string | undefined, right: string | undefined): number {
   const leftPoints = Array.from(left ?? "").map(character => character.codePointAt(0)!);
@@ -35,11 +45,12 @@ function compareStable(left: unknown, right: unknown): number {
   return compareCodePoints(JSON.stringify(left), JSON.stringify(right));
 }
 
-async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
-  const allRelations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porActivo", query => query.eq("activo", true)).collect();
-  const compatibilityPolicyRows = await ctx.db.query("politicasCompatibilidadOpciones").collect();
+export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
+  const allRelations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porActivo", query => query.eq("activo", true)).take(MAX_PUBLICATION_ROWS + 1);
+  const compatibilityPolicyRows = await ctx.db.query("politicasCompatibilidadOpciones").take(MAX_PUBLICATION_ROWS + 1);
   const compatibilityPoliciesById = new Map(compatibilityPolicyRows.map(policy => [policy._id, policy]));
-  const types = await ctx.db.query("tiposRecurso").withIndex("porFamilia").collect();
+  const types = await ctx.db.query("tiposRecurso").withIndex("porFamilia").take(MAX_PUBLICATION_TYPES + 1);
+  if (allRelations.length > MAX_PUBLICATION_ROWS || compatibilityPolicyRows.length > MAX_PUBLICATION_ROWS || types.length > MAX_PUBLICATION_TYPES) throw new Error("CATALOG_LIMIT_EXCEEDED");
   const effectiveTypeIds = new Set<string>();
   for (const type of types) {
     const family = await ctx.db.get(type.familiaRecursoId);
@@ -50,18 +61,37 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const policy = relation.politicaCompatibilidadId === undefined ? undefined : compatibilityPoliciesById.get(relation.politicaCompatibilidadId);
     return policy === undefined || (!policy.activo && effectiveTypeIds.has(String(policy.tipoRecursoId)));
   })) throw new Error("Relación activa sin política de compatibilidad activa");
-  const activeTypes = types.filter(type => effectiveTypeIds.has(String(type._id))).sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
+  const activeTypes = types.filter(type => effectiveTypeIds.has(String(type._id)));
+  const ambiguousKeys = new Set<string>();
+  const seenKeys = new Set<string>();
+  for (const type of activeTypes) (seenKeys.has(type.clave) ? ambiguousKeys : seenKeys).add(type.clave);
+  if (ambiguousKeys.size > 0) throw new Error(`TYPE_KEY_AMBIGUOUS:${[...ambiguousKeys].sort(compareCodePoints).join(",")}`);
+  activeTypes.sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
   const snapshots: SnapshotEntry[] = [];
   const canonical: CanonicalCatalog = [];
 
   for (const type of activeTypes) {
+    const aggregate = await cargarAgregado(ctx, type._id);
+    if (aggregate.status === "INVALID" && aggregate.violations[0]?.code !== "COMPATIBILITY_POLICY_CONFLICT") {
+      const violation = aggregate.violations[0];
+      const legacyDetail = violation?.code === "PRINCIPAL_UNIT_COUNT"
+        ? `Tipo ${type.clave}: se requiere exactamente una unidad natural efectiva`
+        : violation?.code === "UNIT_INACTIVE"
+          ? `Unidad natural inválida para ${type.clave}`
+          : violation?.code === "PRESENTATION_COUNT"
+            ? `Tipo ${type.clave}: se requiere exactamente una política de presentación activa`
+            : violation?.code === "PRESENTATION_TOKEN_INVALID"
+              ? `Política de presentación inválida para ${type.clave}: atributo no efectivo`
+              : violation?.detail ?? "effective aggregate is invalid";
+      throw new Error(`${violation?.code ?? "ASSIGNMENT_SELECTION_INVALID"}:${legacyDetail}`);
+    }
     const family = await ctx.db.get(type.familiaRecursoId);
     const classDocument = family ? await ctx.db.get(family.claseRecursoId) : null;
     if (!family || !classDocument || !resolverJerarquiaEfectiva({ classId: String(classDocument._id), familyId: String(family._id), typeId: String(type._id), familyClassId: String(family.claseRecursoId), typeFamilyId: String(type.familiaRecursoId), classActive: classDocument.activo, familyActive: family.activo, typeActive: type.activo }).effective) continue;
 
-    const policies = await ctx.db.query("politicasUnidadRecurso")
+    const policies = boundedRows(await ctx.db.query("politicasUnidadRecurso")
       .withIndex("porFamilia", query => query.eq("familiaRecursoId", family._id))
-      .collect();
+      .take(MAX_PUBLICATION_ROWS + 1));
     const effectivePolicies = resolverCatalogoEfectivo({
       clase: { id: String(classDocument._id), clave: classDocument.clave, activo: classDocument.activo },
       familia: { id: String(family._id), clave: family.clave, activo: family.activo, claseRecursoId: String(family.claseRecursoId) },
@@ -77,9 +107,9 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const naturalUnit = await ctx.db.get(principals[0].unidadId);
     if (!naturalUnit?.activo) throw new Error(`Unidad natural inválida para ${type.clave}`);
 
-    const attributes = await ctx.db.query("atributosRecurso")
+    const attributes = boundedRows(await ctx.db.query("atributosRecurso")
       .withIndex("porFamilia", query => query.eq("familiaRecursoId", family._id))
-      .collect();
+      .take(MAX_PUBLICATION_ROWS + 1));
     const effectiveAssignments = resolverCatalogoEfectivo({
       clase: { id: String(classDocument._id), clave: classDocument.clave, activo: classDocument.activo },
       familia: { id: String(family._id), clave: family.clave, activo: family.activo, claseRecursoId: String(family.claseRecursoId) },
@@ -95,9 +125,9 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
       const definition = await ctx.db.get(attribute.definicionAtributoId);
       if (!definition?.activo) continue;
       const attributeUnit = definition.unidadId ? await ctx.db.get(definition.unidadId) : null;
-      const options = (await ctx.db.query("opcionesAtributo")
+      const options = boundedRows(await ctx.db.query("opcionesAtributo")
         .withIndex("porDefinicion", query => query.eq("definicionAtributoId", definition._id))
-        .collect())
+        .take(MAX_PUBLICATION_ROWS + 1))
         .filter(option => option.activo)
         .sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
       for (const option of options) optionDefinitions.set(option._id, { attribute, definition, option });
@@ -119,9 +149,9 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const effectiveAttributeIds = new Set(snapshotAttributes.map(attribute => attribute.id));
     const effectiveDefinitionIds = new Set(snapshotAttributes.map(attribute => attribute.definicionAtributoId));
     const rules: Snapshot["reglas"] = [];
-    const ruleRows = await ctx.db.query("reglasAtributoRecurso")
+    const ruleRows = boundedRows(await ctx.db.query("reglasAtributoRecurso")
       .withIndex("porTipo", query => query.eq("tipoRecursoId", type._id))
-      .collect();
+      .take(MAX_PUBLICATION_ROWS + 1));
     for (const rule of ruleRows.filter(item => item.activo)) {
       if (!effectiveAttributeIds.has(rule.atributoCondicionId) || !effectiveAttributeIds.has(rule.atributoAfectadoId)) continue;
       const conditionAttribute = await ctx.db.get(rule.atributoCondicionId);
@@ -161,9 +191,9 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
       compatibilityPolicies.push({ atributoOrigenClave: originDefinition.clave, atributoDestinoClave: destinationDefinition.clave, modo: policy.modo, direccion: policy.direccion, pares: pairs });
     }
 
-    const presentationPolicies = await ctx.db.query("politicasPresentacionCanonica")
+    const presentationPolicies = boundedRows(await ctx.db.query("politicasPresentacionCanonica")
           .withIndex("porTipoYActivo", query => query.eq("tipoRecursoId", type._id).eq("activo", true))
-          .collect();
+          .take(MAX_PUBLICATION_ROWS + 1));
         if (presentationPolicies.length !== 1) throw new Error(`Tipo ${type.clave}: se requiere exactamente una política de presentación activa`);
         const presentationPolicy = presentationPolicies[0];
         if (presentationPolicy.separador.trim() === "" || presentationPolicy.separador.length > 100 || presentationPolicy.tokens.length === 0) throw new Error(`Política de presentación inválida para ${type.clave}`);
@@ -196,7 +226,9 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     canonical.push({ tipoClave: type.clave, snapshot: toCanonical(snapshot) });
   }
 
-  return { snapshots, hash: await sha256Hex(canonicalizeCatalog(canonical)) };
+  const canonicalContent = canonicalizeCatalog(canonical);
+  if (new TextEncoder().encode(canonicalContent).byteLength > MAX_CANONICAL_BYTES) throw new Error("CATALOG_LIMIT_EXCEEDED");
+  return { snapshots, hash: await sha256Hex(canonicalContent) };
 }
 
 function toCanonical(snapshot: Snapshot): CanonicalSnapshot {
@@ -221,6 +253,22 @@ export const asegurarOrganizacion = internalMutation({
     return await ctx.db.insert("organizaciones", { clave, nombre, activo: true, revision: 1 });
   },
 });
+
+export type PublicationResult = { disposition: "CREATED" | "UNCHANGED"; revisionId: Id<"catalogoRevisiones">; numero: number; hashContenido: string };
+
+export async function publicarCatalogoEnTransaccion(ctx: MutationCtx, organizacionId: Id<"organizaciones">): Promise<PublicationResult> {
+  const organization = await ctx.db.get(organizacionId);
+  if (!organization?.activo) throw new Error("Organización inválida");
+  const built = await compile(ctx);
+  const latest = await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYEstado", query => query.eq("organizacionId", organizacionId).eq("estado", "PUBLISHED")).order("desc").first();
+  if (latest?.hashContenido === built.hash) return { disposition: "UNCHANGED", revisionId: latest._id, numero: latest.numero, hashContenido: latest.hashContenido };
+  const previous = await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYNumero", query => query.eq("organizacionId", organizacionId)).order("desc").first();
+  const numero = (previous?.numero ?? 0) + 1;
+  const now = Date.now();
+  const revisionId = await ctx.db.insert("catalogoRevisiones", { organizacionId, numero, estado: "PUBLISHED", hashContenido: built.hash, creadoEn: now, publicadoEn: now });
+  for (const entry of built.snapshots) await ctx.db.insert("catalogoTipoSnapshots", { organizacionId, revisionId, tipoClave: entry.tipoClave, snapshot: entry.snapshot });
+  return { disposition: "CREATED", revisionId, numero, hashContenido: built.hash };
+}
 
 export const publicarCatalogo = internalMutation({
   args: { organizacionId: v.id("organizaciones") },
