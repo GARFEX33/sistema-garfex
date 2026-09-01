@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { classificationStatusFromReferences, projectResourceSummary } from "./recursoResumen";
+import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./recursoResumen";
 import type { Doc } from "../../_generated/dataModel";
 type Resource = Doc<"recursos">;
 const resource = { _id: "resource-1", _creationTime: 1, tipoRecursoId: "type-1", unidadId: "unit-1", identificadorTecnico: "TYPE|A", nombre: "Resource", activo: true, revision: 3, organizacionId: "org-1" } as Resource;
+
+describe("Resource search text normalization", () => {
+  it("normalizes NFC, surrounding whitespace, and internal whitespace runs", () => {
+    expect(normalizeResourceSearchText("  Cafe\u0301\t  de   campo  ")).toBe("Café de campo");
+  });
+
+  it("rejects text that becomes blank after normalization", () => {
+    expect(normalizeResourceSearchText(" \t\n ")).toBe("");
+  });
+});
 
 describe("Resource summary projection", () => {
   it("classifies inactive and missing historical references", () => { expect(classificationStatusFromReferences(resource, { type: null, family: null, clazz: null })).toEqual({ state: "BROKEN_REFERENCE", reasons: ["MISSING_REFERENCE", "CLASS_INACTIVE", "FAMILY_INACTIVE", "TYPE_INACTIVE"] }); expect(classificationStatusFromReferences(resource, { type: { _id: resource.tipoRecursoId, familiaRecursoId: "family-1" as never, activo: false }, family: { _id: "family-1" as never, claseRecursoId: "class-1" as never, activo: true }, clazz: { _id: "class-1" as never, activo: true } })).toEqual({ state: "INERT", reasons: ["TYPE_INACTIVE"] }); });

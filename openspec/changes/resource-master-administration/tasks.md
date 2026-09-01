@@ -97,10 +97,10 @@ Decision needed before apply: No
 
 **Dependency:** WU3a and WU3b, plus corrected search index readiness. **End state:** `buscarRecursosResumen` uses native search `.paginate()` with essential equality filters and relevance-order regression coverage. **Allowed edit surfaces:** Resource admin query/summary helper/tests and generated declarations.
 
-- [ ] **RED** — Add failing tests for NFC/trim/collapsed-whitespace normalization, blank rejection, lifecycle/Type/scope search filters, no Unit argument, repeated equal-relevance native traversal, no values, and no collect/sort fallback; omit cursor binding and token/version tests; estimate 35 lines. <!-- sdd-owner: implementation -->
-- [ ] **GREEN** — Register search with native pagination args/result validator, `withSearchIndex("buscar")`, supplied equality filters, and `.paginate(args.paginationOpts)`; return native relevance pages without cursor wrappers, runtime version/order tokens, fallback sorting, cache, or accumulator; estimate 70 lines. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE** — Repeat unchanged equal-relevance traversal with page sizes 1, 2, and a non-divisor, plus each essential filter combination and normalized-text counterexamples; verify no values/Unit/custom cursor layer; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
-- [ ] **REFACTOR** — Centralize only search-text normalization and native page projection; document relevance order as native Convex behavior; rollback removes search export/tests only; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add failing tests for NFC/trim/collapsed-whitespace normalization, blank rejection, lifecycle/Type/scope search filters, no Unit argument, repeated equal-relevance native traversal, no values, and no collect/sort fallback; omit cursor binding and token/version tests; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Register search with native pagination args/result validator, `withSearchIndex("buscar")`, supplied equality filters, and `.paginate(args.paginationOpts)`; return native relevance pages without cursor wrappers, runtime version/order tokens, fallback sorting, cache, or accumulator; estimate 70 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Repeat unchanged equal-relevance traversal with page sizes 1, 2, and a non-divisor, plus each essential filter combination and normalized-text counterexamples; verify no values/Unit/custom cursor layer; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Centralize only search-text normalization and native page projection; document relevance order as native Convex behavior; rollback removes search export/tests only; estimate 15 lines. <!-- sdd-owner: implementation -->
 
 ### WU5 — Direct bounded Resource detail
 
