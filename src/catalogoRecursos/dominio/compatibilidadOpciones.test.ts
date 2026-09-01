@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluarCompatibilidadOpciones, identidadSlotCompatibilidad, normalizarParCompatibilidad, politicasCompatibilidadEnConflicto, type PoliticaCompatibilidad } from "./compatibilidadOpciones";
+import { evaluarCompatibilidadOpciones, identidadParCompatibilidad, identidadParPorExtremos, identidadSlotCompatibilidad, normalizarParCompatibilidad, normalizarParPorExtremos, politicasCompatibilidadEnConflicto, type PoliticaCompatibilidad } from "./compatibilidadOpciones";
 
 const base: PoliticaCompatibilidad = {
   atributoOrigenClave: "A", atributoDestinoClave: "B", modo: "ALLOWLIST", direccion: "DIRECTIONAL",
@@ -45,5 +45,17 @@ describe("evaluador de compatibilidad de opciones", () => {
     expect(politicasCompatibilidadEnConflicto({ atributoOrigenId: "b", atributoDestinoId: "a", direccion: "DIRECTIONAL" }, { atributoOrigenId: "a", atributoDestinoId: "b", direccion: "DIRECTIONAL" })).toBe(false);
     expect(politicasCompatibilidadEnConflicto({ atributoOrigenId: "a", atributoDestinoId: "b", direccion: "SYMMETRIC" }, { atributoOrigenId: "b", atributoDestinoId: "a", direccion: "DIRECTIONAL" })).toBe(true);
     expect(normalizarParCompatibilidad("b", "B1", "a", "A1", "SYMMETRIC")).toEqual({ origenOpcionId: "a", origenOpcion: "A1", destinoOpcionId: "b", destinoOpcion: "B1" });
+    expect(identidadParCompatibilidad("b", "B1", "a", "A1", "SYMMETRIC")).toBe("S|a|b");
+    expect(identidadParCompatibilidad("a", "A1", "b", "B1", "DIRECTIONAL")).toBe("D|a|b");
+    expect(normalizarParPorExtremos("z-endpoint", "a-option", "a-endpoint", "z-option", "SYMMETRIC")).toEqual({ origenOpcionId: "z-option", destinoOpcionId: "a-option" });
+    expect(identidadParPorExtremos("z-endpoint", "a-option", "a-endpoint", "z-option", "SYMMETRIC")).toBe("S|z-option|a-option");
+  });
+
+  it("evalúa pares relacionados en ambos sentidos sin activar políticas inertes", () => {
+    const symmetric: PoliticaCompatibilidad = { ...base, direccion: "SYMMETRIC" };
+    const inactive: PoliticaCompatibilidad = { ...base, modo: "DENYLIST", activo: false };
+    expect(evaluarCompatibilidadOpciones([symmetric], "A", "A1", "B", "B1")).toBe(true);
+    expect(evaluarCompatibilidadOpciones([symmetric], "B", "B1", "A", "A1")).toBe(true);
+    expect(evaluarCompatibilidadOpciones([inactive], "A", "A1", "B", "B1")).toBe(true);
   });
 });
