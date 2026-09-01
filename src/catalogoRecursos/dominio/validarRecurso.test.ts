@@ -29,4 +29,15 @@ describe("precedencia de atributos", () => {
     expect(resultado.ok).toBe(true);
     if (resultado.ok) expect([...resultado.value.atributos.keys()]).toEqual(["def"]);
   });
+
+  it("uses presence rather than truthiness for required and forbidden values", () => {
+    for (const [tipoDato, value] of [["BOOLEANO", false], ["NUMERO", 0], ["TEXTO", ""]] as const) {
+      const snapshot = base();
+      snapshot.atributos[1].definicion = { id: "def", clave: "DEF", tipoDato, activo: true };
+      expect(validarRecurso(snapshot, { ...entrada("atributo-tipo"), valores: [{ atributoRecursoId: "atributo-tipo", valor: value }] }).ok).toBe(true);
+    }
+    const forbidden = base();
+    forbidden.atributos[1].aplicabilidad = "FORBIDDEN";
+    expect(validarRecurso(forbidden, entrada("atributo-tipo"))).toEqual({ ok: false, code: "ATRIBUTO_PROHIBIDO" });
+  });
 });

@@ -2,6 +2,7 @@ import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { validarAgregado, type AggregateViolation, type ResultadoAgregado } from "../../../src/catalogoRecursos/dominio/validacionAgregado";
 import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../../src/catalogoRecursos/dominio/unidadesEfectivas";
+import { resolverAsignaciones, validarCompletitudAsignaciones } from "../../../src/catalogoRecursos/dominio/asignacionesEfectivas";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -39,8 +40,15 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const familyPolicies = await ctx.db.query("politicasUnidadRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", family._id)).take(MAX_AGGREGATE_ROWS + 1);
   const typePolicies = await ctx.db.query("politicasUnidadRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
   const presentations = await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
-  const bounded = [limitarFilas(familyPolicies), limitarFilas(typePolicies), limitarFilas(presentations)];
+  const attributes = await ctx.db.query("atributosRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", family._id)).take(MAX_AGGREGATE_ROWS + 1);
+  const bounded = [limitarFilas(familyPolicies), limitarFilas(typePolicies), limitarFilas(presentations), limitarFilas(attributes)];
   if (bounded.some(result => result.exceeded)) return { effective, status: "INVALID", violations: [limitViolation("aggregate fan-out exceeds the bounded limit")] };
+  const definitions = new Map((await Promise.all([...new Set(attributes.map(row => row.definicionAtributoId))].map(async id => [String(id), await ctx.db.get(id)] as const))).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null));
+  const toAssignment = (row: typeof attributes[number]) => ({ id: String(row._id), familiaId: String(row.familiaRecursoId), tipoId: row.tipoRecursoId === undefined ? undefined : String(row.tipoRecursoId), definicionId: String(row.definicionAtributoId), definicionClave: definitions.get(String(row.definicionAtributoId))?.clave ?? String(row.definicionAtributoId), tipoDato: definitions.get(String(row.definicionAtributoId))?.tipoDato, activo: row.activo, aplicabilidad: row.aplicabilidad, participaIdentidad: row.participaIdentidad, orden: row.orden });
+  const selectedAssignments = resolverAsignaciones({ familia: attributes.filter(row => row.tipoRecursoId === undefined).map(toAssignment), tipo: attributes.filter(row => row.tipoRecursoId === typeId).map(toAssignment), familiaId: String(family._id), tipoId: String(typeId) }).selected;
+  const options = (await Promise.all([...new Set(selectedAssignments.filter(row => row.tipoDato === "OPCION").map(row => row.definicionId))].map(async id => ctx.db.query("opcionesAtributo").withIndex("porDefinicion", q => q.eq("definicionAtributoId", id as Id<"definicionesAtributo">)).take(MAX_AGGREGATE_ROWS + 1)))).flat().map(row => ({ id: String(row._id), definicionId: String(row.definicionAtributoId), activo: row.activo }));
+  const incompleteAssignments = validarCompletitudAsignaciones(selectedAssignments.filter(row => row.tipoDato === "OPCION"), options);
+  if (incompleteAssignments.length) return { effective, status: "INVALID", violations: incompleteAssignments.map(id => ({ code: "OPTION_SET_EMPTY" as const, detail: id })) };
   const familyRows = familyPolicies.filter(policy => policy.tipoRecursoId === undefined);
   const typeRows = typePolicies;
   if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
