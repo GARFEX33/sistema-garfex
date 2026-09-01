@@ -6,14 +6,14 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `WU3a/WU3b complete; WU4 next` |
-| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b` |
-| Current work unit | `WU4 — native paginated full-text Resource search` |
+| Apply state | `WU3a/WU3b/WU4/WU5 complete; WU6 next` |
+| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5` |
+| Current work unit | `WU6 — thin atomic administrative create (next/pending)` |
 | Delivery | `stacked-to-main` |
 | Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending parent lifecycle after WU3b` |
+| Parent decision gate | `Pending parent lifecycle after WU5` |
 
-WU3a native query/tests and WU3b's real installed React-hook correction are complete. Existing W0/WU1/WU2a/WU2b/WU2c receipts and the historical WU3a evidence below remain preserved; no WU4 behavior was started. The current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
+WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, and WU5 direct bounded detail are complete. Existing W0/WU1/WU2a/WU2b/WU2c/WU3a/WU3b/WU4 receipts and the historical evidence below remain preserved. WU6 is next and pending; no WU6 attempt has started. The current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
 
 OpenSpec CLI remains absent in this environment; it was not installed or used.
 
@@ -490,6 +490,82 @@ The persisted `tasks.md` artifact was re-read after checkbox updates. WU3a and W
 - [ ] **RED** — Add create tests for effective catalog, organization, values/limit, scoped active/inactive duplicates, aliases, and final Resource/value/alias state after every failure and concurrent-equivalent outcome; do not test custom rollback/retry machinery; estimate 40 lines. <!-- sdd-owner: implementation -->
 - [ ] **GREEN** — Implement one thin mutation that validates, derives identity, performs bounded duplicate/alias reads, and writes Resource revision 1, values, scope key, and alias atomically; rely on Convex rollback/OCC; estimate 95 lines. <!-- sdd-owner: implementation -->
 - [ ] **TRIANGULATE** — Prove global/organization scope, inactive duplicate reservation, alias/value failure final state, at-most-one concurrent identity, no publication changes, and legacy create compatibility; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Keep persistence helpers bounded and business-focused; add no lock, coordinator, compensation, cache, or retry protocol; rollback removes admin create only; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [ ] **RED** — Add tests for missing/stale-first behavior, valid no-op, mutable fields, immutable classification/ownership/identity/lifecycle, current ineffective catalog, inactive duplicates, alias preservation, and final aggregate state after each failure; estimate 45 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement revision-first candidate construction/validation, no-op after validation, bounded identity check, atomic value replacement and one revision patch; import the shared value limit and rely on Convex transaction rollback; estimate 115 lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Verify stale beats no-op/business validation, invalid equal candidate is not unchanged, organization identity cannot drift, material revision increments once, and every failed final state equals the prior aggregate; full verification and runtime-or-N/A; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Centralize candidate equality/immutable reporting without adding transaction choreography or retry coupling; rollback removes admin update only; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [ ] **RED** — Add lifecycle tests for missing/stale/current same-state, exactly-one revision increment, activation against effective/inert/invalid state, deactivation preservation, blocker visibility, and final state after failures; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement thin activate/deactivate mutations with revision-first handling; activation validates bounded current aggregate and identity, deactivation patches only state/revision; rely on native atomicity/OCC; estimate 75 lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Verify current versus stale same-state, failed activation remains unchanged, values/aliases/catalog/publication remain preserved, and blockers observe active state; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Reuse revision/effective-validation seams and remove any transaction/cache/retry abstraction; rollback removes lifecycle exports only; estimate 10 lines. <!-- sdd-owner: implementation -->
+- [ ] **RED** — Add a consumer fixture using generated references, `FunctionArgs`, `FunctionReturnType`, `Id<"recursos">`, direct `usePaginatedQuery` list/search calls, native results/status/load-more, detail, seven functions, dispositions, and `AdminErrorData`; assert no Unit/token/DTO/adapter/cache; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Add only required package exposure and regenerate through Convex codegen; make the fixture compile without backend imports, manual DTOs, page adapters, or duplicated validation; estimate 40 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Typecheck every native query/mutation shape, run full legacy Resource regressions, verify generated declarations match source, and confirm existing catalog-admin pagination was not changed; full verification and runtime-or-N/A; estimate 30 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Keep exports limited to generated Convex/API/data-model/error contracts and concise consumer documentation; rollback removes fixture/export/docs after API exports; estimate 15 authored lines. <!-- sdd-owner: implementation -->
+- [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 52 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+
+## WU5 Apply Evidence — `resource-admin-wu5`
+
+### Structured status consumed
+
+- Native status was authoritative OpenSpec status for `resource-master-administration`: `artifactStore: openspec`, `applyState: ready`, `nextRecommended: apply`, all required artifacts present, and no blocked reasons.
+- Action context was `repo-local` with workspace `/home/garfex/PROGRAMACION/sistema-garfex` and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; no edit-root warning was present.
+- Workload gate was `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, and `400-line budget risk: High`; the parent assigned only WU5 under `auto-chain`. Authored WU5 scope was 189 changed lines, below 400; no split was needed.
+- Ownership validation found zero malformed markers. Only WU5 implementation rows were selected and checked; WU6 onward and both parent rows remain deferred.
+- Native attempt authority reported active parent token `sha256:0a08fe2a665fb1f55541a41c6f61884dbd713bd66bd69e1f558e4a653276c0c2`. This executor did not acquire a competing attempt or settle it.
+- Parent settlement must preserve this exact obligation: `sha256:20b6ff8ed2d33b6d74208f12972818ca91d29e5864155161c7579db2b90410fc` requires remediation with distinct current verification evidence. No alternate evidence revision was invented.
+
+### Scope and TDD evidence
+
+- WU5 only. No WU6 mutation, branch, stage, commit, custom persistence, custom pagination, or active Convex development shutdown was started.
+- Safety net: `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts convex/catalogoAdmin/resourceValidators.test.ts` — 3 files, 44 tests passed before edits.
+- RED: detail integration and bounded-loader tests were added first; `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts` — 49 tests, 7 expected failures and 42 existing tests passed because the admin detail export did not yet exist.
+- GREEN: registered the direct detail query, reused summary/detail projection, `cargarAgregado`, nullable references, and `loadResourceValuesBounded`; focused suite reached 49/49 passing.
+- TRIANGULATE: added organization ownership, inactive/inert/broken references, 0/1/200 and 201 cardinalities, structured limit failure assertions, and a one-query helper harness; `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts` — 2 files, 52 tests passed.
+- REFACTOR: generalized typed catalog reference projection after codegen exposed the Unit-reference union mismatch; the same focused suite remained 52/52 passing.
+
+### Implementation and accounting
+
+- Detail performs direct `ctx.db.get(recursoId)` and returns `null` when absent. Found details include stored fields, nullable Class/Family/Type/Unit/organization references, hierarchy and aggregate diagnostics, and stored values.
+- The sole value access is `loadResourceValuesBounded`, using `valoresAtributoRecurso.porRecurso` and exactly `.take(MAX_RESOURCE_VALUES + 1)`. Counts 0, 1, and 200 are returned; 201 throws validated `ADMIN_INVALID_STATE` with `RESOURCE_VALUE_LIMIT_EXCEEDED` context and no truncated detail.
+- Summary/list/search remains value-free; legacy `convex/catalogoRecursos/recursos.ts` detail behavior remains unchanged and passed regression coverage.
+- Verified WU5 accounting: 189 authored code/test changed lines, 207 generated declaration lines, 19 task-artifact lines, and 86 apply-evidence lines after evidence corrections, for 501 total changed lines in the staged candidate. The reviewable WU5 product/test slice remains 189 authored lines; the authored code/test diff was 186 additions + 3 deletions across `convex/catalogoAdmin/recursos.ts`, `convex/catalogoAdmin/recursos.test.ts`, and `convex/catalogoAdmin/lib/recursoDetalle.test.ts`. Generated output is tracked separately and produced only by Convex CLI.
+- Files changed: `convex/catalogoAdmin/recursos.ts`, `convex/catalogoAdmin/recursos.test.ts`, `convex/catalogoAdmin/lib/recursoDetalle.test.ts`, `convex/_generated/api.d.ts`, `openspec/changes/resource-master-administration/tasks.md`, and this progress artifact.
+- Rollback boundary: remove only the WU5 admin detail export/integration and WU5 tests; retain shared contracts/loader and never delete stored Resource, value, alias, catalog, publication, or snapshot data.
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| Focused WU5 implementation suite | `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts` — 2 files, 52 tests passed |
+| Focused WU5/legacy/helper/validator tests | `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoRecursos/recursos.test.ts convex/catalogoAdmin/lib/recursoDetalle.test.ts convex/catalogoAdmin/resourceValidators.test.ts` — 4 files, 92 tests passed |
+| Full Vitest | `pnpm exec vitest run` — 34 files, 299 tests passed |
+| Backend typecheck | `pnpm typecheck` — `tsc --noEmit` passed |
+| Consumer typecheck | `pnpm typecheck:consumer` — passed |
+| Convex codegen/typecheck | `pnpm exec convex codegen --typecheck enable` — passed |
+| Parent disposition | `convex codegen --typecheck enable` printing `Uploading functions to Convex...` under the already-running attached dev process is established native Convex CLI behavior observed repeatedly; repository hashes/status remained stable, no custom deploy or process stop occurred, and this is not a WU5 blocker |
+| Generated hash stability | repeated codegen kept generated hashes stable; `convex/_generated/api.d.ts` SHA-256 remained `2b40408ba17d997bea7f17fa3db47ffea833a7aaf7b87af4edc659535c1dd8b5` |
+| Diff validation | `git diff --check` — passed |
+| Active-dev-compatible runtime boundary | `pnpm exec convex dev --once` returned `A local backend is still running on port 3210`; active development was not stopped or mutated |
+
+### TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| WU5 RED | `convex/catalogoAdmin/recursos.test.ts` | Integration via convex-test | ✅ 44/44 | ✅ 7 expected failures / 42 pass | ✅ 49/49 | ✅ 52/52 with boundaries and references | ✅ 52/52 |
+| WU5 GREEN | `convex/catalogoAdmin/recursos.ts` | Integration via convex-test | ✅ 44/44 | ✅ Missing export failure | ✅ Detail query passed | ✅ Limit/reference cases passed | ✅ Typed reference fix passed |
+| WU5 TRIANGULATE | `convex/catalogoAdmin/lib/recursoDetalle.test.ts` | Unit plus bounded query harness | ✅ 1 existing test | ✅ Access test written | ✅ Focused suite passed | ✅ Query/index/take counts asserted | ✅ Focused suite passed |
+| WU5 REFACTOR | `convex/catalogoAdmin/recursos.ts` | Typecheck and integration | ✅ 52/52 | ✅ Existing behavior captured | ✅ Codegen passed after fix | ✅ Legacy/full suites passed | ✅ Clean |
+
+### Remaining work
+
+The exact unchecked implementation and parent-owned task lines are retained below; no WU6 work was started:
+
+- [ ] **RED** — Add create tests for effective catalog, organization, values/limit, scoped active/inactive duplicates, aliases, and final Resource/value/alias state after every failure and concurrent-equivalent outcome; do not test custom rollback/retry machinery; estimate 40 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement one thin mutation that validates, derives identity, performs bounded duplicate/alias reads, and writes Resource revision 1, values, scope key, and alias atomically; rely on Convex rollback/OCC; estimate 95 lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Prove global/organization scope, inactive duplicate reservation, alias atomicity, concurrent-equivalent duplicate behavior, validation-before-write, injected value-write rollback, no publication/catalog-revision/snapshot mutation, structured contexts, and legacy create compatibility; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
 - [ ] **REFACTOR** — Keep persistence helpers bounded and business-focused; add no lock, coordinator, compensation, cache, or retry protocol; rollback removes admin create only; estimate 15 lines. <!-- sdd-owner: implementation -->
 - [ ] **RED** — Add tests for missing/stale-first behavior, valid no-op, mutable fields, immutable classification/ownership/identity/lifecycle, current ineffective catalog, inactive duplicates, alias preservation, and final aggregate state after each failure; estimate 45 lines. <!-- sdd-owner: implementation -->
 - [ ] **GREEN** — Implement revision-first candidate construction/validation, no-op after validation, bounded identity check, atomic value replacement and one revision patch; import the shared value limit and rely on Convex transaction rollback; estimate 115 lines. <!-- sdd-owner: implementation -->

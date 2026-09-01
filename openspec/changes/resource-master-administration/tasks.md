@@ -10,19 +10,18 @@ Strict TDD remains RED → GREEN → TRIANGULATE → REFACTOR. Every pending aut
 
 ## Historical evidence preservation
 
-W0, WU1, WU2a, WU2b, WU2c, WU3a, and WU3b are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU4 is next.
+W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, and WU5 are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU6 is next and pending.
 
 ## Review Workload Forecast
 
 | Field | Value |
 |---|---|
-| Pending authored estimate | Approximately 905 additions + deletions after completed WU3a/WU3b; generated declarations separate |
+| Pending authored estimate | Approximately 640 additions + deletions across pending WU6–WU9; generated declarations separate |
 | 400-line budget risk | High across the stack; low per current unit; WU3a ~319 and WU3b ~152, no exception |
 | Delivery | `auto-chain`, stacked-to-main |
-| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 → WU5 → WU6 → WU7 → WU8 → WU9 |
-| Pending implementation rows | 24 |
-| Completed implementation rows | 28 |
-| Parent rows | 2 pending |
+| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 ✓ → WU5 ✓ → WU6 (next/pending) → WU7 → WU8 → WU9 |
+| Implementation rows | 52 total: 36 checked, 16 unchecked |
+| Parent rows | 0 checked, 2 unchecked |
 
 Decision needed before apply: No
 
@@ -106,10 +105,10 @@ Decision needed before apply: No
 
 **Dependency:** WU2a and WU2c. **End state:** direct detail returns stored/inert diagnostics and values through one bounded indexed load. **Allowed edit surfaces:** Resource admin query, completed detail helper/validators, focused tests, generated declarations.
 
-- [ ] **RED** — Add failing cases for missing `null`, active/inactive/inert/broken detail, 0/1/200/201 values, exactly one `porRecurso` bounded load, no truncation, and centralized `MAX_RESOURCE_VALUES`; estimate 25 lines. <!-- sdd-owner: implementation -->
-- [ ] **GREEN** — Register direct detail using the completed WU2a projector/loader and sole shared limit constant; preserve legacy detail; estimate 60 lines. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE** — Verify nullable references, exact load count, final error data at the limit, and no summary dependency on the loader; full verification and runtime-or-N/A; estimate 20 lines. <!-- sdd-owner: implementation -->
-- [ ] **REFACTOR** — Keep one named bounded loader and one authoritative limit definition; rollback removes detail export/integration only; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add failing cases for missing `null`, active/inactive/inert/broken detail, 0/1/200/201 values, exactly one `porRecurso` bounded load, no truncation, and centralized `MAX_RESOURCE_VALUES`; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Register direct detail using the completed WU2a projector/loader and sole shared limit constant; preserve legacy detail; estimate 60 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Verify nullable references, exact load count, final error data at the limit, and no summary dependency on the loader; full verification and runtime-or-N/A; estimate 20 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Keep one named bounded loader and one authoritative limit definition; rollback removes detail export/integration only; estimate 15 lines. <!-- sdd-owner: implementation -->
 
 ### WU6 — Thin atomic administrative create
 
