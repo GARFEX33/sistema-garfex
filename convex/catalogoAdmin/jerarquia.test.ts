@@ -130,4 +130,76 @@ describe("lecturas administrativas de clases", () => {
     await t.run(async (ctx) => { await ctx.db.delete(id); });
     expect(await t.query(api.catalogoAdmin.jerarquia.obtenerClase, { claseRecursoId: id })).toBeNull();
   });
+
+  describe("ciclo administrativo de familias", () => {
+    it("aplica identidad dentro de la clase y mantiene la propiedad inmutable", async () => {
+      const t = convexTest(schema, modules);
+      const classes = await t.run(async ctx => {
+        const first = await ctx.db.insert("clasesRecurso", { clave: "C1", nombre: "C1", activo: true, revision: 1 });
+        const second = await ctx.db.insert("clasesRecurso", { clave: "C2", nombre: "C2", activo: true, revision: 1 });
+        return { first, second };
+      });
+      const created = await t.mutation(api.catalogoAdmin.jerarquia.crearFamilia, { claseRecursoId: classes.first, clave: "  F  ", nombre: " Familia ", activo: false });
+      expect(created).toMatchObject({ disposition: "CREATED", item: { claseRecursoId: classes.first, clave: "F", nombre: "Familia", revision: 1, effective: false } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.crearFamilia, { claseRecursoId: classes.first, clave: "F", nombre: "Otra" })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.crearFamilia, { claseRecursoId: classes.second, clave: "F", nombre: "Otra" })).resolves.toMatchObject({ item: { claseRecursoId: classes.second, revision: 1 } });
+      const unchanged = await t.mutation(api.catalogoAdmin.jerarquia.actualizarFamilia, { familiaRecursoId: created.item.id, expectedRevision: 1, claseRecursoId: classes.first, clave: "F", nombre: " Familia " });
+      expect(unchanged).toMatchObject({ disposition: "UNCHANGED", item: { revision: 1 } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarFamilia, { familiaRecursoId: created.item.id, expectedRevision: 1, claseRecursoId: classes.second })).rejects.toMatchObject({ data: { code: "ADMIN_IMMUTABLE_FIELD" } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarFamilia, { familiaRecursoId: created.item.id, expectedRevision: 2, nombre: "No" })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+      const missing = await t.run(async ctx => { const id = await ctx.db.insert("clasesRecurso", { clave: "gone", nombre: "gone", activo: true, revision: 1 }); await ctx.db.delete(id); return id; });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.crearFamilia, { claseRecursoId: missing, clave: "X", nombre: "X" })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE" } });
+    });
+
+    it("bloquea descendientes y recursos activos sin tocar la rama", async () => {
+      const blocked = convexTest(schema, modules);
+      const active = await insertTree(blocked, { classActive: true, familyActive: true, typeActive: true });
+      await expect(blocked.mutation(api.catalogoAdmin.jerarquia.desactivarFamilia, { familiaRecursoId: active.familia, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED", context: { relationKind: "active-type", blocker: { kind: "tiposRecurso", id: active.tipo } } } });
+      const resource = convexTest(schema, modules);
+      const resourceTree = await insertTree(resource, { classActive: true, familyActive: true, typeActive: false, resourceActive: true });
+      await expect(resource.mutation(api.catalogoAdmin.jerarquia.desactivarFamilia, { familiaRecursoId: resourceTree.familia, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED" } });
+      const safe = convexTest(schema, modules);
+      const inert = await insertTree(safe, { classActive: true, familyActive: true, typeActive: false, resourceActive: false });
+      const result = await safe.mutation(api.catalogoAdmin.jerarquia.desactivarFamilia, { familiaRecursoId: inert.familia, expectedRevision: 1 });
+      expect(result).toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 2, effective: false } });
+      expect(await safe.run(async ctx => ({ family: await ctx.db.get(inert.familia), type: await ctx.db.get(inert.tipo) }))).toMatchObject({ family: { activo: false, revision: 2 }, type: { activo: false, revision: 1 } });
+    });
+
+    it("valida revisión antes de no-op y valida los tipos efectivos al activar", async () => {
+      const t = convexTest(schema, modules);
+      const invalid = await insertTree(t, { classActive: true, familyActive: false, typeActive: true, typeRevision: 0 });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: invalid.familia, expectedRevision: 2 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: invalid.familia, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+      expect(await t.run(async ctx => ({ family: await ctx.db.get(invalid.familia), type: await ctx.db.get(invalid.tipo) }))).toMatchObject({ family: { activo: false, revision: 1 }, type: { activo: true, revision: 0 } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.desactivarFamilia, { familiaRecursoId: invalid.familia, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UNCHANGED", item: { revision: 1 } });
+      const noOp = convexTest(schema, modules);
+      const inactive = await insertTree(noOp, { classActive: true, familyActive: false, typeActive: true });
+      const changed = await noOp.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: inactive.familia, expectedRevision: 1 });
+      expect(changed).toMatchObject({ disposition: "UPDATED", item: { revision: 2 } });
+      const unchanged = await noOp.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: inactive.familia, expectedRevision: 2 });
+      expect(unchanged).toMatchObject({ disposition: "UNCHANGED", item: { revision: 2 } });
+    });
+
+    it("pagina por clase y anota una familia bajo una clase inactiva como inerte", async () => {
+      const t = convexTest(schema, modules);
+      const ids = await t.run(async ctx => {
+        const first = await ctx.db.insert("clasesRecurso", { clave: "A", nombre: "A", activo: true, revision: 1 });
+        const second = await ctx.db.insert("clasesRecurso", { clave: "B", nombre: "B", activo: false, revision: 1 });
+        const family = await ctx.db.insert("familiasRecurso", { claseRecursoId: second, clave: "F", nombre: "F", activo: true, revision: 1 });
+        const other = await ctx.db.insert("familiasRecurso", { claseRecursoId: first, clave: "F", nombre: "F", activo: true, revision: 1 });
+        await ctx.db.patch(family, { adminSortId: family }); await ctx.db.patch(other, { adminSortId: other });
+        return { first, second, family };
+      });
+      expect(await t.query(api.catalogoAdmin.jerarquia.obtenerFamilia, { familiaRecursoId: ids.family })).toMatchObject({ claseRecursoId: ids.second, activo: true, effective: false });
+      const page = await t.query(api.catalogoAdmin.jerarquia.listarFamilias, { claseRecursoId: ids.second, pageSize: 1, cursor: null });
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]).toMatchObject({ claseRecursoId: ids.second, effective: false });
+      await t.run(async ctx => { for (const key of ["G", "H"]) { const id = await ctx.db.insert("familiasRecurso", { claseRecursoId: ids.second, clave: key, nombre: key, activo: true, revision: 1 }); await ctx.db.patch(id, { adminSortId: id }); } });
+      const seen: string[] = []; let cursor: string | null = null;
+      do { const next: { items: Array<{ id: string }>; continuationCursor: string | null } = await t.query(api.catalogoAdmin.jerarquia.listarFamilias, { claseRecursoId: ids.second, pageSize: 1, cursor }); seen.push(...next.items.map(item => item.id)); cursor = next.continuationCursor; } while (cursor);
+      expect(seen).toHaveLength(3);
+      const bound = await t.query(api.catalogoAdmin.jerarquia.listarFamilias, { claseRecursoId: ids.second, pageSize: 1, cursor: null });
+      await expect(t.query(api.catalogoAdmin.jerarquia.listarFamilias, { claseRecursoId: ids.first, pageSize: 1, cursor: bound.continuationCursor })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_ARGUMENT" } });
+    });
+  });
 });
