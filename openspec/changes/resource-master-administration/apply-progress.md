@@ -6,14 +6,14 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `Implementation complete; parent verification next` |
+| Apply state | `Verified; lifecycle accepted` |
 | Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, WU7b, WU8, WU9` |
-| Current work unit | `WU9 — native React contract complete` |
+| Current work unit | `Parent verification and lifecycle gates complete` |
 | Delivery | `stacked-to-main` |
-| Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending post-apply verification and lifecycle acceptance` |
+| Active branch/PR | `sdd/resource-admin-wu9; local only` |
+| Parent decision gate | `Accepted after PASS verification` |
 
-All implementation work units W0–WU9 are complete. Existing historical receipts remain preserved; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts. The two parent-owned verification/lifecycle rows remain intentionally unchecked.
+All implementation work units W0–WU9 and both parent-owned verification/lifecycle rows are complete. Existing historical receipts remain preserved; the current task sequence in `tasks.md` supersedes old cumulative checkbox snapshots embedded in earlier receipts.
 
 OpenSpec CLI remains absent in this environment; it was not installed or used.
 
@@ -876,3 +876,22 @@ Next recommended action: `parent-lifecycle`. `sdd-apply` does not start review, 
 
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
 - [ ] After verification, confirm all 60 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+
+## Maintainer size exception — native-first documentation rescope
+
+- Decision: explicit `size:exception`, accepted by the maintainer after the first final verification reported the workload gate.
+- Exact scope: commit `3e8c30a` (`docs(sdd): adopt native Convex resource flow`) only.
+- Accepted accounting: 941 additions + 999 deletions = 1,940 authored documentation lines; generated and product-code lines: 0.
+- Rationale: the commit atomically reconciled explore, proposal, three specs, design, tasks, and progress around the user-selected Convex-native architecture. The maintainer chose this bounded documentation-only exception instead of rewriting the entire unpushed descendant chain.
+- Non-generalization: every other Resource implementation/review slice remains below 400 authored lines; this exception does not authorize any future oversized unit.
+- Rollback/review boundary: review commit `3e8c30a` as one cross-artifact architecture reconciliation; dependent implementation commits remain independently reversible in their recorded stacked order.
+
+## Parent post-apply acceptance
+
+- Final verification report: `verify-report.md`, PASS, evidence revision `sha256:959a96c61958cc7bab8d4e8e2b9a9e93195039eb54fbf18095ae54131bd35b78`.
+- Commands passed: 35 files / 334 tests, backend typecheck, external consumer typecheck, Convex codegen with 5/5 generated hashes unchanged, and diff hygiene.
+- Native-first architecture passed: Resource list/search use native pagination and React hooks; no custom Resource cursor, `AdminPage`, cache, Unit filter, or transaction coordinator exists.
+- Review workload accepted: every implementation slice is below 400 authored lines except the explicitly bounded documentation-only `size:exception` above; WU8 is 398 authored lines.
+- Residual follow-up: deprecated optional `adminSortId` remains inert pending bounded deployed-row cleanup and later schema tightening. It is not read, written, indexed, or required by Resource administration.
+- Codegen caveat: native deployment-state download/upload messaging was observed; stable repository hashes are not claimed as runtime smoke evidence.
+- Delivery state: local stacked branches and commits only; no push or pull request was performed.
