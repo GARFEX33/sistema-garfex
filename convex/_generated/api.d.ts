@@ -9,6 +9,7 @@
  */
 
 import type * as catalogoAdmin_atributos from "../catalogoAdmin/atributos.js";
+import type * as catalogoAdmin_compatibilidad from "../catalogoAdmin/compatibilidad.js";
 import type * as catalogoAdmin_jerarquia from "../catalogoAdmin/jerarquia.js";
 import type * as catalogoAdmin_lib_backfillMetadatos from "../catalogoAdmin/lib/backfillMetadatos.js";
 import type * as catalogoAdmin_lib_cargarAgregado from "../catalogoAdmin/lib/cargarAgregado.js";
@@ -34,6 +35,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "catalogoAdmin/atributos": typeof catalogoAdmin_atributos;
+  "catalogoAdmin/compatibilidad": typeof catalogoAdmin_compatibilidad;
   "catalogoAdmin/jerarquia": typeof catalogoAdmin_jerarquia;
   "catalogoAdmin/lib/backfillMetadatos": typeof catalogoAdmin_lib_backfillMetadatos;
   "catalogoAdmin/lib/cargarAgregado": typeof catalogoAdmin_lib_cargarAgregado;

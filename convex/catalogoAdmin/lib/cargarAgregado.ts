@@ -5,6 +5,7 @@ import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../..
 import { resolverAsignaciones, validarCompletitudAsignaciones } from "../../../src/catalogoRecursos/dominio/asignacionesEfectivas";
 import { validarReglasCondicionales, type ReglaCondicional } from "../../../src/catalogoRecursos/dominio/reglasCondicionales";
 import { validarEstructuraPresentacion } from "../../../src/catalogoRecursos/dominio/presentacionCanonica";
+import { politicasCompatibilidadEnConflicto } from "../../../src/catalogoRecursos/dominio/compatibilidadOpciones";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -54,11 +55,27 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   if (incompleteAssignments.length) return { effective, status: "INVALID", violations: incompleteAssignments.map(id => ({ code: "OPTION_SET_EMPTY" as const, detail: id })) };
   const selectedIds = new Set(selectedAssignments.map(row => row.id));
   const activeOptionIds = new Set(options.filter(option => option.activo).map(option => option.id));
+  const compatibilityRows = await ctx.db.query("politicasCompatibilidadOpciones").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
+  const optionById = new Map(options.map(option => [option.id, option]));
+  const compatibilityPolicies = [] as Array<{ active: boolean; allowlist: boolean; hasRelation: boolean; valid?: boolean }>;
+  for (const policy of compatibilityRows) if (policy.activo) {
+    const origin = selectedAssignments.find(row => row.id === String(policy.atributoOrigenId));
+    const destination = selectedAssignments.find(row => row.id === String(policy.atributoDestinoId));
+    const relations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPolitica", q => q.eq("politicaCompatibilidadId", policy._id)).take(MAX_AGGREGATE_ROWS + 1);
+    let valid = Boolean(origin && destination && origin.tipoDato === "OPCION" && destination.tipoDato === "OPCION"); let hasRelation = false;
+    for (const relation of relations) {
+      const source = optionById.get(String(relation.opcionOrigenId)); const target = optionById.get(String(relation.opcionDestinoId));
+      if (relation.activo && source?.activo && target?.activo) hasRelation = true;
+      if (relation.activo && (!source || !target || source.definicionId !== origin?.definicionId || target.definicionId !== destination?.definicionId)) valid = false;
+    }
+    if (compatibilityRows.some(other => other.activo && other._id !== policy._id && politicasCompatibilidadEnConflicto(policy, other))) valid = false;
+    compatibilityPolicies.push({ active: true, allowlist: policy.modo === "ALLOWLIST", hasRelation, valid });
+  }
   const ruleViolations = validarReglasCondicionales(rules.map(row => ({ id: String(row._id), atributoCondicionId: String(row.atributoCondicionId), opcionCondicionId: row.opcionCondicionId === undefined ? undefined : String(row.opcionCondicionId), atributoAfectadoId: String(row.atributoAfectadoId), aplicabilidad: row.aplicabilidad, activo: row.activo } satisfies ReglaCondicional)), selectedIds, activeOptionIds);
   if (ruleViolations.length) return { effective, status: "INVALID", violations: ruleViolations.map(violation => ({ code: violation.code, detail: violation.detail })) };
   const familyRows = familyPolicies.filter(policy => policy.tipoRecursoId === undefined);
   const typeRows = typePolicies;
-  if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0 && rules.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
+  if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0 && rules.length === 0 && compatibilityPolicies.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
   const allPolicies = [...familyRows, ...typeRows];
   const unitActivity = new Map(await Promise.all([...new Set(allPolicies.map(policy => policy.unidadId))].map(async id => [id, Boolean((await ctx.db.get(id))?.activo)] as const)));
   const toDomain = (policy: typeof allPolicies[number]): PoliticaUnidadEfectiva => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal, unidadActiva: unitActivity.get(policy.unidadId) === true });
@@ -80,6 +97,7 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
     hierarchy: { typeId: type._id, familyId: family._id, classId: clase._id, familyOfTypeId: type.familiaRecursoId, classOfFamilyId: family.claseRecursoId },
     principalUnits,
     presentationPolicies,
+    compatibilityPolicies,
   });
   return { effective, ...result };
 }

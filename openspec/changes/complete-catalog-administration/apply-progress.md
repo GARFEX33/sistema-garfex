@@ -880,3 +880,66 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Native status after checkbox persistence: `taskProgress.completed: 53`, `taskProgress.pending: 22`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`; final verification is not claimed because later implementation and parent lifecycle rows remain.
 - The authenticated W11 attempt was settled `passed` with evidence revision `sha256:994fd298ff8cbbc88e1f1ab3c17851400db6aa4051785ab14b529aab6d227030`.
 - This executor recommends `parent-lifecycle`; it did not create/approve receipts, launch review/refutation/correction/validation actors, or perform delivery actions.
+
+# Apply progress — W12
+
+## Status consumed
+
+- Native status: `openspec` authoritative; `changeName: complete-catalog-administration`; `applyState: ready`; proposal, specs, design, tasks, and cumulative apply progress present.
+- `actionContext.mode`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Active bounded attempt continued with token `sha256:913ef608c7317b120372601fa3b196167793d19b80e272f1debbf073b2b2b53d`; bounds 2 attempts / 380 changed lines; delivery boundary W12 on `sdd/catalog-admin-w12`, stacked on W11.
+- Workload gate: decision needed `No`; chained delivery `Yes`; strategy `stacked-to-main`; roadmap risk `High`, W12 slice remained within the requested boundary.
+
+## W12 implementation evidence
+
+- Added compatibility policy lifecycle/detail/list/update/activate/deactivate commands with optimistic revision/no-op behavior and no hard deletion.
+- Added effective endpoint validation through Type assignment precedence, distinct endpoint checks, OPCION definition checks, active option-set checks, and hierarchy inertness annotations.
+- Added reusable directional/symmetric slot identity and conflict predicates. Directional reverse slots coexist; symmetric reverse and directional/symmetric overlaps conflict; mode is excluded from identity.
+- Added active allowlist nonempty enforcement, empty denylist acceptance, inactive-policy inertness, normalized metadata, filtered cursor reads, and generated API references.
+- Extended aggregate loading/validation so active compatibility policies participate in Type completeness checks without affecting inert branches.
+- Pure evaluation now ignores explicitly inactive policies, preserves directional scope, evaluates symmetric calls in both directions, and rejects empty active allowlists.
+
+## TDD Cycle Evidence
+
+| Cycle | Exact evidence | Result |
+|---|---|---|
+| RED | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts` before implementation | Expected failures: missing admin module and missing normalization exports |
+| GREEN | Same focused command after implementation | PASS — 2 files, 10 tests |
+| GREEN aggregate seam | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts src/catalogoRecursos/dominio/validacionAgregado.test.ts` | PASS — 3 files, 12 tests |
+| TRIANGULATE focused/regression | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts convex/catalogoRecursos/recursos.test.ts` | PASS — 3 files, 47 tests |
+| TRIANGULATE public | `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts convex/catalogoRecursos/catalogo.test.ts convex/catalogoRecursos/catalogoPublicado.test.ts` | PASS — 4 files, 32 tests |
+| TRIANGULATE full/typecheck | `pnpm exec vitest run`; `pnpm typecheck` | PASS — 27 files, 186 tests; `tsc --noEmit` passed |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and TypeScript validation completed |
+| Runtime boundary | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account |
+| REFACTOR | Reused exported slot normalization/conflict helpers and reran focused/full evidence | PASS — behavior and evaluator results unchanged |
+| Hygiene | `git diff --check` | PASS — no output |
+
+## Completed tasks and persisted checkboxes
+
+- W12 RED, GREEN, TRIANGULATE, and REFACTOR are marked `- [x]` in `tasks.md`.
+- Only W12 implementation rows were checked; W13–W16 implementation rows and both parent-owned lifecycle rows remain deferred.
+
+## Files changed and rollback boundary
+
+- `convex/catalogoAdmin/compatibilidad.ts` and `convex/catalogoAdmin/compatibilidad.test.ts`: policy administration and focused Convex tests.
+- `src/catalogoRecursos/dominio/compatibilidadOpciones.ts` and its test: reusable slot/pair normalization, conflict matrix, inactive filtering, and pure evaluation evidence.
+- `convex/catalogoAdmin/lib/cargarAgregado.ts` and `src/catalogoRecursos/dominio/validacionAgregado.ts`: active compatibility aggregate checks.
+- `convex/_generated/api.d.ts`: retained normal codegen additions for `catalogoAdmin.compatibilidad`.
+- `openspec/changes/complete-catalog-administration/tasks.md`: four W12 checkbox updates only.
+- Authored W12 changes are below the 380-attempt/400-review-line boundary; generated output is derived and excluded from authored estimates.
+- Rollback: remove W12 compatibility policy exports/tests and compatibility aggregate seam changes, restore the four W12 checkbox flips, and retain prior W11 behavior and generated output only through normal codegen. No rows, relations, snapshots, or revisions are deleted.
+
+## Remaining tasks and deferred lifecycle
+
+- Exact next implementation slice: W13 — Compatibility relations and normalization; all four W13 rows remain unchecked.
+- W14–W16 implementation rows remain unchecked.
+- Parent-owned lifecycle rows remain byte-for-byte unchanged and deferred to the parent lifecycle.
+- `nextRecommended`: `parent-lifecycle`; this executor did not start review, receipt, refutation, correction, validation, commit, push, PR, or settle actions.
+
+## W12 final evidence amendment
+
+- Reordered active-policy validation so a directional/symmetric slot collision reports `ADMIN_CONFLICT` before an empty-allowlist aggregate error; this preserves the exact conflict matrix independent of policy mode/content.
+- Final focused/regression run: `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts convex/catalogoRecursos/recursos.test.ts` — PASS, 3 files / 47 tests.
+- Final full run: `pnpm exec vitest run` — PASS, 27 files / 186 tests.
+- Final contract/runtime run: `pnpm exec convex codegen --typecheck enable && pnpm exec convex dev --once && pnpm typecheck && git diff --check` — PASS; local functions ready, `tsc --noEmit` passed, diff clean.
+- Re-read persisted tasks: W12 implementation rows are visibly `- [x]`; native status reports `taskProgress.completed: 57`, `pending: 18`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply`. Later implementation and parent lifecycle rows remain, so this phase returns `parent-lifecycle`.
