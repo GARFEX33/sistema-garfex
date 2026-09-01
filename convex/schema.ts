@@ -210,6 +210,9 @@ export default defineSchema({
     revision: v.number(),
     organizacionId: v.optional(v.id("organizaciones")),
     identidadVersion: v.optional(v.number()),
+    // Rollout: deploy optional metadata/indexes, complete backfill, wait for index readiness, then enable admin reads.
+    adminSortId: v.optional(v.string()),
+    adminScopeKey: v.optional(v.string()),
   })
     .index("porIdentificadorTecnico", ["identificadorTecnico"])
     .index("porOrganizacionYIdentificadorTecnico", ["organizacionId", "identificadorTecnico"])
@@ -217,9 +220,25 @@ export default defineSchema({
     .index("porActivo", ["activo"])
         .index("porTipoYActivo", ["tipoRecursoId", "activo"])
     .index("porUnidad", ["unidadId"])
+    .index("adminPorOrden", ["identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYOrden", ["activo", "identificadorTecnico", "adminSortId"])
+    .index("adminPorTipoYOrden", ["tipoRecursoId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYTipoYOrden", ["activo", "tipoRecursoId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorUnidadYOrden", ["unidadId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYUnidadYOrden", ["activo", "unidadId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorScopeYOrden", ["adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYScopeYOrden", ["activo", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorTipoYUnidadYOrden", ["tipoRecursoId", "unidadId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYTipoYUnidadYOrden", ["activo", "tipoRecursoId", "unidadId", "identificadorTecnico", "adminSortId"])
+    .index("adminPorTipoYScopeYOrden", ["tipoRecursoId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYTipoYScopeYOrden", ["activo", "tipoRecursoId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorUnidadYScopeYOrden", ["unidadId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYUnidadYScopeYOrden", ["activo", "unidadId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorTipoYUnidadYScopeYOrden", ["tipoRecursoId", "unidadId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
+    .index("adminPorActivoYTipoYUnidadYScopeYOrden", ["activo", "tipoRecursoId", "unidadId", "adminScopeKey", "identificadorTecnico", "adminSortId"])
     .searchIndex("buscar", {
       searchField: "nombre",
-      filterFields: ["tipoRecursoId", "activo"],
+      filterFields: ["tipoRecursoId", "unidadId", "activo", "adminScopeKey"],
     }),
 
 

@@ -689,6 +689,8 @@ export type DataModel = {
   recursos: {
     document: {
       activo: boolean;
+      adminScopeKey?: string;
+      adminSortId?: string;
       descripcion?: string;
       identidadVersion?: number;
       identificadorTecnico: string;
@@ -704,6 +706,8 @@ export type DataModel = {
       | "_creationTime"
       | "_id"
       | "activo"
+      | "adminScopeKey"
+      | "adminSortId"
       | "descripcion"
       | "identidadVersion"
       | "identificadorTecnico"
@@ -715,6 +719,114 @@ export type DataModel = {
     indexes: {
       by_id: ["_id"];
       by_creation_time: ["_creationTime"];
+      adminPorActivoYOrden: [
+        "activo",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYScopeYOrden: [
+        "activo",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYTipoYOrden: [
+        "activo",
+        "tipoRecursoId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYTipoYScopeYOrden: [
+        "activo",
+        "tipoRecursoId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYTipoYUnidadYOrden: [
+        "activo",
+        "tipoRecursoId",
+        "unidadId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYTipoYUnidadYScopeYOrden: [
+        "activo",
+        "tipoRecursoId",
+        "unidadId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYUnidadYOrden: [
+        "activo",
+        "unidadId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorActivoYUnidadYScopeYOrden: [
+        "activo",
+        "unidadId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorOrden: ["identificadorTecnico", "adminSortId", "_creationTime"];
+      adminPorScopeYOrden: [
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorTipoYOrden: [
+        "tipoRecursoId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorTipoYScopeYOrden: [
+        "tipoRecursoId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorTipoYUnidadYOrden: [
+        "tipoRecursoId",
+        "unidadId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorTipoYUnidadYScopeYOrden: [
+        "tipoRecursoId",
+        "unidadId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorUnidadYOrden: [
+        "unidadId",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
+      adminPorUnidadYScopeYOrden: [
+        "unidadId",
+        "adminScopeKey",
+        "identificadorTecnico",
+        "adminSortId",
+        "_creationTime",
+      ];
       porActivo: ["activo", "_creationTime"];
       porIdentificadorTecnico: ["identificadorTecnico", "_creationTime"];
       porOrganizacionYIdentificadorTecnico: [
@@ -729,7 +841,7 @@ export type DataModel = {
     searchIndexes: {
       buscar: {
         searchField: "nombre";
-        filterFields: "activo" | "tipoRecursoId";
+        filterFields: "activo" | "adminScopeKey" | "tipoRecursoId" | "unidadId";
       };
     };
     vectorIndexes: {};

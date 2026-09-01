@@ -9,6 +9,7 @@ import {
 } from "./validacionRecurso";
 import { registrarAlias } from "./identidadesRecurso";
 import { resolverJerarquiaEfectiva } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
+import { deriveResourceMetadata } from "../catalogoAdmin/lib/backfillMetadatos";
 
 const valor = v.object({
   atributoRecursoId: v.id("atributosRecurso"),
@@ -165,12 +166,28 @@ async function conValores(ctx: Ctx, recursoId: Id<"recursos">) {
     .withIndex("porRecurso", (q) => q.eq("recursoId", recursoId))
     .collect();
 }
+function legacyResourceProjection(recurso: Doc<"recursos">, valores: Awaited<ReturnType<typeof conValores>>) {
+  return {
+    _id: recurso._id,
+    _creationTime: recurso._creationTime,
+    tipoRecursoId: recurso.tipoRecursoId,
+    unidadId: recurso.unidadId,
+    identificadorTecnico: recurso.identificadorTecnico,
+    nombre: recurso.nombre,
+    descripcion: recurso.descripcion,
+    activo: recurso.activo,
+    revision: recurso.revision,
+    organizacionId: recurso.organizacionId,
+    identidadVersion: recurso.identidadVersion,
+    valores,
+  };
+}
 async function respuesta(
   ctx: Ctx,
   recurso: Doc<"recursos">,
   recursoId: Id<"recursos">,
 ) {
-  return { ...recurso, valores: await conValores(ctx, recursoId) };
+  return legacyResourceProjection(recurso, await conValores(ctx, recursoId));
 }
 
 export const crearRecurso = mutation({
@@ -199,6 +216,7 @@ export const crearRecurso = mutation({
       organizacionId: args.organizacionId,
       identidadVersion: args.organizacionId === undefined ? undefined : 1,
     });
+    await ctx.db.patch(recursoId, deriveResourceMetadata({ _id: recursoId, organizacionId: args.organizacionId }));
     if (args.organizacionId !== undefined)
       await registrarAlias(ctx, { organizacionId: args.organizacionId, recursoId, version: 1, clave: identificadorTecnico });
     for (const item of args.valores)

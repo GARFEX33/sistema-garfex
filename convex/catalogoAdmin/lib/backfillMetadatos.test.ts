@@ -117,6 +117,63 @@ describe("backfill de metadatos administrativos", () => {
       await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPoliticaYOpcionesNormalizadasYAdminSort").take(1);
       await ctx.db.query("reglasAtributoRecurso").withIndex("porTipoYCondicionYOpcionYAfectadoYAdminSort").take(1);
       await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYEstadoYNumeroYAdminSort").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorTipoYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorUnidadYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYUnidadYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorTipoYUnidadYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYUnidadYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorTipoYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorUnidadYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYUnidadYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorTipoYUnidadYScopeYOrden").take(1);
+      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYUnidadYScopeYOrden").take(1);
     });
+  });
+
+  it("rellena recursos con alcance determinista y reporta duplicados en lotes repetibles", async () => {
+    const t = convexTest(schema, modules);
+    const f = await seed(t);
+    const organization = await t.run(async ctx => (await ctx.db.get(f.revision))!.organizacionId);
+    const ids = await t.run(async ctx => {
+      const globalId = await ctx.db.insert("recursos", {
+        tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Global", descripcion: "Preservar", activo: false, revision: 4,
+        adminSortId: "incorrecto", adminScopeKey: "ORG:incorrecta",
+      });
+      const orgId = await ctx.db.insert("recursos", {
+        tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Organización", activo: false, revision: 8, organizacionId: organization,
+        identidadVersion: 1,
+      });
+      const globalDuplicate = await ctx.db.insert("recursos", {
+        tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Global duplicado", activo: true, revision: 5,
+      });
+      const orgDuplicate = await ctx.db.insert("recursos", {
+        tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Organización duplicada", activo: true, revision: 9, organizacionId: organization,
+        identidadVersion: 1,
+      });
+      return { globalId, orgId, globalDuplicate, orgDuplicate };
+    });
+
+    const reports = await runToCompletion(t, 1);
+    const resourceReport = reports.filter((report): report is { table: string; identity: string; ids: string[] } =>
+      typeof report === "object" && report !== null && (report as { table?: string }).table === "recursos");
+    expect(resourceReport).toEqual(expect.arrayContaining([
+      { table: "recursos", identity: "GLOBAL|R-1", ids: [ids.globalId, ids.globalDuplicate].sort() },
+      { table: "recursos", identity: `ORG:${organization}|R-1`, ids: [ids.orgId, ids.orgDuplicate].sort() },
+    ]));
+    const rows = await t.run(async ctx => ({ global: await ctx.db.get(ids.globalId), organization: await ctx.db.get(ids.orgId) }));
+    expect(rows.global).toMatchObject({ adminSortId: ids.globalId, adminScopeKey: "GLOBAL", tipoRecursoId: f.tipo, unidadId: f.unidad, nombre: "Global", descripcion: "Preservar", activo: false, revision: 4 });
+    expect(rows.organization).toMatchObject({ adminSortId: ids.orgId, adminScopeKey: `ORG:${organization}`, activo: false, revision: 8 });
+    const duplicates = await t.run(async ctx => ({ global: await ctx.db.get(ids.globalDuplicate), organization: await ctx.db.get(ids.orgDuplicate) }));
+    expect(duplicates.global).toMatchObject({ adminSortId: ids.globalDuplicate, adminScopeKey: "GLOBAL" });
+    expect(duplicates.organization).toMatchObject({ adminSortId: ids.orgDuplicate, adminScopeKey: `ORG:${organization}` });
+    const repeatedReports = (await runToCompletion(t, 1)).filter((report): report is { table: string; identity: string; ids: string[] } =>
+      typeof report === "object" && report !== null && (report as { table?: string }).table === "recursos");
+    expect(repeatedReports).toEqual(resourceReport);
   });
 });
