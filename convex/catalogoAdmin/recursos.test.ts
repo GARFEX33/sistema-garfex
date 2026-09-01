@@ -126,7 +126,7 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
       atributoRecursoId: attribute,
       valor: "must not be returned",
     });
-    return { clazz, family, typeA, typeB, unit, organization, ids };
+    return { clazz, family, typeA, typeB, unit, organization, definition, attribute, ids };
   });
 }
 
@@ -327,4 +327,110 @@ describe("catalogoAdmin.recursos.buscarRecursosResumen", () => {
     expect(api.catalogoAdmin.recursos.buscarRecursosResumen).toBeDefined();
   });
 
+});
+
+describe("catalogoAdmin.recursos.obtenerDetalleRecurso", () => {
+  const detailSource = (import.meta as ImportMeta & {
+    glob: (pattern: string, options?: object) => Record<string, string>;
+  }).glob("./lib/recursoDetalle.ts", { query: "?raw", import: "default", eager: true })["./lib/recursoDetalle.ts"];
+
+  it("returns null for an unknown Resource ID", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const unknown = fixture.ids.globalAActive;
+    await t.run(async (ctx) => { await ctx.db.delete(unknown); });
+
+    await expect(t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: unknown })).resolves.toBeNull();
+  });
+
+  it("returns a complete active detail with diagnostics and stored values", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const result = await t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: fixture.ids.globalAActive });
+
+    expect(result).toMatchObject({
+      id: fixture.ids.globalAActive,
+      identificadorTecnico: "RESOURCE_1",
+      descripcion: null,
+      identidadVersion: null,
+      clase: { id: fixture.clazz, activo: true },
+      familia: { id: fixture.family, activo: true },
+      tipo: { id: fixture.typeA, activo: true },
+      unidad: { id: fixture.unit, simbolo: null, activo: true },
+      organizacion: null,
+      classificationStatus: { state: "EFFECTIVE" },
+      catalogDiagnostics: { hierarchy: { state: "EFFECTIVE" }, aggregateStatus: "NOT_EVALUATED", violations: [] },
+    });
+    expect(result?.valores).toHaveLength(1);
+    expect(result?.valores[0]).toMatchObject({ recursoId: fixture.ids.globalAActive, atributoRecursoId: fixture.attribute, valor: "must not be returned" });
+  });
+
+  it("preserves organization references and nullable historical fields", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(fixture.ids.organizationAActive, { descripcion: "owned", identidadVersion: 7 });
+    });
+
+    const result = await t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: fixture.ids.organizationAActive });
+    expect(result).toMatchObject({ descripcion: "owned", identidadVersion: 7, organizacion: { id: fixture.organization, clave: "ORG", activo: true }, activo: true });
+    expect(result?.valores).toEqual([]);
+  });
+
+  it("keeps inactive history and broken references readable", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    await t.run(async (ctx) => { await ctx.db.patch(fixture.typeA, { activo: false }); });
+
+    const inert = await t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: fixture.ids.globalAInactive });
+    expect(inert).toMatchObject({ activo: false, tipo: { id: fixture.typeA, activo: false }, classificationStatus: { state: "INERT" }, catalogDiagnostics: { hierarchy: { state: "INERT" } } });
+
+    await t.run(async (ctx) => {
+      await ctx.db.delete(fixture.typeA);
+      await ctx.db.delete(fixture.family);
+      await ctx.db.delete(fixture.clazz);
+      await ctx.db.delete(fixture.unit);
+      await ctx.db.delete(fixture.organization);
+    });
+    const broken = await t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: fixture.ids.organizationAInactive });
+    expect(broken).toMatchObject({ clase: null, familia: null, tipo: null, unidad: null, organizacion: null, classificationStatus: { state: "BROKEN_REFERENCE" }, catalogDiagnostics: { hierarchy: { state: "BROKEN_REFERENCE" }, aggregateStatus: "INVALID" } });
+  });
+
+  it.each([0, 1, 200])("returns all stored values at the accepted boundary (%s)", async (count) => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const recursoId = count === 1 ? fixture.ids.globalAActive : fixture.ids.globalBActive;
+    await t.run(async (ctx) => {
+      const existing = count === 1 ? 1 : 0;
+      for (let index = existing; index < count; index += 1) {
+        await ctx.db.insert("valoresAtributoRecurso", { recursoId, atributoRecursoId: fixture.attribute, valor: `value-${index}` });
+      }
+    });
+    const result = await t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId });
+    expect(result?.valores).toHaveLength(count);
+  });
+
+  it("rejects the first excessive value without truncating the result", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    await t.run(async (ctx) => {
+      for (let index = 1; index < 201; index += 1) {
+        await ctx.db.insert("valoresAtributoRecurso", { recursoId: fixture.ids.globalAActive, atributoRecursoId: fixture.attribute, valor: `value-${index}` });
+      }
+    });
+
+    await expect(t.query(api.catalogoAdmin.recursos.obtenerDetalleRecurso, { recursoId: fixture.ids.globalAActive })).rejects.toMatchObject({
+      data: { code: "ADMIN_INVALID_STATE", context: { field: "valores", reason: expect.stringContaining("RESOURCE_VALUE_LIMIT_EXCEEDED"), violations: [{ code: "RESOURCE_VALUE_LIMIT_EXCEEDED", count: 201 }] } },
+    });
+  });
+
+  it("uses exactly one bounded indexed value load and keeps summaries value-free", () => {
+    const loader = detailSource.slice(detailSource.indexOf("export async function loadResourceValuesBounded"));
+    expect(loader.match(/\.take\(/g)).toHaveLength(1);
+    expect(loader).toContain('.withIndex("porRecurso"');
+    expect(loader).toContain(".take(MAX_RESOURCE_VALUES + 1)");
+    expect(loader).not.toContain(".collect()");
+    const summarySource = source.slice(source.indexOf("export const listarRecursosResumen"), source.indexOf("function resourceReference"));
+    expect(summarySource).not.toContain("loadResourceValuesBounded");
+  });
 });

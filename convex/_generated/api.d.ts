@@ -2292,6 +2292,213 @@ export declare const api: {
           splitCursor?: string | null;
         }
       >;
+      obtenerDetalleRecurso: FunctionReference<
+        "query",
+        "public",
+        { recursoId: Id<"recursos"> },
+        {
+          activo: boolean;
+          catalogDiagnostics: {
+            aggregateStatus: "VALID" | "INVALID" | "NOT_EVALUATED";
+            hierarchy: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            violations: Array<{
+              code:
+                | "HIERARCHY_REFERENCE_INVALID"
+                | "PRINCIPAL_UNIT_COUNT"
+                | "UNIT_INACTIVE"
+                | "NUMERIC_UNIT_INVALID"
+                | "OPTION_SET_EMPTY"
+                | "ASSIGNMENT_SELECTION_INVALID"
+                | "RULE_REFERENCE_INVALID"
+                | "RULE_RESULT_INVALID"
+                | "RULE_CONFLICT"
+                | "PRESENTATION_COUNT"
+                | "PRESENTATION_TOKEN_INVALID"
+                | "COMPATIBILITY_POLICY_CONFLICT"
+                | "COMPATIBILITY_RELATION_INVALID"
+                | "ALLOWLIST_EMPTY"
+                | "TYPE_KEY_AMBIGUOUS"
+                | "CATALOG_LIMIT_EXCEEDED"
+                | "RESOURCE_VALUE_LIMIT_EXCEEDED"
+                | "RESOURCE_SEARCH_RESULT_LIMIT_EXCEEDED"
+                | "RESOURCE_ATTRIBUTE_DUPLICATE"
+                | "RESOURCE_REQUIRED_VALUE_MISSING"
+                | "RESOURCE_NON_FINITE_NUMBER"
+                | "RESOURCE_ATTRIBUTE_FORBIDDEN"
+                | "RESOURCE_VALUE_TYPE_INVALID";
+              count?: number;
+              detail?: string;
+              entity?:
+                | { id: Id<"organizaciones">; kind: "organizaciones" }
+                | { id: Id<"catalogoRevisiones">; kind: "catalogoRevisiones" }
+                | {
+                    id: Id<"catalogoTipoSnapshots">;
+                    kind: "catalogoTipoSnapshots";
+                  }
+                | { id: Id<"clasesRecurso">; kind: "clasesRecurso" }
+                | { id: Id<"familiasRecurso">; kind: "familiasRecurso" }
+                | { id: Id<"tiposRecurso">; kind: "tiposRecurso" }
+                | { id: Id<"unidades">; kind: "unidades" }
+                | {
+                    id: Id<"politicasUnidadRecurso">;
+                    kind: "politicasUnidadRecurso";
+                  }
+                | {
+                    id: Id<"definicionesAtributo">;
+                    kind: "definicionesAtributo";
+                  }
+                | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
+                | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"politicasPresentacionCanonica">;
+                    kind: "politicasPresentacionCanonica";
+                  }
+                | {
+                    id: Id<"politicasCompatibilidadOpciones">;
+                    kind: "politicasCompatibilidadOpciones";
+                  }
+                | {
+                    id: Id<"relacionesOpcionesAtributo">;
+                    kind: "relacionesOpcionesAtributo";
+                  }
+                | {
+                    id: Id<"reglasAtributoRecurso">;
+                    kind: "reglasAtributoRecurso";
+                  }
+                | { id: Id<"recursos">; kind: "recursos" }
+                | { id: Id<"identidadesRecurso">; kind: "identidadesRecurso" }
+                | {
+                    id: Id<"valoresAtributoRecurso">;
+                    kind: "valoresAtributoRecurso";
+                  };
+              field?: string;
+              relatedEntity?:
+                | { id: Id<"organizaciones">; kind: "organizaciones" }
+                | { id: Id<"catalogoRevisiones">; kind: "catalogoRevisiones" }
+                | {
+                    id: Id<"catalogoTipoSnapshots">;
+                    kind: "catalogoTipoSnapshots";
+                  }
+                | { id: Id<"clasesRecurso">; kind: "clasesRecurso" }
+                | { id: Id<"familiasRecurso">; kind: "familiasRecurso" }
+                | { id: Id<"tiposRecurso">; kind: "tiposRecurso" }
+                | { id: Id<"unidades">; kind: "unidades" }
+                | {
+                    id: Id<"politicasUnidadRecurso">;
+                    kind: "politicasUnidadRecurso";
+                  }
+                | {
+                    id: Id<"definicionesAtributo">;
+                    kind: "definicionesAtributo";
+                  }
+                | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
+                | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"politicasPresentacionCanonica">;
+                    kind: "politicasPresentacionCanonica";
+                  }
+                | {
+                    id: Id<"politicasCompatibilidadOpciones">;
+                    kind: "politicasCompatibilidadOpciones";
+                  }
+                | {
+                    id: Id<"relacionesOpcionesAtributo">;
+                    kind: "relacionesOpcionesAtributo";
+                  }
+                | {
+                    id: Id<"reglasAtributoRecurso">;
+                    kind: "reglasAtributoRecurso";
+                  }
+                | { id: Id<"recursos">; kind: "recursos" }
+                | { id: Id<"identidadesRecurso">; kind: "identidadesRecurso" }
+                | {
+                    id: Id<"valoresAtributoRecurso">;
+                    kind: "valoresAtributoRecurso";
+                  };
+            }>;
+          };
+          clase: {
+            activo: boolean;
+            clave: string;
+            id:
+              | Id<"clasesRecurso">
+              | Id<"familiasRecurso">
+              | Id<"tiposRecurso">
+              | Id<"unidades">
+              | Id<"organizaciones">;
+            nombre: string;
+            revision: number;
+          } | null;
+          classificationStatus: {
+            reasons: Array<string>;
+            state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+          };
+          descripcion: string | null;
+          familia: {
+            activo: boolean;
+            clave: string;
+            id:
+              | Id<"clasesRecurso">
+              | Id<"familiasRecurso">
+              | Id<"tiposRecurso">
+              | Id<"unidades">
+              | Id<"organizaciones">;
+            nombre: string;
+            revision: number;
+          } | null;
+          id: Id<"recursos">;
+          identidadVersion: number | null;
+          identificadorTecnico: string;
+          nombre: string;
+          organizacion: {
+            activo: boolean;
+            clave: string;
+            id:
+              | Id<"clasesRecurso">
+              | Id<"familiasRecurso">
+              | Id<"tiposRecurso">
+              | Id<"unidades">
+              | Id<"organizaciones">;
+            nombre: string;
+            revision: number;
+          } | null;
+          organizacionId?: Id<"organizaciones">;
+          revision: number;
+          tipo: {
+            activo: boolean;
+            clave: string;
+            id:
+              | Id<"clasesRecurso">
+              | Id<"familiasRecurso">
+              | Id<"tiposRecurso">
+              | Id<"unidades">
+              | Id<"organizaciones">;
+            nombre: string;
+            revision: number;
+          } | null;
+          tipoRecursoId: Id<"tiposRecurso">;
+          unidad: {
+            activo: boolean;
+            clave: string;
+            id: Id<"unidades">;
+            nombre: string;
+            revision: number;
+            simbolo: string | null;
+          } | null;
+          unidadId: Id<"unidades">;
+          valores: Array<{
+            _creationTime: number;
+            _id: Id<"valoresAtributoRecurso">;
+            atributoRecursoId: Id<"atributosRecurso">;
+            opcionAtributoId?: Id<"opcionesAtributo">;
+            recursoId: Id<"recursos">;
+            valor: string | number | boolean;
+          }>;
+        } | null
+      >;
     };
     reglas: {
       activarReglaAtributo: FunctionReference<
