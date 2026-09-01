@@ -3,6 +3,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { validarAgregado, type AggregateViolation, type ResultadoAgregado } from "../../../src/catalogoRecursos/dominio/validacionAgregado";
 import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../../src/catalogoRecursos/dominio/unidadesEfectivas";
 import { resolverAsignaciones, validarCompletitudAsignaciones } from "../../../src/catalogoRecursos/dominio/asignacionesEfectivas";
+import { validarReglasCondicionales, type ReglaCondicional } from "../../../src/catalogoRecursos/dominio/reglasCondicionales";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -41,7 +42,8 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const typePolicies = await ctx.db.query("politicasUnidadRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
   const presentations = await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
   const attributes = await ctx.db.query("atributosRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", family._id)).take(MAX_AGGREGATE_ROWS + 1);
-  const bounded = [limitarFilas(familyPolicies), limitarFilas(typePolicies), limitarFilas(presentations), limitarFilas(attributes)];
+  const rules = await ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
+  const bounded = [limitarFilas(familyPolicies), limitarFilas(typePolicies), limitarFilas(presentations), limitarFilas(attributes), limitarFilas(rules)];
   if (bounded.some(result => result.exceeded)) return { effective, status: "INVALID", violations: [limitViolation("aggregate fan-out exceeds the bounded limit")] };
   const definitions = new Map((await Promise.all([...new Set(attributes.map(row => row.definicionAtributoId))].map(async id => [String(id), await ctx.db.get(id)] as const))).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== null));
   const toAssignment = (row: typeof attributes[number]) => ({ id: String(row._id), familiaId: String(row.familiaRecursoId), tipoId: row.tipoRecursoId === undefined ? undefined : String(row.tipoRecursoId), definicionId: String(row.definicionAtributoId), definicionClave: definitions.get(String(row.definicionAtributoId))?.clave ?? String(row.definicionAtributoId), tipoDato: definitions.get(String(row.definicionAtributoId))?.tipoDato, activo: row.activo, aplicabilidad: row.aplicabilidad, participaIdentidad: row.participaIdentidad, orden: row.orden });
@@ -49,9 +51,13 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const options = (await Promise.all([...new Set(selectedAssignments.filter(row => row.tipoDato === "OPCION").map(row => row.definicionId))].map(async id => ctx.db.query("opcionesAtributo").withIndex("porDefinicion", q => q.eq("definicionAtributoId", id as Id<"definicionesAtributo">)).take(MAX_AGGREGATE_ROWS + 1)))).flat().map(row => ({ id: String(row._id), definicionId: String(row.definicionAtributoId), activo: row.activo }));
   const incompleteAssignments = validarCompletitudAsignaciones(selectedAssignments.filter(row => row.tipoDato === "OPCION"), options);
   if (incompleteAssignments.length) return { effective, status: "INVALID", violations: incompleteAssignments.map(id => ({ code: "OPTION_SET_EMPTY" as const, detail: id })) };
+  const selectedIds = new Set(selectedAssignments.map(row => row.id));
+  const activeOptionIds = new Set(options.filter(option => option.activo).map(option => option.id));
+  const ruleViolations = validarReglasCondicionales(rules.map(row => ({ id: String(row._id), atributoCondicionId: String(row.atributoCondicionId), opcionCondicionId: row.opcionCondicionId === undefined ? undefined : String(row.opcionCondicionId), atributoAfectadoId: String(row.atributoAfectadoId), aplicabilidad: row.aplicabilidad, activo: row.activo } satisfies ReglaCondicional)), selectedIds, activeOptionIds);
+  if (ruleViolations.length) return { effective, status: "INVALID", violations: ruleViolations.map(violation => ({ code: violation.code, detail: violation.detail })) };
   const familyRows = familyPolicies.filter(policy => policy.tipoRecursoId === undefined);
   const typeRows = typePolicies;
-  if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
+  if (familyRows.length === 0 && typeRows.length === 0 && presentations.length === 0 && rules.length === 0) return { effective, status: "NOT_EVALUATED", violations: [] };
   const allPolicies = [...familyRows, ...typeRows];
   const unitActivity = new Map(await Promise.all([...new Set(allPolicies.map(policy => policy.unidadId))].map(async id => [id, Boolean((await ctx.db.get(id))?.activo)] as const)));
   const toDomain = (policy: typeof allPolicies[number]): PoliticaUnidadEfectiva => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal, unidadActiva: unitActivity.get(policy.unidadId) === true });

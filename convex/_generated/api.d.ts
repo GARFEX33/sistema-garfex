@@ -15,6 +15,7 @@ import type * as catalogoAdmin_lib_cargarAgregado from "../catalogoAdmin/lib/car
 import type * as catalogoAdmin_lib_errors from "../catalogoAdmin/lib/errors.js";
 import type * as catalogoAdmin_lib_pagination from "../catalogoAdmin/lib/pagination.js";
 import type * as catalogoAdmin_lib_revisions from "../catalogoAdmin/lib/revisions.js";
+import type * as catalogoAdmin_reglas from "../catalogoAdmin/reglas.js";
 import type * as catalogoAdmin_unidades from "../catalogoAdmin/unidades.js";
 import type * as catalogoAdmin_validators from "../catalogoAdmin/validators.js";
 import type * as catalogoRecursos_catalogo from "../catalogoRecursos/catalogo.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   "catalogoAdmin/lib/errors": typeof catalogoAdmin_lib_errors;
   "catalogoAdmin/lib/pagination": typeof catalogoAdmin_lib_pagination;
   "catalogoAdmin/lib/revisions": typeof catalogoAdmin_lib_revisions;
+  "catalogoAdmin/reglas": typeof catalogoAdmin_reglas;
   "catalogoAdmin/unidades": typeof catalogoAdmin_unidades;
   "catalogoAdmin/validators": typeof catalogoAdmin_validators;
   "catalogoRecursos/catalogo": typeof catalogoRecursos_catalogo;

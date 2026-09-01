@@ -40,4 +40,14 @@ describe("precedencia de atributos", () => {
     forbidden.atributos[1].aplicabilidad = "FORBIDDEN";
     expect(validarRecurso(forbidden, entrada("atributo-tipo"))).toEqual({ ok: false, code: "ATRIBUTO_PROHIBIDO" });
   });
+
+  it("applies a raw-input rule to false, zero, and empty string without iterating", () => {
+    for (const [tipoDato, value] of [["BOOLEANO", false], ["NUMERO", 0], ["TEXTO", ""]] as const) {
+      const snapshot = base();
+      snapshot.atributos.push({ id: "atributo-afectado", activo: true, definicionAtributoId: "def-afectado", tipoRecursoId: "tipo", aplicabilidad: "CONDITIONAL", participaIdentidad: false, definicion: { id: "def-afectado", clave: "AFECTADO", tipoDato: "TEXTO", activo: true } });
+      snapshot.atributos[1].definicion = { id: "def", clave: "DEF", tipoDato, activo: true };
+      snapshot.reglas = [{ id: "regla", activo: true, atributoCondicionId: "atributo-tipo", atributoAfectadoId: "atributo-afectado", aplicabilidad: "REQUIRED" }];
+      expect(validarRecurso(snapshot, { ...entrada("atributo-tipo"), valores: [{ atributoRecursoId: "atributo-tipo", valor: value }] })).toEqual({ ok: false, code: "ATRIBUTO_REQUERIDO_AUSENTE" });
+    }
+  });
 });

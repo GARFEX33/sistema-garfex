@@ -1,4 +1,5 @@
 import { aplicabilidadBase, resolverAsignaciones, type AsignacionEfectiva } from "./asignacionesEfectivas";
+import { evaluarReglasCondicionales } from "./reglasCondicionales";
 import type {
   Aplicabilidad, AtributoConDefinicion, CatalogoSnapshot, EntradaRecurso, FalloValidacion,
   IdDominio, ResultadoDominio, ValorEntrada,
@@ -30,22 +31,15 @@ export function validarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecur
   const atributosPorId = new Map([...aplicables.values()].map(atributo => [atributo.id, atributo]));
   for (const valor of entrada.valores) if (!atributosPorId.has(valor.atributoRecursoId)) return fallo("ATRIBUTO_NO_APLICABLE");
 
-  const aplicabilidad = new Map<IdDominio, Aplicabilidad>(
-    [...aplicables].map(([id, atributo]) => [id, aplicabilidadBase(atributo.aplicabilidad)]),
+  const aplicabilidadBasePorId = new Map<IdDominio, Aplicabilidad>(
+    [...aplicables.values()].map(atributo => [atributo.id, aplicabilidadBase(atributo.aplicabilidad)]),
   );
-  for (const regla of snapshot.reglas.filter(regla => regla.activo)) {
-    const condicionAtributo = atributosPorId.get(regla.atributoCondicionId);
-    const afectadoAtributo = atributosPorId.get(regla.atributoAfectadoId);
-    if (!condicionAtributo || !afectadoAtributo) continue;
-    const condicion = valores.get(regla.atributoCondicionId);
-    let activa = condicion !== undefined;
-    if (activa && regla.opcionCondicionId) activa = condicion!.opcionAtributoId === regla.opcionCondicionId;
-    if (activa) aplicabilidad.set(afectadoAtributo.definicionAtributoId, regla.aplicabilidad);
-  }
+  const reglasEfectivas = snapshot.reglas.filter(regla => regla.activo && (regla.opcionCondicionId === undefined || snapshot.opciones.some(option => option.id === regla.opcionCondicionId && option.activo)));
+  const aplicabilidad = evaluarReglasCondicionales(reglasEfectivas, valores, aplicabilidadBasePorId);
 
   for (const [id, atributo] of aplicables) {
-    const estado = aplicabilidad.get(id);
-    if ((estado === "REQUIRED" || estado === "CONDITIONAL") && !valores.has(atributo.id)) return fallo("ATRIBUTO_REQUERIDO_AUSENTE");
+    const estado = aplicabilidad.get(atributo.id);
+    if (estado === "REQUIRED" && !valores.has(atributo.id)) return fallo("ATRIBUTO_REQUERIDO_AUSENTE");
     if ((estado === "FORBIDDEN" || estado === "NOT_APPLICABLE") && valores.has(atributo.id)) return fallo("ATRIBUTO_PROHIBIDO");
     if (!valores.has(atributo.id)) continue;
     const valor = valores.get(atributo.id)!;
