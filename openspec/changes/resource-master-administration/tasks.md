@@ -10,17 +10,17 @@ Strict TDD remains RED → GREEN → TRIANGULATE → REFACTOR. Every pending aut
 
 ## Historical evidence preservation
 
-W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, and WU7b are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU8 is next and depends on both WU7 slices.
+W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, WU7b, and WU8 are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU9 is next and depends on the completed Resource administration surface.
 
 ## Review Workload Forecast
 
 | Field | Value |
 |---|---|
-| Pending authored estimate | Approximately 255 additions + deletions across pending WU8–WU9; generated declarations separate |
-| 400-line budget risk | High across the completed stack; low per pending unit; WU8 ~145 and WU9 ~110, no exception |
+| Pending authored estimate | Approximately 110 additions + deletions for pending WU9; generated declarations separate |
+| 400-line budget risk | High across the completed stack; low for pending WU9; completed WU8 remained below 400, no exception |
 | Delivery | `auto-chain`, stacked-to-main |
-| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 ✓ → WU5 ✓ → WU6a ✓ → WU6b ✓ → WU7a ✓ → WU7b ✓ → WU8 → WU9 |
-| Implementation rows | 60 total: 52 checked, 8 unchecked |
+| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 ✓ → WU5 ✓ → WU6a ✓ → WU6b ✓ → WU7a ✓ → WU7b ✓ → WU8 ✓ → WU9 |
+| Implementation rows | 60 total: 56 checked, 4 unchecked |
 | Parent rows | 2 total: 0 checked, 2 unchecked |
 | Total rows | 62 |
 
@@ -156,10 +156,10 @@ Verifier-recommended review split: WU6a and WU6b remain historical slices. WU7a 
 
 **Dependency:** WU7a and WU7b. **End state:** activation/deactivation use one Convex mutation each, current-revision idempotence, and GARFEX effective-state rules. **Allowed edit surfaces:** Resource admin mutation/helpers/tests, catalog blocker regression tests only if needed, generated declarations.
 
-- [ ] **RED** — Add lifecycle tests for missing/stale/current same-state, exactly-one revision increment, activation against effective/inert/invalid state, deactivation preservation, blocker visibility, and final state after failures; estimate 35 lines. <!-- sdd-owner: implementation -->
-- [ ] **GREEN** — Implement thin activate/deactivate mutations with revision-first handling; activation validates bounded current aggregate and identity, deactivation patches only state/revision; rely on native atomicity/OCC; estimate 75 lines. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE** — Verify current versus stale same-state, failed activation remains unchanged, values/aliases/catalog/publication remain preserved, and blockers observe active state; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
-- [ ] **REFACTOR** — Reuse revision/effective-validation seams and remove any transaction/cache/retry abstraction; rollback removes lifecycle exports only; estimate 10 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add lifecycle tests for missing/stale/current same-state, exactly-one revision increment, activation against effective/inert/invalid state, deactivation preservation, blocker visibility, and final state after failures; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Implement thin activate/deactivate mutations with revision-first handling; activation validates bounded current aggregate and identity, deactivation patches only state/revision; rely on native atomicity/OCC; estimate 75 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Verify current versus stale same-state, failed activation remains unchanged, values/aliases/catalog/publication remain preserved, and blockers observe active state; full verification and runtime-or-N/A; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Reuse revision/effective-validation seams and remove any transaction/cache/retry abstraction; rollback removes lifecycle exports only; estimate 10 lines. <!-- sdd-owner: implementation -->
 
 ### WU9 — Generated native React contract and regressions
 
