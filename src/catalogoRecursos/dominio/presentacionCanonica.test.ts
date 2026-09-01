@@ -11,7 +11,7 @@ describe("presentación canónica", () => {
   it("renderiza etiquetas de opciones demo", () => {
     const result = renderizarPresentacionCanonica(
       policy([{ tipo: "TYPE_NAME" }, { tipo: "ATTRIBUTE_VALUE", atributoClave: "MATERIAL" }]),
-      new Map([["MATERIAL", { tipoDato: "OPCION", valor: "DEMO_COBRE", opcionNombre: "Cobre" }]]),
+      new Map([["MATERIAL", { tipoDato: "OPCION", valor: "TEST_COBRE", opcionNombre: "Cobre" }]]),
     );
     expect(result).toEqual({ ok: true, nombre: "Cable · Cobre" });
   });
