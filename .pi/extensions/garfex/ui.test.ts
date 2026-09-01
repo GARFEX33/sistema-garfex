@@ -26,10 +26,16 @@ const keybindings = {
 };
 const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const catalogSourceExtras = {
+  consultarClases: async () => [], consultarFamiliasDeClase: async () => [], consultarTiposDeFamilia: async () => [],
+  consultarUnidadesValidas: async () => [], consultarAtributosAplicables: async () => [], consultarOpcionesPermitidas: async () => [],
+  crearRecurso: async () => resource,
+};
 const sourceFrom = (load: (query: ResourceQuery) => Promise<Resource[]>) => ({
   list: () => load({ kind: "list" }),
   search: (text: string) => load({ kind: "search", text }),
   getDetail: async () => null,
+  ...catalogSourceExtras,
 });
 
 it("gives GARFEX_CONVEX_URL precedence and reports missing config", () => {
@@ -46,7 +52,7 @@ it("routes list and search queries without side effects", () => {
 
 it("uses exact generated references for list, search, and detail requests", async () => {
   const query = vi.fn().mockResolvedValue([]);
-  const mutation = vi.fn();
+  const mutation = vi.fn().mockResolvedValue(resource);
   const source = createResourceDataSource({ GARFEX_CONVEX_URL: "https://example" }, () => ({ query, mutation }));
   await source.list(); await source.search("bomba"); await source.getDetail(fakeId<"recursos">("r1"));
   expect(query).toHaveBeenNthCalledWith(1, api.catalogoRecursos.recursos.listarRecursos, { activo: true });
@@ -60,16 +66,16 @@ it("represents empty and populated results as distinct view states", () => {
 });
 
 describe("GARFEX menu orchestration", () => {
-  function menuContext(select: (...args: any[]) => Promise<string | undefined>, input = async () => undefined) {
-    return { mode: "tui", ui: { select, input, notify: vi.fn() } } as any;
+  function menuContext(select: (...args: unknown[]) => Promise<string | undefined>, input = async () => undefined) {
+    return { mode: "tui", ui: { select, input, notify: vi.fn() } } as unknown as Parameters<typeof runGarfexMenus>[0];
   }
 
   it("shows the system menu first and ignores command arguments", async () => {
-    const command = { handler: undefined as any };
+    const command: { handler?: (argument: string, context: Parameters<typeof runGarfexMenus>[0]) => Promise<void> } = {};
     const select = vi.fn().mockResolvedValueOnce("Salir");
-    garfexExtension({ registerCommand: (_name: string, definition: any) => { command.handler = definition.handler; } } as any);
+    garfexExtension({ registerCommand: (_name: string, definition: { handler: (argument: string, context: Parameters<typeof runGarfexMenus>[0]) => Promise<void> }) => { command.handler = definition.handler; } } as unknown as Parameters<typeof garfexExtension>[0]);
     const ctx = menuContext(select);
-    await command.handler("cable", ctx);
+    await command.handler!("cable", ctx);
     expect(select).toHaveBeenNthCalledWith(1, "Sistema GARFEX", ["Catálogo de Recursos", "Salir"]);
   });
 
@@ -118,14 +124,14 @@ describe("GARFEX menu orchestration", () => {
     expect(select).toHaveBeenCalledTimes(2);
     finish();
     await running;
-    expect(select).toHaveBeenCalledWith("Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Volver"]);
+    expect(select).toHaveBeenCalledWith("Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Crear recurso", "Volver"]);
   });
 
   it("returns from catalog cancel and closes on main cancel", async () => {
     const select = vi.fn().mockResolvedValueOnce("Catálogo de Recursos").mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
     await runGarfexMenus(menuContext(select), vi.fn().mockResolvedValue(undefined));
     expect(select).toHaveBeenNthCalledWith(1, "Sistema GARFEX", ["Catálogo de Recursos", "Salir"]);
-    expect(select).toHaveBeenNthCalledWith(2, "Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Volver"]);
+    expect(select).toHaveBeenNthCalledWith(2, "Catálogo de Recursos", ["Listar recursos", "Buscar recursos", "Crear recurso", "Volver"]);
     expect(select).toHaveBeenCalledTimes(3);
   });
 });
@@ -150,7 +156,7 @@ describe("ResourceBrowser controls and state help", () => {
   it("ignores a late detail error after cancel", async () => {
   let reject!: (error: Error) => void;
   const pending = new Promise<never>((_, r) => { reject = r; });
-  const browser = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: async () => pending }, theme, { requestRender: vi.fn() }, keybindings, vi.fn());
+  const browser = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: async () => pending, ...catalogSourceExtras }, theme, { requestRender: vi.fn() }, keybindings, vi.fn());
   await flush(); browser.handleInput("enter"); browser.handleInput("cancel"); reject(new Error("tarde")); await flush();
   expect(browser.render(80).join("\\n")).not.toContain("tarde");
 });
@@ -162,7 +168,7 @@ it("truncates long output to the supplied width", async () => {
   });
 
   it("renders enriched detail fields and labels without raw ids", async () => {
-    const source = { list: async () => [resource], search: async () => [], getDetail: async () => detail };
+    const source = { list: async () => [resource], search: async () => [], getDetail: async () => detail, ...catalogSourceExtras };
     const browser = new ResourceBrowser({ kind: "list" }, source, theme, { requestRender: vi.fn() }, keybindings, vi.fn());
     await flush(); browser.handleInput("enter"); await flush();
     const rendered = browser.render(120).join("\\n");
@@ -174,17 +180,17 @@ it("truncates long output to the supplied width", async () => {
 
   it("renders missing and error detail states with back and retry", async () => {
     const tui = { requestRender: vi.fn() }; const done = vi.fn();
-    const missing = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: async () => null }, theme, tui, keybindings, done);
+    const missing = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: async () => null, ...catalogSourceExtras }, theme, tui, keybindings, done);
     await flush(); missing.handleInput("enter"); await flush(); expect(missing.render(80).join("\\n")).toContain("No se encontró"); missing.handleInput("cancel"); expect(missing.render(80).join("\\n")).toContain("Bomba visible");
     const retry = vi.fn().mockRejectedValueOnce(new Error("fallo")).mockResolvedValueOnce(detail);
-    const browser = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: retry }, theme, tui, keybindings, vi.fn());
+    const browser = new ResourceBrowser({ kind: "list" }, { list: async () => [resource], search: async () => [], getDetail: retry, ...catalogSourceExtras }, theme, tui, keybindings, vi.fn());
     await flush(); browser.handleInput("enter"); await flush(); expect(browser.render(80).join("\\n")).toContain("reintentar"); browser.handleInput("enter"); await flush(); expect(browser.render(80).join("\\n")).toContain("Descripción enriquecida");
   });
 
   it("routes detail loading and ignores a late response after cancel", async () => {
     let resolve!: (value: null) => void;
     const pending = new Promise<null>((r) => { resolve = r; });
-    const source = { list: async () => [resource], search: async () => [], getDetail: async () => pending };
+    const source = { list: async () => [resource], search: async () => [], getDetail: async () => pending, ...catalogSourceExtras };
     const browser = new ResourceBrowser({ kind: "list" }, source, theme, { requestRender: vi.fn() }, keybindings, vi.fn());
     await flush(); browser.handleInput("enter");
     expect(browser.render(80).join("\n")).toContain("Cargando detalle…");
