@@ -3,6 +3,13 @@ import { convexTest } from "convex-test";
 import { internal } from "../_generated/api";
 import schema from "../schema";
 
+/** Test-only Vite typing; ImportMeta.glob is not included in the root TypeScript config. */
+declare global {
+  interface ImportMeta {
+    glob: (path: string) => Record<string, () => Promise<unknown>>;
+  }
+}
+
 const modules = {
   ...import.meta.glob("../_generated/**/*.{ts,js}"),
   ...Object.fromEntries(Object.entries(import.meta.glob("./*.{ts,js}")).map(([path, module]) => [`../catalogoRecursos/${path.slice(2)}`, module])),
