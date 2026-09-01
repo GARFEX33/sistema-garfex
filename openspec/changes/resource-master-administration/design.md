@@ -4,7 +4,7 @@
 
 Implement the additive `api.catalogoAdmin.recursos` surface with native Convex pagination, search, reactivity, generated types, atomic mutations, and optimistic concurrency control. Custom Resource code exists only for GARFEX business rules and projections.
 
-The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, WU2b, WU3a, and WU3b receipts remain historical truth. Completed WU2c corrects WU1 before WU3a; WU3a and WU3b are complete, and WU4 is next.
+The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, WU2b, WU3a, WU3b, WU4, and WU5 receipts remain historical truth. WU6a records the thin mutation/base-validation slice and WU6b records the corrected scope and boundary slice; WU7 is next and depends on both.
 
 Existing custom catalog-admin pagination remains outside this Resource rescope. No catalog-admin query, cursor, page result, cache, or consumer is authorized for rewrite here.
 
@@ -350,7 +350,21 @@ Every pending unit follows RED → GREEN → TRIANGULATE → REFACTOR and remain
 - exactly one indexed value load;
 - no duplicated limit constant.
 
-### WU6–WU8 mutations
+### WU6a thin mutation and base validation
+
+- effective Class → Family → Type and active Unit validation;
+- bounded 0/200 accepted and 201 rejected value behavior;
+- derived identity, revision-one inactive Resource, successful value persistence, and organization alias writes;
+- native atomicity/OCC only, with no lock, retry, coordinator, compensation, or cache.
+
+### WU6b scope correction and failure boundaries
+
+- global duplicate lookup matches only `organizacionId === undefined`;
+- organization lookup is exact organization plus identity, and both scopes reserve inactive duplicates;
+- cross-scope duplicate, alias collision, active/inactive organization, injected alias/value-write, concurrent-equivalent, publication non-mutation, and legacy compatibility final-state evidence;
+- dedicated focused surface `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`.
+
+### WU7–WU8 mutations
 
 - GARFEX validation, revision, immutable, identity, alias, and lifecycle rules;
 - final database state after every failure;
@@ -386,9 +400,11 @@ Full verification:
 4. Deploy WU3a native list.
 5. Validate WU3b's source-derived generated consumer contract against the installed React hook.
 6. Deploy WU4 native search.
-7. Deploy WU5–WU8 detail and mutations.
-8. Generate and expose WU9 consumer contract.
-9. Run full legacy and native consumer verification.
+7. Deploy WU5 direct detail.
+8. Deploy WU6a/WU6b create slices.
+9. Deploy WU7–WU8 mutations.
+10. Generate and expose WU9 consumer contract.
+11. Run full legacy and native consumer verification.
 
 ### Rollback
 
@@ -410,16 +426,19 @@ Full verification:
 | WU2c | Complete | WU2b | 180 | Resource schema/backfill/write correction and focused tests |
 | WU3a | Complete history | WU2c | ~319 | native list query/tests |
 | WU3b | Complete history | WU3a | ~152 | direct installed React hook/generated consumer contract/evidence |
-| WU4 | Pending | WU3a + WU3b | 145 | native search export/tests |
-| WU5 | Pending | WU2a, WU2c | 120 | detail export/integration tests |
-| WU6 | Pending | WU2b, WU5 | 175 | create export/orchestration/tests |
-| WU7 | Pending | WU6 | 210 | update export/orchestration/tests |
+| WU4 | Complete history | WU3a + WU3b | 145 | native search export/tests |
+| WU5 | Complete history | WU2a, WU2c | 120 | detail export/integration tests |
+| WU6a | Complete historical slice | WU2b, WU5 | 260 | thin create mutation/base validation and persistence |
+| WU6b | Complete historical correction | WU6a | 270 | scope correction, dedicated boundaries, and final-state tests |
+| WU7 | Pending; next | WU6a + WU6b | 210 | update export/orchestration/tests |
 | WU8 | Pending | WU7 | 145 | lifecycle exports/tests |
 | WU9 | Pending | WU3a, WU3b, WU4–WU8 | 110 authored | generated consumer fixture/package exposure/docs |
 
-Pending forecast after completing WU3a/WU3b is approximately 905 authored changed lines. WU3a query/tests are accounted at approximately 319 authored lines and WU3b consumer/generated/task/evidence at approximately 152 authored lines; each remains below 400 with no exception. Generated declarations are tracked separately.
+Current pending authored forecast is approximately 675 lines across WU7–WU9. WU6a is approximately 260 and WU6b approximately 270 authored changed lines, each below the 400-line review budget. Generated declarations are tracked separately. The two WU6 slices are historical checked work; WU7 is the next unchecked implementation unit. Two parent-owned gates remain pending.
 
-There are 52 implementation-owned TDD rows after splitting WU3 into WU3a/WU3b: 28 completed rows and 24 pending rows. Two parent-owned gates remain pending, for 54 total task rows: 28 checked and 26 unchecked.
+### WU6 review boundary reconciliation
+
+The verifier-recommended split is retained without exception: WU6a contains the base implementation, first dedicated scenarios, and 37 generated lines; WU6b contains the one-line global-scope fix, remaining dedicated boundary tests, and final documentation. Each review slice stays below 400 changed lines, and generated output remains separately identified from authored accounting.
 
 ## 13. Remaining product decisions
 

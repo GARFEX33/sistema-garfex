@@ -141,4 +141,87 @@ describe("recursoPersistencia / crearRecurso", () => {
     expect(await state(t)).toEqual(before);
   });
 
+  it("keeps global and organization identities in separate exact scopes", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    await create(t, input(fixture, { ownership: { kind: "ORGANIZATION", organizacionId: fixture.organization } }));
+    await expect(create(t, input(fixture))).resolves.toMatchObject({ disposition: "CREATED" });
+    await expect(create(t, input(fixture, { ownership: { kind: "ORGANIZATION", organizacionId: fixture.organization } }))).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+    await expect(create(t, input(fixture))).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+    await expect(create(t, input(fixture, { ownership: { kind: "ORGANIZATION", organizacionId: fixture.otherOrganization } }))).resolves.toMatchObject({ disposition: "CREATED" });
+  });
+
+  it("does not let an organization-owned row block global creation", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    await t.run(async (ctx) => {
+      const organizationResource = await ctx.db.insert("recursos", { tipoRecursoId: fixture.tipo, unidadId: fixture.unidad, identificadorTecnico: "v1|CLASS|FAMILY|TYPE|", nombre: "Organization row", activo: false, revision: 1, organizacionId: fixture.organization, identidadVersion: 1, adminScopeKey: `ORG:${fixture.organization}` });
+      await ctx.db.insert("identidadesRecurso", { organizacionId: fixture.organization, recursoId: organizationResource, version: 1, clave: "v1|CLASS|FAMILY|TYPE|", activa: true, creadaEn: 1 });
+    });
+    await expect(create(t, input(fixture))).resolves.toMatchObject({ disposition: "CREATED" });
+  });
+
+  it("reserves inactive duplicates in each exact scope and reports alias collisions", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const organizationInput = input(fixture, { ownership: { kind: "ORGANIZATION", organizacionId: fixture.organization } });
+    await create(t, organizationInput);
+    const before = await state(t);
+    await expect(create(t, organizationInput)).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+    expect(await state(t)).toEqual(before);
+
+    const dummy = await t.run(async (ctx) => {
+      const resourceId = await ctx.db.insert("recursos", { tipoRecursoId: fixture.tipo, unidadId: fixture.unidad, identificadorTecnico: "different", nombre: "Dummy", activo: false, revision: 1, organizacionId: fixture.otherOrganization, identidadVersion: 1, adminScopeKey: `ORG:${fixture.otherOrganization}` });
+      await ctx.db.insert("identidadesRecurso", { organizacionId: fixture.otherOrganization, recursoId: resourceId, version: 1, clave: "v1|CLASS|FAMILY|TYPE|", activa: true, creadaEn: 1 });
+      return resourceId;
+    });
+    const beforeAlias = await state(t);
+    await expect(create(t, input(fixture, { ownership: { kind: "ORGANIZATION", organizacionId: fixture.otherOrganization } }))).rejects.toMatchObject({ data: { code: "ADMIN_CONFLICT" } });
+    expect(dummy).toBeDefined();
+    expect(await state(t)).toEqual(beforeAlias);
+  });
+
+  it("rolls back injected alias and value-write failures through the native transaction", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const before = await state(t);
+    await expect(t.run(async (ctx) => insertarRecursoAdministrativo(ctx as never, {
+      tipoRecursoId: fixture.tipo,
+      unidadId: fixture.unidad,
+      identificadorTecnico: "v1|CLASS|FAMILY|TYPE|",
+      nombre: "Injected value failure",
+      ownership: { organizacionId: fixture.organization },
+      valores: [{ atributoRecursoId: fixture.attribute, valor: undefined } as never],
+    }))).rejects.toThrow();
+    expect(await state(t)).toEqual(before);
+
+    await t.run(async (ctx) => {
+      const resourceId = await ctx.db.insert("recursos", { tipoRecursoId: fixture.tipo, unidadId: fixture.unidad, identificadorTecnico: "different", nombre: "Alias owner", activo: false, revision: 1, organizacionId: fixture.organization, identidadVersion: 1, adminScopeKey: `ORG:${fixture.organization}` });
+      await ctx.db.insert("identidadesRecurso", { organizacionId: fixture.organization, recursoId: resourceId, version: 1, clave: "v1|CLASS|FAMILY|TYPE|", activa: true, creadaEn: 1 });
+    });
+    const aliasBefore = await state(t);
+    await expect(t.run(async (ctx) => insertarRecursoAdministrativo(ctx as never, {
+      tipoRecursoId: fixture.tipo,
+      unidadId: fixture.unidad,
+      identificadorTecnico: "v1|CLASS|FAMILY|TYPE|",
+      nombre: "Injected alias failure",
+      ownership: { organizacionId: fixture.organization },
+      valores: [],
+    }))).rejects.toThrow(/conflicto/i);
+    expect(await state(t)).toEqual(aliasBefore);
+  });
+
+  it("does not mutate publication data and leaves one committed identity under equivalent concurrency", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const args = input(fixture, { ownership: { kind: "GLOBAL" } });
+    const outcomes = await Promise.allSettled([create(t, args), create(t, args)]);
+    expect(outcomes.filter(outcome => outcome.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.filter(outcome => outcome.status === "rejected")[0]).toMatchObject({ reason: { data: { code: "ADMIN_DUPLICATE_KEY" } } });
+    expect(await t.run(async (ctx) => ({
+      resources: (await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", q => q.eq("identificadorTecnico", "v1|CLASS|FAMILY|TYPE|")).collect()).length,
+      revisions: await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYNumero").collect(),
+      snapshots: await ctx.db.query("catalogoTipoSnapshots").withIndex("porOrganizacionYTipo").collect(),
+    }))).toMatchObject({ resources: 1, revisions: [], snapshots: [] });
+  });
 });

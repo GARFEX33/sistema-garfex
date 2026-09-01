@@ -6,14 +6,14 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `WU3a/WU3b/WU4/WU5 complete; WU6 next` |
-| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5` |
-| Current work unit | `WU6 — thin atomic administrative create (next/pending)` |
+| Apply state | `WU6a/WU6b complete; WU7 next` |
+| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b` |
+| Current work unit | `WU6a/WU6b — corrected and split historical create slices` |
 | Delivery | `stacked-to-main` |
 | Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending parent lifecycle after WU5` |
+| Parent decision gate | `Pending parent lifecycle after WU6b` |
 
-WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, and WU5 direct bounded detail are complete. Existing W0/WU1/WU2a/WU2b/WU2c/WU3a/WU3b/WU4 receipts and the historical evidence below remain preserved. WU6 is next and pending; no WU6 attempt has started. The current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
+WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, WU5 direct bounded detail, and the corrected WU6a/WU6b slices are complete. Existing historical receipts remain preserved. WU7 is next and pending; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
 
 OpenSpec CLI remains absent in this environment; it was not installed or used.
 
@@ -504,7 +504,7 @@ The persisted `tasks.md` artifact was re-read after checkbox updates. WU3a and W
 - [ ] **TRIANGULATE** — Typecheck every native query/mutation shape, run full legacy Resource regressions, verify generated declarations match source, and confirm existing catalog-admin pagination was not changed; full verification and runtime-or-N/A; estimate 30 authored lines. <!-- sdd-owner: implementation -->
 - [ ] **REFACTOR** — Keep exports limited to generated Convex/API/data-model/error contracts and concise consumer documentation; rollback removes fixture/export/docs after API exports; estimate 15 authored lines. <!-- sdd-owner: implementation -->
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
-- [ ] After verification, confirm all 52 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 56 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
 
 ## WU5 Apply Evidence — `resource-admin-wu5`
 
@@ -580,4 +580,105 @@ The exact unchecked implementation and parent-owned task lines are retained belo
 - [ ] **TRIANGULATE** — Typecheck every native query/mutation shape, run full legacy Resource regressions, verify generated declarations match source, and confirm existing catalog-admin pagination was not changed; full verification and runtime-or-N/A; estimate 30 authored lines. <!-- sdd-owner: implementation -->
 - [ ] **REFACTOR** — Keep exports limited to generated Convex/API/data-model/error contracts and concise consumer documentation; rollback removes fixture/export/docs after API exports; estimate 15 authored lines. <!-- sdd-owner: implementation -->
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
-- [ ] After verification, confirm all 52 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 56 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+
+## WU6 Apply Evidence — corrected and split into WU6a/WU6b
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status` v2 for `resource-master-administration`: authoritative `openspec`, `applyState: ready`, `nextRecommended: apply`, proposal/specs/design/tasks/apply-progress present, verify report missing, and no blocked reasons.
+- Action context was `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex`, with the workspace as the allowed edit root; no edit-root warning was present.
+- Workload guard was explicitly `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, and `400-line budget risk: High`. The verifier-recommended split is the resolved delivery path: WU6a contains the base implementation, first dedicated scenarios, and 37 generated lines; WU6b contains the one-line global-scope fix, remaining dedicated boundary tests, and final documentation. Each slice stays below 400 changed lines with no exception. WU7 was not started.
+- Continued the active native attempt with token `sha256:d53e0b32f37a0ea8445d179233cd4337e4d29d3303d55542a454637a71de575a`; no second attempt or runtime start was used.
+- Produced state: WU6a and WU6b implementation rows are checked; WU7 is next. The authoritative task artifact has 56 implementation rows = 44 checked + 12 unchecked, 2 parent rows unchecked, and 58 total rows. Verify remains parent-gated.
+
+### WU6a — thin mutation and base validation
+
+- RED evidence was the focused create surface before the scope correction: the new create scenarios exposed the missing/incorrect administrative create behavior; no custom rollback or retry behavior was introduced.
+- GREEN evidence is covered by the create mutation, bounded administrative validator/identity seam, and persistence helper. The mutation derives identity, writes inactive revision-one Resources, persists supplied values, writes organization aliases, and relies on native Convex atomicity/OCC.
+- TRIANGULATE evidence includes accepted 0/200 and rejected 201 value boundaries, effective hierarchy and active Unit validation, successful non-empty value persistence, active/inactive organization validation, structured failures, and legacy Resource regression coverage.
+- REFACTOR evidence is the thin helper boundary: no lock, retry protocol, coordinator, compensation, cache, publication mutation, or legacy API change.
+
+### WU6b — scope correction and failure boundaries
+
+- RED focused command: `pnpm exec vitest run convex/catalogoAdmin/lib/recursoPersistencia.test.ts` — 9 tests executed, with 2 expected failures proving that an organization-owned duplicate incorrectly blocked global creation before the correction.
+- GREEN/TRIANGULATE focused command: `pnpm exec vitest run convex/catalogoAdmin/lib/recursoPersistencia.test.ts convex/catalogoAdmin/recursos.test.ts` — 2 files, 59 tests passed. Dedicated coverage proves global lookup matches only `organizacionId === undefined`, organization lookup is exact, inactive duplicates reserve each scope, cross-scope creates are allowed, aliases collide exactly, and final Resource/value/alias state is unchanged after boundary failures.
+- Failure-boundary evidence includes natural alias collision plus deliberately injected alias/value-write failures through the persistence helper; both leave the complete final aggregate unchanged. Equivalent concurrent creates produced one committed identity and one structured duplicate failure. Publication revisions and type snapshots remained empty.
+- Focused final commands: `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts` — 1 file, 50 tests passed; `pnpm exec vitest run convex/catalogoAdmin/lib/recursoPersistencia.test.ts` — 1 file, 9 tests passed.
+
+### Verification and accounting
+
+- Full suite: `pnpm exec vitest run` — 35 files, 308 tests passed.
+- Typechecks: `pnpm typecheck` passed; `pnpm typecheck:consumer` passed.
+- Generated stability: no codegen was rerun for this correction. Prior codegen under active development emitted native CLI download/upload messages; `convex/_generated/api.d.ts` SHA-256 was `e23977e4b7ed5121437f90e546f6d0496eda8c4f8901cd61f618a2e4c075a3bc` on both prior runs, and repository hashes/status stayed stable. The generated declaration adds only the create reference and is excluded from authored line budgets.
+- Diff checks: `git diff --check` passed. No branch, stage, commit, or active Convex development process was stopped. These observations do not prove remote runtime non-mutation, and no such claim is made.
+- Final authored intended review boundaries: WU6a approximately 260 changed lines and WU6b approximately 270 changed lines, each below 400; generated declarations remain separate. The direct rollback boundary for WU6a removes base create/validation/persistence behavior; WU6b removes only the scope correction and dedicated boundary tests. Neither rollback deletes stored Resource, value, alias, catalog, publication, or snapshot data.
+
+### Files and remaining work
+
+- Product/test surfaces: `convex/catalogoAdmin/recursos.ts`, `convex/catalogoAdmin/lib/recursoPersistencia.ts`, `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`, and the shared administrative validation seam in `convex/catalogoRecursos/validacionRecurso.ts`.
+- Generated surface: `convex/_generated/api.d.ts`, regenerated only through the Convex CLI.
+- Planning evidence: `openspec/changes/resource-master-administration/design.md`, `tasks.md`, and this `apply-progress.md`; the old WU6 block is represented historically as checked WU6a and WU6b, with WU7 depending on both.
+- Remaining implementation tasks are WU7, WU8, and WU9. Exact unchecked implementation rows are the four WU7 rows, four WU8 rows, and four WU9 rows in `tasks.md`; both parent-owned lifecycle gates remain deferred and byte-for-byte preserved.
+
+### TDD Cycle Evidence
+
+| Slice | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| WU6a | Create scenarios established the missing admin-create behavior before implementation | Thin mutation, validator/identity seam, persistence, values, aliases, and revision-one inactive write passed focused coverage | 0/200/201, effective references, organizations, values, aliases, structured errors, and legacy regressions passed | Native atomicity/OCC retained; no transaction machinery added |
+| WU6b | Dedicated scope test failed 2/9 on organization rows blocking global creates | Undefined-organization equality lookup corrected; dedicated plus integration focused suites passed 59/59 | Scope matrix, inactive reservation, alias/value final-state rollback, concurrency, publication non-mutation, and legacy compatibility passed | Documentation and intended review split corrected; generated hash and diff checks passed |
+
+### Parent lifecycle handoff
+
+Parent must perform review/verification lifecycle actions. This executor did not start bounded review, create or approve receipts, validate delivery gates, stop the active Convex dev process, or run a runtime deployment harness. Next recommended action is `parent-lifecycle` for review and then WU7 apply.
+
+## WU6a/WU6b gate-finding correction evidence
+
+### Structured status and scope
+
+- Consumed authoritative native status for `resource-master-administration`: `artifactStore: openspec`, `applyState: ready`, `dependencies.apply: ready`, `nextRecommended: apply`, all required apply artifacts present, and no blocked reasons.
+- Action context was `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex`; the user-authorized edit surfaces were limited to `convex/catalogoAdmin/lib/recursoPersistencia.test.ts` and the three OpenSpec evidence/design/task files. No target was outside the authoritative workspace.
+- Workload gate was resolved by the verifier-recommended stacked split: WU6a base implementation + first dedicated scenarios + 37 generated lines; WU6b one-line global-scope fix + remaining dedicated boundary tests + final documentation. Both slices stay below 400 changed lines; no exception was used. WU7 was not started.
+- Ownership count from the persisted task artifact: 56 implementation rows = 44 checked + 12 unchecked; 2 parent rows unchecked; 58 total. No task checkbox changed in this correction; WU6a/WU6b remain checked and WU7–WU9 remain deferred. Parent-owned checkbox rows were preserved byte-for-byte.
+
+### Exact dedicated-test assertions added
+
+In `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`, the existing first scenario now reads the created organization-owned Resource and asserts:
+
+```ts
+expect(persistedResource).not.toBeNull();
+expect(persistedResource?.activo).toBe(false);
+expect(persistedResource?.revision).toBe(1);
+expect(persistedResource?.organizacionId).toBe(fixture.organization);
+expect(persistedResource?.identificadorTecnico).toBe("v1|CLASS|FAMILY|TYPE|");
+expect(await t.run(async (ctx) => ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q.eq("recursoId", result.item.id)).collect())).toEqual([
+  expect.objectContaining({
+    organizacionId: fixture.organization,
+    recursoId: result.item.id,
+    version: 1,
+    clave: "v1|CLASS|FAMILY|TYPE|",
+  }),
+]);
+```
+
+The dedicated suite remains nine scenarios; no scenario was added.
+
+### TDD and verification evidence
+
+| Phase | Evidence |
+|---|---|
+| RED | Temporarily inverted the new `activo` expectation; dedicated Vitest failed 1/9 with received `false` versus expected `true`, then the assertion was corrected. No production code was edited. |
+| GREEN | `pnpm exec vitest run convex/catalogoAdmin/lib/recursoPersistencia.test.ts` — 1 file, 9 tests passed. |
+| TRIANGULATE | `pnpm exec vitest run convex/catalogoAdmin/lib/recursoPersistencia.test.ts convex/catalogoAdmin/recursos.test.ts` — 2 files, 59 tests passed; `pnpm exec vitest run` — 35 files, 308 tests passed. |
+| REFACTOR | `pnpm typecheck` passed; `pnpm typecheck:consumer` passed; `git diff --check` passed. Counts, review split, runtime wording, and file accounting were reconciled without codegen rerun. |
+
+### Runtime and generated-output wording
+
+Prior codegen under active development emitted native CLI download/upload messages. Repository hashes/status stayed stable and no process was stopped. Prior generated hash evidence remains sufficient; codegen was not run again. These observations do not prove remote runtime non-mutation, so no such claim is made.
+
+### Final file accounting and parent staging boundary
+
+- Correction surfaces: `convex/catalogoAdmin/lib/recursoPersistencia.test.ts` (14 added assertion lines; nine scenarios preserved), `design.md`, `tasks.md`, and `apply-progress.md` (documentation/evidence reconciliation). No runtime/product source, generated declaration, branch, stage, or commit was changed by this correction.
+- Current worktree accounting against `HEAD` for the three tracked OpenSpec files is `apply-progress.md +106/-5`, `design.md +30/-11`, and `tasks.md +28/-13`; this includes preserved historical evidence already present in the worktree. The dedicated test is untracked at 227 total lines, with the correction hunk limited to the assertion block above.
+- Recommended parent staging hunk boundary: `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`, immediately after `expect(result.item.nombre).toBe("With value");` and before the existing `valoresAtributoRecurso` assertion.
+- Rollback boundary: remove only the added dedicated assertions and the WU6a/WU6b documentation/evidence reconciliation; do not alter product behavior, generated files, parent lifecycle state, or stored data.
