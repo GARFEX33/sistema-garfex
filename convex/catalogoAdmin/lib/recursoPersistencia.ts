@@ -12,7 +12,7 @@ export async function buscarRecursoPorIdentidad(
   input: { organizacionId?: Id<"organizaciones">; identificadorTecnico: string },
 ) {
   const query = input.organizacionId === undefined
-    ? ctx.db.query("recursos").withIndex("porIdentificadorTecnico", q => q.eq("identificadorTecnico", input.identificadorTecnico))
+    ? ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", q => q.eq("organizacionId", undefined).eq("identificadorTecnico", input.identificadorTecnico))
     : ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", q => q.eq("organizacionId", input.organizacionId).eq("identificadorTecnico", input.identificadorTecnico));
   return (await query.take(2))[0] ?? null;
 }
