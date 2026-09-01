@@ -3,6 +3,8 @@ import { convexTest } from "convex-test";
 import { api } from "../_generated/api";
 import { identidadRecurso } from "./validacionRecurso";
 import schema from "../schema";
+import type { DataModel } from "../_generated/dataModel";
+import { MAX_RESOURCE_VALUES } from "../catalogoAdmin/resourceValidators";
 
 const generatedModules = (import.meta as ImportMeta & {
   glob: (pattern: string) => Record<string, () => Promise<unknown>>;
@@ -10,6 +12,8 @@ const generatedModules = (import.meta as ImportMeta & {
 const localModules = (import.meta as ImportMeta & {
   glob: (pattern: string) => Record<string, () => Promise<unknown>>;
 }).glob("./*.{ts,js}");
+type SearchFilters = DataModel["recursos"]["searchIndexes"]["buscar"]["filterFields"];
+const resourceSearchHasNoUnit: "unidadId" extends SearchFilters ? false : true = true;
 const modules = {
   ...generatedModules,
   ...Object.fromEntries(
@@ -85,9 +89,13 @@ describe("recursos", () => {
     const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     expect(Object.keys(creado).sort()).toEqual(["_creationTime", "_id", "activo", "identificadorTecnico", "nombre", "revision", "tipoRecursoId", "unidadId", "valores"].sort());
     const stored = await t.run(async ctx => ctx.db.get(creado._id));
-    expect(stored).toMatchObject({ adminSortId: creado._id, adminScopeKey: "GLOBAL" });
-    const searchable = await t.run(async ctx => ctx.db.query("recursos").withSearchIndex("buscar", (q: any) => q.search("nombre", "Bomba").eq("tipoRecursoId", f.tipo).eq("unidadId", f.unidad).eq("activo", true).eq("adminScopeKey", "GLOBAL")).take(1));
+    expect(stored).toMatchObject({ adminScopeKey: "GLOBAL" });
+    expect(stored).not.toHaveProperty("adminSortId");
+    expect(MAX_RESOURCE_VALUES).toBe(200);
+    const searchable = await t.run(async ctx => ctx.db.query("recursos").withSearchIndex("buscar", (q: any) => q.search("nombre", "Bomba").eq("tipoRecursoId", f.tipo).eq("activo", true).eq("adminScopeKey", "GLOBAL")).take(1));
     expect(searchable.map(row => row._id)).toEqual([creado._id]);
+    expect(resourceSearchHasNoUnit).toBe(true);
+
   });
 
   it("no usa el nombre para identidad y rechaza duplicados", async () => {

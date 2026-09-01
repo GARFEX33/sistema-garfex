@@ -4,7 +4,7 @@
 
 Implement the additive `api.catalogoAdmin.recursos` surface with native Convex pagination, search, reactivity, generated types, atomic mutations, and optimistic concurrency control. Custom Resource code exists only for GARFEX business rules and projections.
 
-The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, and WU2b receipts remain historical truth. A pending WU2c corrects WU1 before WU3.
+The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, and WU2b receipts remain historical truth. Completed WU2c corrects WU1 before WU3; WU3 is next.
 
 Existing custom catalog-admin pagination remains outside this Resource rescope. No catalog-admin query, cursor, page result, cache, or consumer is authorized for rewrite here.
 
@@ -113,15 +113,17 @@ Convex indexes provide stable native traversal and native continuation. Therefor
 - the appended Resource backfill branch; and
 - Resource tests and generated model expectations.
 
+The schema keeps `adminSortId` as a clearly deprecated optional storage field temporarily because this execution cannot prove that every deployed row is free of WU1 metadata. It is inert residue only: no runtime write, query, index, backfill, or API contract depends on it.
+
 Safe populated-data rollout:
 
 1. audit whether WU1's optional Resource `adminSortId` reached a deployment;
 2. stop writes/backfill production of the field and remove all index dependencies;
-3. if stored values exist, use a bounded one-time WU2c cleanup over an existing Resource index to unset only that obsolete field, then verify zero remaining values;
-4. remove the optional schema field after cleanup is proven; and
+3. if stored values exist, run a bounded one-time operator cleanup over `recursos` using `porIdentificadorTecnico`, unsetting only `adminSortId` page by page, then independently verify zero remaining values;
+4. remove the optional schema field in a later tightening deployment only after that cleanup is proven; and
 5. never delete or rewrite Resource business data.
 
-The one-time cleanup, if needed, is migration hygiene for the already-authored WU1 field. It is not a pagination layer and must not be merged into the generic metadata backfill, whose Resource responsibility after correction is only `adminScopeKey` repair. WU1 runtime evidence claimed no successful deployment, but implementation must verify rather than assume deployment state.
+This WU2c records the cleanup/tightening boundary but does not add an executable cleanup helper: the generic metadata backfill remains scope-only, and no runtime path may depend on the obsolete field. WU1 runtime evidence claimed no successful deployment, but the active local dev session and any deployed rows cannot be treated as proof of absence.
 
 ### 5.3 Exact list index coverage
 
@@ -372,7 +374,7 @@ Full verification:
 ### Rollout
 
 1. Preserve W0/WU1/WU2a/WU2b receipts.
-2. WU2c audits deployment state, stops obsolete sort writes, corrects Resource indexes/search filters, repairs scope metadata, and safely removes obsolete Resource sort metadata.
+2. WU2c audited deployment state, stopped obsolete sort writes, corrected Resource indexes/search filters, repaired scope metadata, and safely retained obsolete Resource sort metadata as inert rollout residue where deployment absence could not be proven.
 3. Wait for corrected indexes/search index to become ready and complete scope repair.
 4. Deploy WU3 native list.
 5. Deploy WU4 native search.
@@ -397,7 +399,7 @@ Full verification:
 | WU1 | Complete history; partially superseded | catalog admin stack | recorded | corrected by WU2c; receipt unchanged |
 | WU2a | Complete history | WU1 | recorded | contracts/projections/detail helpers |
 | WU2b | Complete history | WU2a | recorded | validation/mapping seam |
-| WU2c | Pending | WU2b | 180 | Resource schema/backfill/write correction and focused tests |
+| WU2c | Complete | WU2b | 180 | Resource schema/backfill/write correction and focused tests |
 | WU3 | Pending | WU2c | 155 | native list export/tests |
 | WU4 | Pending | WU3 | 145 | native search export/tests |
 | WU5 | Pending | WU2a, WU2c | 120 | detail export/integration tests |
@@ -408,7 +410,7 @@ Full verification:
 
 Pending forecast is approximately 1,240 authored changed lines. Every pending unit is under 400; split before review if any approaches 350. Generated declarations are tracked separately.
 
-There are 48 implementation-owned TDD rows after adding WU2c: 16 completed historical rows and 32 pending rows. Two parent-owned gates remain pending, for 50 total task rows.
+There are 48 implementation-owned TDD rows after adding WU2c: 20 completed rows and 28 pending rows. Two parent-owned gates remain pending, for 50 total task rows.
 
 ## 13. Remaining product decisions
 

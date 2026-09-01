@@ -10,7 +10,7 @@ Strict TDD remains RED → GREEN → TRIANGULATE → REFACTOR. Every pending aut
 
 ## Historical evidence preservation
 
-W0, WU1, WU2a, and WU2b are completed historical units. Their checked rows below preserve what was implemented and verified at that time, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU2c is the explicit pending correction transaction and MUST complete before WU3.
+W0, WU1, WU2a, WU2b, and WU2c are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU3 is next.
 
 ## Review Workload Forecast
 
@@ -19,9 +19,9 @@ W0, WU1, WU2a, and WU2b are completed historical units. Their checked rows below
 | Pending authored estimate | Approximately 1,240 additions + deletions; generated declarations separate |
 | 400-line budget risk | High across the stack; low per current unit |
 | Delivery | `auto-chain`, stacked-to-main |
-| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c → WU3 → WU4 → WU5 → WU6 → WU7 → WU8 → WU9 |
-| Pending implementation rows | 32 |
-| Completed implementation rows | 16 |
+| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3 → WU4 → WU5 → WU6 → WU7 → WU8 → WU9 |
+| Pending implementation rows | 28 |
+| Completed implementation rows | 20 |
 | Parent rows | 2 pending |
 
 Decision needed before apply: No
@@ -64,16 +64,16 @@ Decision needed before apply: No
 - [x] **TRIANGULATE** — Prove all eight context/`ConvexError.data` cases, duplicate/required/forbidden/non-finite/invalid-type failures, excessive aggregate fan-out, safe limits, and legacy names, arguments, returns, and Spanish errors; focused command `pnpm exec vitest run convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoRecursos/validacionRecurso.test.ts convex/catalogoRecursos/recursos.test.ts`; full boundary `pnpm exec vitest run && pnpm typecheck && pnpm exec convex codegen --typecheck enable && git diff --check`; rollback removes only WU2b integration/tests while preserving stored data and legacy behavior; authored estimate: 45 lines. <!-- sdd-owner: implementation -->
 - [x] **REFACTOR** — Centralize domain-to-admin mapping behind the validation seam without parsing Spanish messages, and keep the legacy wrapper as the compatibility boundary; focused command `pnpm exec vitest run convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoRecursos/validacionRecurso.test.ts`; full boundary `pnpm exec vitest run && pnpm typecheck && git diff --check`; rollback reverts only WU2b refactoring; authored estimate: 25 lines. <!-- sdd-owner: implementation -->
 
-## Pending implementation work units
+## Implementation work units
 
 ### WU2c — Correct WU1 to native-first Resource indexes and metadata
 
-**Dependency:** completed WU1/WU2a/WU2b. **End state:** Resource pagination has no Unit/sort dependency; only `adminScopeKey` and equality-prefix-minimal scope indexes remain; the Resource backfill branch repairs scope only; the sole existing `MAX_RESOURCE_VALUES` definition remains authoritative. **Allowed edit surfaces:** `convex/schema.ts`, Resource-specific branches in `convex/catalogoAdmin/lib/backfillMetadatos.ts`, narrowly `convex/catalogoRecursos/recursos.ts`, focused tests, and CLI-generated declarations. Preserve non-Resource catalog-admin backfill behavior.
+**Dependency:** completed WU1/WU2a/WU2b. **End state:** Resource pagination has no Unit/sort dependency; only `adminScopeKey` and equality-prefix-minimal scope indexes remain; the Resource backfill branch repairs scope only; the sole existing `MAX_RESOURCE_VALUES` definition remains authoritative. **Allowed edit surfaces:** `convex/schema.ts`, Resource-specific branches in `convex/catalogoAdmin/lib/backfillMetadatos.ts`, narrowly `convex/catalogoRecursos/recursos.ts`, narrowly `convex/catalogoRecursos/validacionRecurso.ts` for the centralized constant import, WU2c focused tests, `openspec/changes/resource-master-administration/design.md` for rollout evidence, `openspec/changes/resource-master-administration/tasks.md` for WU2c metadata, `openspec/changes/resource-master-administration/apply-progress.md` for apply evidence, and CLI-generated declarations. Preserve non-Resource catalog-admin backfill behavior.
 
-- [ ] **RED** — Add failing schema/backfill/legacy tests proving Unit is absent from Resource search filters, sixteen Resource `adminPor*` sort indexes are rejected, equality-prefix coverage requires only `[adminScopeKey,tipoRecursoId,activo]` and `[adminScopeKey,activo]`, Resource backfill patches only scope, Resource writes do not require `adminSortId`, and one production `MAX_RESOURCE_VALUES` definition is imported; focused `pnpm exec vitest run convex/catalogoAdmin/lib/backfillMetadatos.test.ts convex/catalogoRecursos/recursos.test.ts`; rollback removes only WU2c tests; estimate 35 lines. <!-- sdd-owner: implementation -->
-- [ ] **GREEN** — Remove Resource Unit search filtering, sort-index/write/backfill dependencies, and obsolete `adminSortId` schema state using the safe populated-data sequence in `design.md`; retain `adminScopeKey`, preserve all prior catalog plans, and add exactly the two equality-prefix scope index shapes; run focused tests, codegen, and typecheck; rollback restores only the correction while never deleting business data; estimate 85 lines. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE** — Exercise all eight supported lifecycle/Type/scope combinations against schema prefix coverage, empty/populated scope repair, global/organization rows, legacy output, and optional bounded obsolete-field cleanup if deployment audit requires it; prove no Unit/sort dependency and no catalog-admin pagination change; full Vitest/typecheck/codegen/runtime-or-N/A; estimate 40 lines. <!-- sdd-owner: implementation -->
-- [ ] **REFACTOR** — Keep Resource scope derivation small, Resource backfill responsibility limited to `adminScopeKey`, and the centralized value limit imported by future units; remove temporary cleanup code only after rollout evidence permits; rollback reverts WU2c cleanup only; estimate 20 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add failing schema/backfill/legacy tests proving Unit is absent from Resource search filters, sixteen Resource `adminPor*` sort indexes are rejected, equality-prefix coverage requires only `[adminScopeKey,tipoRecursoId,activo]` and `[adminScopeKey,activo]`, Resource backfill patches only scope, Resource writes do not require `adminSortId`, and one production `MAX_RESOURCE_VALUES` definition is imported; focused `pnpm exec vitest run convex/catalogoAdmin/lib/backfillMetadatos.test.ts convex/catalogoRecursos/recursos.test.ts`; rollback removes only WU2c tests; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Remove Resource Unit search filtering, sort-index/write/backfill dependencies, and obsolete `adminSortId` schema state using the safe populated-data sequence in `design.md`; retain `adminScopeKey`, preserve all prior catalog plans, and add exactly the two equality-prefix scope index shapes; run focused tests, codegen, and typecheck; rollback restores only the correction while never deleting business data; estimate 85 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Exercise all eight supported lifecycle/Type/scope combinations against schema prefix coverage, empty/populated scope repair, global/organization rows, legacy output, and optional bounded obsolete-field cleanup if deployment audit requires it; prove no Unit/sort dependency and no catalog-admin pagination change; full Vitest/typecheck/codegen/runtime-or-N/A; estimate 40 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Keep Resource scope derivation small, Resource backfill responsibility limited to `adminScopeKey`, and the centralized value limit imported by future units; remove temporary cleanup code only after rollout evidence permits; rollback reverts WU2c cleanup only; estimate 20 lines. <!-- sdd-owner: implementation -->
 
 ### WU3 — Native paginated Resource summary list
 

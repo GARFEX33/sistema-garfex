@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Id, DataModel } from "../../_generated/dataModel";
 import schema from "../../schema";
+import { metadataPatch } from "./backfillMetadatos";
 
 const backfillReference = (internal as any).catalogoAdmin.lib.backfillMetadatos.backfillMetadatos;
+type ResourceIndexes = DataModel["recursos"]["indexes"];
+type ResourceIndexNames = keyof ResourceIndexes;
+type ObsoleteResourceIndex =
+  | "adminPorOrden" | "adminPorActivoYOrden" | "adminPorTipoYOrden" | "adminPorActivoYTipoYOrden"
+  | "adminPorUnidadYOrden" | "adminPorActivoYUnidadYOrden" | "adminPorScopeYOrden" | "adminPorActivoYScopeYOrden"
+  | "adminPorTipoYUnidadYOrden" | "adminPorActivoYTipoYUnidadYOrden" | "adminPorTipoYScopeYOrden" | "adminPorActivoYTipoYScopeYOrden"
+  | "adminPorUnidadYScopeYOrden" | "adminPorActivoYUnidadYScopeYOrden" | "adminPorTipoYUnidadYScopeYOrden" | "adminPorActivoYTipoYUnidadYScopeYOrden";
+type Assert<T extends true> = T;
+const resourceSchemaAssertions: [
+  Assert<Extract<ObsoleteResourceIndex, ResourceIndexNames> extends never ? true : false>,
+  Assert<ResourceIndexes["adminPorScopeYTipoYActivo"] extends ["adminScopeKey", "tipoRecursoId", "activo", "_creationTime"] ? true : false>,
+  Assert<ResourceIndexes["adminPorScopeYActivo"] extends ["adminScopeKey", "activo", "_creationTime"] ? true : false>,
+] = [true, true, true];
 const modules = {
   ...import.meta.glob("../../_generated/**/*.{ts,js}"),
   ...Object.fromEntries(Object.entries(import.meta.glob("./*.{ts,js}")).map(([path, module]) => [`../../catalogoAdmin/lib/${path.slice(2)}`, module])),
@@ -59,6 +73,13 @@ async function runToCompletion(t: ReturnType<typeof convexTest>, batchSize = 2) 
   return reports;
 }
 
+describe("derivación de metadatos WU2c", () => {
+  it("mantiene la única derivación de alcance sin producir sort metadata", () => {
+    expect(metadataPatch("recursos", { _id: "r1", organizacionId: "o1" })).toEqual({ adminScopeKey: "ORG:o1" });
+    expect(metadataPatch("recursos", { _id: "r1" })).toEqual({ adminScopeKey: "GLOBAL" });
+  });
+});
+
 describe("backfill de metadatos administrativos", () => {
   it("rellena metadatos opcionales en lotes reanudables y conserva datos", async () => {
     const t = convexTest(schema, modules);
@@ -94,7 +115,7 @@ describe("backfill de metadatos administrativos", () => {
     expect(duplicate[0].identity).toContain("D");
   });
 
-  it("es idempotente, admite tablas vacías y expone los índices administrativos", async () => {
+  it("es idempotente, admite tablas vacías y expone solo los índices Resource mínimos", async () => {
     const empty = convexTest(schema, modules);
     expect(await runToCompletion(empty, 3)).toEqual([]);
 
@@ -117,33 +138,45 @@ describe("backfill de metadatos administrativos", () => {
       await ctx.db.query("relacionesOpcionesAtributo").withIndex("porPoliticaYOpcionesNormalizadasYAdminSort").take(1);
       await ctx.db.query("reglasAtributoRecurso").withIndex("porTipoYCondicionYOpcionYAfectadoYAdminSort").take(1);
       await ctx.db.query("catalogoRevisiones").withIndex("porOrganizacionYEstadoYNumeroYAdminSort").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorTipoYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorUnidadYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYUnidadYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorTipoYUnidadYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYUnidadYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorTipoYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorUnidadYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYUnidadYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorTipoYUnidadYScopeYOrden").take(1);
-      await ctx.db.query("recursos").withIndex("adminPorActivoYTipoYUnidadYScopeYOrden").take(1);
+      await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYTipoYActivo").take(1);
+      await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYActivo").take(1);
+          await (ctx.db.query("recursos") as any).withIndex("porIdentificadorTecnico").take(1);
+          await (ctx.db.query("recursos") as any).withIndex("porActivo", (q: any) => q.eq("activo", true)).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("porTipo", (q: any) => q.eq("tipoRecursoId", "tipo")).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("porTipoYActivo", (q: any) => q.eq("tipoRecursoId", "tipo").eq("activo", true)).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYTipoYActivo", (q: any) => q.eq("adminScopeKey", "GLOBAL")).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYTipoYActivo", (q: any) => q.eq("adminScopeKey", "GLOBAL").eq("tipoRecursoId", "tipo")).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYActivo", (q: any) => q.eq("adminScopeKey", "GLOBAL").eq("activo", true)).take(1);
+          await (ctx.db.query("recursos") as any).withIndex("adminPorScopeYTipoYActivo", (q: any) => q.eq("adminScopeKey", "GLOBAL").eq("tipoRecursoId", "tipo").eq("activo", true)).take(1);
+
+
+
+
+      expect(resourceSchemaAssertions).toBeDefined();
+
+
+
+
+
+
+
+
+
+
+
+
+
     });
   });
 
-  it("rellena recursos con alcance determinista y reporta duplicados en lotes repetibles", async () => {
+  it("repara solo el alcance de recursos en lotes repetibles", async () => {
     const t = convexTest(schema, modules);
     const f = await seed(t);
     const organization = await t.run(async ctx => (await ctx.db.get(f.revision))!.organizacionId);
     const ids = await t.run(async ctx => {
       const globalId = await ctx.db.insert("recursos", {
         tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Global", descripcion: "Preservar", activo: false, revision: 4,
-        adminSortId: "incorrecto", adminScopeKey: "ORG:incorrecta",
+        adminSortId: "legacy-sort", adminScopeKey: "ORG:incorrecta",
       });
       const orgId = await ctx.db.insert("recursos", {
         tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "R-1", nombre: "Organización", activo: false, revision: 8, organizacionId: organization,
@@ -162,18 +195,21 @@ describe("backfill de metadatos administrativos", () => {
     const reports = await runToCompletion(t, 1);
     const resourceReport = reports.filter((report): report is { table: string; identity: string; ids: string[] } =>
       typeof report === "object" && report !== null && (report as { table?: string }).table === "recursos");
-    expect(resourceReport).toEqual(expect.arrayContaining([
-      { table: "recursos", identity: "GLOBAL|R-1", ids: [ids.globalId, ids.globalDuplicate].sort() },
-      { table: "recursos", identity: `ORG:${organization}|R-1`, ids: [ids.orgId, ids.orgDuplicate].sort() },
-    ]));
+    expect(resourceReport).toEqual([]);
+
+
+
     const rows = await t.run(async ctx => ({ global: await ctx.db.get(ids.globalId), organization: await ctx.db.get(ids.orgId) }));
-    expect(rows.global).toMatchObject({ adminSortId: ids.globalId, adminScopeKey: "GLOBAL", tipoRecursoId: f.tipo, unidadId: f.unidad, nombre: "Global", descripcion: "Preservar", activo: false, revision: 4 });
-    expect(rows.organization).toMatchObject({ adminSortId: ids.orgId, adminScopeKey: `ORG:${organization}`, activo: false, revision: 8 });
+    expect(rows.global).toMatchObject({ adminSortId: "legacy-sort", adminScopeKey: "GLOBAL", tipoRecursoId: f.tipo, unidadId: f.unidad, nombre: "Global", descripcion: "Preservar", activo: false, revision: 4 });
+    expect(rows.organization).toMatchObject({ adminScopeKey: `ORG:${organization}`, activo: false, revision: 8 });
     const duplicates = await t.run(async ctx => ({ global: await ctx.db.get(ids.globalDuplicate), organization: await ctx.db.get(ids.orgDuplicate) }));
-    expect(duplicates.global).toMatchObject({ adminSortId: ids.globalDuplicate, adminScopeKey: "GLOBAL" });
-    expect(duplicates.organization).toMatchObject({ adminSortId: ids.orgDuplicate, adminScopeKey: `ORG:${organization}` });
+    expect(duplicates.global).toMatchObject({ adminScopeKey: "GLOBAL" });
+        expect(duplicates.global).not.toHaveProperty("adminSortId");
+    expect(duplicates.organization).toMatchObject({ adminScopeKey: `ORG:${organization}` });
+        expect(duplicates.organization).not.toHaveProperty("adminSortId");
     const repeatedReports = (await runToCompletion(t, 1)).filter((report): report is { table: string; identity: string; ids: string[] } =>
       typeof report === "object" && report !== null && (report as { table?: string }).table === "recursos");
-    expect(repeatedReports).toEqual(resourceReport);
+    expect(repeatedReports).toEqual([]);
+
   });
 });

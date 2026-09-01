@@ -216,7 +216,7 @@ export const crearRecurso = mutation({
       organizacionId: args.organizacionId,
       identidadVersion: args.organizacionId === undefined ? undefined : 1,
     });
-    await ctx.db.patch(recursoId, deriveResourceMetadata({ _id: recursoId, organizacionId: args.organizacionId }));
+    await ctx.db.patch(recursoId, deriveResourceMetadata({ organizacionId: args.organizacionId }));
     if (args.organizacionId !== undefined)
       await registrarAlias(ctx, { organizacionId: args.organizacionId, recursoId, version: 1, clave: identificadorTecnico });
     for (const item of args.valores)
