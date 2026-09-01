@@ -6,7 +6,7 @@ export type AgregadoInput = {
   effective: boolean;
   hierarchy: { typeId: string; familyId: string; classId: string; familyOfTypeId: string; classOfFamilyId: string };
   principalUnits: Array<{ active: boolean; unitActive: boolean; principal?: boolean }>;
-  presentationPolicies: Array<{ active: boolean; tokenCount: number }>;
+  presentationPolicies: Array<{ active: boolean; tokenCount: number; violations?: AggregateViolation[] }>;
   deferredChecks?: Array<{ status: AggregateStatus; violations?: AggregateViolation[] }>;
 };
 
@@ -23,6 +23,7 @@ export function validarAgregado(input: AgregadoInput): ResultadoAgregado {
   const presentations = input.presentationPolicies.filter(policy => policy.active);
   if (presentations.length !== 1) violations.push({ code: "PRESENTATION_COUNT", detail: `expected one active presentation, got ${presentations.length}` });
   if (presentations.some(policy => policy.tokenCount < 1)) violations.push({ code: "PRESENTATION_TOKEN_INVALID" });
+  for (const policy of presentations) violations.push(...(policy.violations ?? []));
   for (const check of input.deferredChecks ?? []) violations.push(...(check.violations ?? []));
   const deferred = (input.deferredChecks ?? []).some(check => check.status === "NOT_EVALUATED");
   return { status: violations.length ? "INVALID" : deferred ? "NOT_EVALUATED" : "VALID", violations };
