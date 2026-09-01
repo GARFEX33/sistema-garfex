@@ -2,7 +2,7 @@ import type { Id, Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { identidadRecurso as identidadDominio } from "../../src/catalogoRecursos/dominio/identidadRecurso";
 import { validarRecurso as validarDominio } from "../../src/catalogoRecursos/dominio/validarRecurso";
-import type { Atributo, CatalogoSnapshot, EntradaRecurso, Opcion, Definicion, ValorEntrada as ValorDominio } from "../../src/catalogoRecursos/dominio/tipos";
+import type { Atributo, CatalogoSnapshot, EntradaRecurso, Opcion, Definicion, ValorEntrada as ValorDominio, ResultadoDominio } from "../../src/catalogoRecursos/dominio/tipos";
 
 export type ValorEntrada = Omit<ValorDominio, "atributoRecursoId" | "opcionAtributoId"> & {
   atributoRecursoId: Id<"atributosRecurso">;
@@ -19,6 +19,14 @@ export type CrearRecursoEntrada = Omit<EntradaRecurso, "claseRecursoId" | "famil
 };
 
 type AtributoValidado = Doc<"atributosRecurso"> & { definicion: Doc<"definicionesAtributo"> };
+
+export const MAX_RESOURCE_VALUES = 200;
+
+/** Pure, bounded evaluation seam; unlike validarRecurso it never throws. */
+export function evaluarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecurso, limit = MAX_RESOURCE_VALUES): ResultadoDominio | { ok: false; code: "RESOURCE_VALUE_LIMIT_EXCEEDED" } {
+  if (entrada.valores.length > limit) return { ok: false, code: "RESOURCE_VALUE_LIMIT_EXCEEDED" };
+  return validarDominio(snapshot, entrada);
+}
 
 const mensajes: Record<string, string> = {
   JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA: "Jerarquía o unidad inexistente/inactiva",
