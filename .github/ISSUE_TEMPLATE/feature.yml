@@ -1,0 +1,71 @@
+name: Feature or change delivery
+description: Propose an approved feature or change for delivery
+title: ""
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem-need
+    attributes:
+      label: Problem/need
+      description: What problem or need should this change address?
+      placeholder: Describe the problem, need, or opportunity.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-outcome
+    attributes:
+      label: Proposed outcome
+      description: What observable outcome should the change deliver?
+      placeholder: Describe the desired result.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included, and what is explicitly out of scope?
+      placeholder: List the boundaries of the proposed work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: What conditions must be met for this change to be accepted?
+      placeholder: List concrete, verifiable criteria.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification-plan
+    attributes:
+      label: Verification plan
+      description: How will the outcome and acceptance criteria be verified?
+      placeholder: Describe tests, checks, or other verification.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: delivery-strategy
+    attributes:
+      label: Delivery strategy
+      description: Choose the intended PR delivery strategy.
+      options:
+        - Single PR
+        - Stacked to main
+        - Feature branch chain
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context, references, or constraints.
+      placeholder: Optional supporting information.
+    validations:
+      required: false
