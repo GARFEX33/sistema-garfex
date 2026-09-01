@@ -4,7 +4,7 @@
 
 Implement the additive `api.catalogoAdmin.recursos` surface with native Convex pagination, search, reactivity, generated types, atomic mutations, and optimistic concurrency control. Custom Resource code exists only for GARFEX business rules and projections.
 
-The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, WU2b, WU3a, WU3b, WU4, and WU5 receipts remain historical truth. WU6a records the thin mutation/base-validation slice and WU6b records the corrected scope and boundary slice; WU7 is next and depends on both.
+The prior Resource design is superseded where it required `AdminPage`, cursor envelopes/hashes, list/search plans, order/version tokens, `adminSortId`, Unit filtering, manual page accumulation, or a custom cache. Completed W0, WU1, WU2a, WU2b, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, and WU7b receipts remain historical truth. WU8 is next and depends on both WU7 slices.
 
 Existing custom catalog-admin pagination remains outside this Resource rescope. No catalog-admin query, cursor, page result, cache, or consumer is authorized for rewrite here.
 
@@ -264,7 +264,7 @@ Convex aborts all writes on any throw. OCC retries conflicting transactions; aft
 
 1. load Resource or `ADMIN_NOT_FOUND`;
 2. compare `expectedRevision` before no-op or domain work;
-3. enforce immutable echoes/boundaries;
+3. enforce immutable echoes/boundaries; optional echoes for Type, resolved Class/Family, organization scope, active lifecycle, and derived technical identity must match the stored/current values or fail with `ADMIN_IMMUTABLE_FIELD`;
 4. bounded-load stored values using centralized `MAX_RESOURCE_VALUES`;
 5. build and validate the complete candidate;
 6. return `UNCHANGED` only if the valid normalized candidate equals stored state;
@@ -364,12 +364,15 @@ Every pending unit follows RED → GREEN → TRIANGULATE → REFACTOR and remain
 - cross-scope duplicate, alias collision, active/inactive organization, injected alias/value-write, concurrent-equivalent, publication non-mutation, and legacy compatibility final-state evidence;
 - dedicated focused surface `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`.
 
-### WU7–WU8 mutations
+### WU7a/WU7b update mutations
 
-- GARFEX validation, revision, immutable, identity, alias, and lifecycle rules;
-- final database state after every failure;
-- concurrent-equivalent externally visible outcome under OCC;
-- no tests coupled to retry count, compensating writes, custom locks, or internal transaction choreography.
+- WU7a covers revision-first validation, normalized no-op, mutable replacement, exact 0/200/201 value sets, and one revision increment;
+- WU7b covers matching/changed immutable echoes for Type, resolved Class/Family, organization scope, active lifecycle, and derived technical identity;
+- both slices cover identity/alias rules and final database state after every failure, including ineffective catalog and invalid aggregate;
+- catalog revisions, snapshots, publication data, and aliases remain unchanged unless the Resource update itself succeeds;
+- no tests are coupled to retry count, compensating writes, custom locks, or internal transaction choreography.
+
+WU8 depends on both WU7a and WU7b and remains outside this apply.
 
 ### WU9 generated consumer
 
@@ -430,15 +433,16 @@ Full verification:
 | WU5 | Complete history | WU2a, WU2c | 120 | detail export/integration tests |
 | WU6a | Complete historical slice | WU2b, WU5 | 260 | thin create mutation/base validation and persistence |
 | WU6b | Complete historical correction | WU6a | 270 | scope correction, dedicated boundaries, and final-state tests |
-| WU7 | Pending; next | WU6a + WU6b | 210 | update export/orchestration/tests |
-| WU8 | Pending | WU7 | 145 | lifecycle exports/tests |
+| WU7a | Complete | WU6a + WU6b | 348 authored (337 additions + 11 deletions) | revision-first update/base replacement and focused tests |
+| WU7b | Complete | WU7a | 330 authored (292 additions + 38 deletions) | immutable echoes, ordering, final-state tests, and evidence |
+| WU8 | Pending | WU7a + WU7b | 145 | lifecycle exports/tests |
 | WU9 | Pending | WU3a, WU3b, WU4–WU8 | 110 authored | generated consumer fixture/package exposure/docs |
 
-Current pending authored forecast is approximately 675 lines across WU7–WU9. WU6a is approximately 260 and WU6b approximately 270 authored changed lines, each below the 400-line review budget. Generated declarations are tracked separately. The two WU6 slices are historical checked work; WU7 is the next unchecked implementation unit. Two parent-owned gates remain pending.
+Current pending authored forecast is approximately 255 lines across WU8–WU9. WU6a, WU6b, WU7a, and WU7b are completed slices, each below the 400-line review budget; WU7a is 348 authored changed lines (337 additions + 11 deletions) and WU7b is 330 authored changed lines (292 additions + 38 deletions) by the staged/worktree split. Generated declarations are tracked separately. WU8 is the next unchecked implementation unit and depends on both WU7 slices. Two parent-owned gates remain pending.
 
 ### WU6 review boundary reconciliation
 
-The verifier-recommended split is retained without exception: WU6a contains the base implementation, first dedicated scenarios, and 37 generated lines; WU6b contains the one-line global-scope fix, remaining dedicated boundary tests, and final documentation. Each review slice stays below 400 changed lines, and generated output remains separately identified from authored accounting.
+The verifier-recommended split is retained without exception: WU6a and WU6b remain historical create slices; WU7a contains revision-first update/base replacement; WU7b contains immutable echoes, ordering, and final-state boundaries. WU7a is 348 authored changed lines (337 additions + 11 deletions) and WU7b is 330 authored changed lines (292 additions + 38 deletions) by the intended parent hunk split; generated output remains separately identified. Each review slice stays below 400 changed lines.
 
 ## 13. Remaining product decisions
 

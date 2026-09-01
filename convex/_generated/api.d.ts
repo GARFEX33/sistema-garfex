@@ -2215,10 +2215,12 @@ export declare const api: {
         "mutation",
         "public",
         {
+          activo?: boolean;
           claseRecursoId?: Id<"clasesRecurso">;
           descripcion?: string;
           expectedRevision: number;
           familiaRecursoId?: Id<"familiasRecurso">;
+          identificadorTecnico?: string;
           nombre?: string;
           ownership?:
             | { kind: "GLOBAL" }

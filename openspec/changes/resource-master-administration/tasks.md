@@ -10,26 +10,26 @@ Strict TDD remains RED → GREEN → TRIANGULATE → REFACTOR. Every pending aut
 
 ## Historical evidence preservation
 
-W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, and WU6b are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU7 is next and pending.
+W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, and WU7b are completed units. Their checked rows below preserve what was implemented and verified, including WU1's now-superseded sixteen-index/Unit/sort design. Do not uncheck or reinterpret those rows. WU8 is next and depends on both WU7 slices.
 
 ## Review Workload Forecast
 
 | Field | Value |
 |---|---|
-| Pending authored estimate | Approximately 465 additions + deletions across pending WU7–WU9; generated declarations separate |
-| 400-line budget risk | High across the stack; low per current unit; WU3a ~319, WU3b ~152, WU6a ~260, WU6b ~270, no exception |
+| Pending authored estimate | Approximately 255 additions + deletions across pending WU8–WU9; generated declarations separate |
+| 400-line budget risk | High across the completed stack; low per pending unit; WU8 ~145 and WU9 ~110, no exception |
 | Delivery | `auto-chain`, stacked-to-main |
-| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 ✓ → WU5 ✓ → WU6a ✓ → WU6b ✓ → WU7 (next/pending) → WU8 → WU9 |
-| Implementation rows | 56 total: 44 checked, 12 unchecked |
+| Sequence | W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c ✓ → WU3a ✓ → WU3b ✓ → WU4 ✓ → WU5 ✓ → WU6a ✓ → WU6b ✓ → WU7a ✓ → WU7b ✓ → WU8 → WU9 |
+| Implementation rows | 60 total: 52 checked, 8 unchecked |
 | Parent rows | 2 total: 0 checked, 2 unchecked |
-| Total rows | 58 |
+| Total rows | 62 |
 
 Decision needed before apply: No
 Chained PRs recommended: Yes
 Chain strategy: stacked-to-main
 400-line budget risk: High
 
-Verifier-recommended review split: WU6a is the base implementation plus first dedicated scenarios plus 37 generated lines; WU6b is the one-line global-scope fix plus remaining dedicated boundary tests plus final documentation. Each slice stays below 400 changed lines, with no size exception.
+Verifier-recommended review split: WU6a and WU6b remain historical slices. WU7a contains revision-first update/base replacement; WU7b contains immutable echoes, ordering, and final-state boundaries. Each intended slice stays below 400 lines, with no size exception.
 
 ## Completed historical work units
 
@@ -134,18 +134,27 @@ Verifier-recommended review split: WU6a is the base implementation plus first de
 - [x] **TRIANGULATE** — Run the dedicated and integration focused suites and confirm global organization-owned rows do not block global creation, while inactive duplicates do block their own scope; estimate 55 lines. <!-- sdd-owner: implementation -->
 - [x] **REFACTOR** — Record the split, honest evidence, generated separation, and below-400 intended review boundary; rollback reverts only the WU6b scope correction/tests/evidence; estimate 30 lines. <!-- sdd-owner: implementation -->
 
-### WU7 — Thin revision-first administrative update
+### WU7a — Revision-first update and base replacement
 
-**Dependency:** WU6a and WU6b. **End state:** one Convex mutation checks revision first, validates a complete candidate, and atomically replaces mutable aggregate state. **Allowed edit surfaces:** Resource admin mutation, persistence/validation helpers, validators, focused tests, generated declarations.
+**Dependency:** WU6a and WU6b. **End state:** one Convex mutation checks revision first, validates a complete candidate, and atomically replaces the mutable Resource/value set. **Allowed edit surfaces:** Resource admin mutation, persistence/validation helpers, focused update tests, and generated declarations. **Actual authored split count:** 348 changed lines (337 additions + 11 deletions); generated declarations are separate.
 
-- [x] **RED** — Add tests for missing/stale-first behavior, valid no-op, mutable fields, immutable classification/ownership/identity/lifecycle, current ineffective catalog, inactive duplicates, alias preservation, and final aggregate state after each failure; estimate 45 lines. <!-- sdd-owner: implementation -->
-- [x] **GREEN** — Implement revision-first candidate construction/validation, no-op after validation, bounded identity check, atomic value replacement and one revision patch; import the shared value limit and rely on Convex transaction rollback; estimate 115 lines. <!-- sdd-owner: implementation -->
-- [x] **TRIANGULATE** — Verify stale beats no-op/business validation, invalid equal candidate is not unchanged, organization identity cannot drift, material revision increments once, and every failed final state equals the prior aggregate; full verification and runtime-or-N/A; estimate 35 lines. <!-- sdd-owner: implementation -->
-- [x] **REFACTOR** — Centralize candidate equality/immutable reporting without adding transaction choreography or retry coupling; rollback removes admin update only; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [x] **RED** — Add failing tests for missing/stale-first behavior, valid normalized no-op, mutable fields, exact 0/200/201 value replacement sets, invalid values, and persisted candidate equality; estimate 45 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Implement revision-first candidate construction/validation, no-op only after validation, bounded identity check, atomic value replacement, and one revision patch; import the shared value limit and rely on Convex transaction rollback; estimate 115 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Verify stale beats no-op and invalid candidates, invalid semantically equal candidates fail, material success increments exactly once, and persisted Resource/value state is exact; full verification and runtime-or-N/A; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Keep candidate equality and replacement as thin business seams without transaction choreography or retry coupling; rollback removes only the update/base-replacement slice; estimate 15 lines. <!-- sdd-owner: implementation -->
+
+### WU7b — Immutable echoes, ordering, and final-state boundaries
+
+**Dependency:** WU7a. **End state:** update accepts only matching optional immutable echoes for Type, resolved Class/Family, organization scope, active lifecycle, and derived technical identity; changed echoes fail before mutation, and every failure preserves the complete aggregate. **Allowed edit surfaces:** Resource admin mutation, focused update/persistence tests, validators only when required for the argument contract, generated declarations, and change evidence. **Actual authored split count:** 330 changed lines (292 additions + 38 deletions); generated declarations are separate.
+
+- [x] **RED** — Add failing tests for matching/changed immutable echoes, stale-first precedence over immutable/catalog/invalid work, ineffective catalog/aggregate, inactive/global duplicate collisions, organization identity drift, alias preservation, and publication/catalog snapshot non-mutation; estimate 45 lines. <!-- sdd-owner: implementation -->
+- [x] **GREEN** — Add only the necessary active-lifecycle and derived-identity echo arguments, enforce all immutable boundaries while keeping matching echoes valid, preserve aliases, and retain one thin native Convex mutation; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE** — Assert Resource/value/alias final state after every failure, global identity collision behavior, organization scope preservation, no catalog revision/snapshot/publication mutation, and the no-lock/no-retry/no-compensation source boundary; full verification and runtime-or-N/A; estimate 50 lines. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR** — Record the corrected split, truthful generated separation, and actionable rollback boundary while keeping WU8 dependent on both WU7 slices; estimate 20 lines. <!-- sdd-owner: implementation -->
 
 ### WU8 — Thin revision-guarded lifecycle mutations
 
-**Dependency:** WU7. **End state:** activation/deactivation use one Convex mutation each, current-revision idempotence, and GARFEX effective-state rules. **Allowed edit surfaces:** Resource admin mutation/helpers/tests, catalog blocker regression tests only if needed, generated declarations.
+**Dependency:** WU7a and WU7b. **End state:** activation/deactivation use one Convex mutation each, current-revision idempotence, and GARFEX effective-state rules. **Allowed edit surfaces:** Resource admin mutation/helpers/tests, catalog blocker regression tests only if needed, generated declarations.
 
 - [ ] **RED** — Add lifecycle tests for missing/stale/current same-state, exactly-one revision increment, activation against effective/inert/invalid state, deactivation preservation, blocker visibility, and final state after failures; estimate 35 lines. <!-- sdd-owner: implementation -->
 - [ ] **GREEN** — Implement thin activate/deactivate mutations with revision-first handling; activation validates bounded current aggregate and identity, deactivation patches only state/revision; rely on native atomicity/OCC; estimate 75 lines. <!-- sdd-owner: implementation -->
@@ -164,4 +173,4 @@ Verifier-recommended review split: WU6a is the base implementation plus first de
 ## Parent-owned post-apply gates
 
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
-- [ ] After verification, confirm all 56 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 60 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
