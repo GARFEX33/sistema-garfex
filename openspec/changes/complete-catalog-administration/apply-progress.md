@@ -565,3 +565,57 @@ The following exact unchecked task lines remain persisted and are deferred to la
 
 - Native status remains `applyState: ready` because later implementation tasks remain; final verification is blocked pending parent lifecycle approval.
 - `nextRecommended: parent-lifecycle`; parent owns verification, receipts, delivery gates, and settle actions.
+
+# Apply progress — W7
+
+## Status consumed and boundary
+
+- Native status: `spec-driven`, `openspec` authoritative, `applyState: ready`; change `complete-catalog-administration` and all proposal/spec/design/tasks artifacts present.
+- `actionContext.mode`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Active attempt continued with native token `sha256:6b3c6d427f8a7bcef84e93f15b15d802ee709918a6722f946a9a2d0876ff7209`; bound to 2 attempts / 380 changed lines. Workload gate was resolved `Decision needed before apply: No`, chained `stacked-to-main`; W7 stayed below the 400-line review boundary.
+
+## TDD Cycle Evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | Added pure precedence and Convex lifecycle tests, then ran the focused command before implementation | Expected failures: missing resolver/admin module |
+| GREEN | `pnpm exec vitest run src/catalogoRecursos/dominio/unidadesEfectivas.test.ts convex/catalogoAdmin/unidades.test.ts` | PASS — 2 files, 6 tests |
+| TRIANGULATE | Focused W7 tests plus `cargarAgregado`, aggregate, hierarchy, catalog, resource, and publication regression tests | PASS — 6 files, 75 tests |
+| TRIANGULATE full | `pnpm exec vitest run` | PASS — 21 files, 159 tests |
+| Typecheck | `pnpm typecheck` | PASS — `tsc --noEmit` |
+| Codegen | `pnpm exec convex codegen --typecheck enable` | PASS — generated API binding includes `catalogoAdmin/unidades` |
+| Runtime | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account |
+| REFACTOR/hygiene | `git diff --check` | PASS — no whitespace errors |
+
+## Completed tasks and persisted checkboxes
+
+- W7 RED, GREEN, TRIANGULATE, and REFACTOR are marked `- [x]` in `tasks.md`; the persisted tasks file was re-read after the update.
+- Unit commands provide create/detail/list/update/activate/deactivate with immutable global keys, normalized descriptive fields, revisions, and active-resource/numeric/principal blockers.
+- Policy commands provide create/detail/list/update/activate/deactivate with immutable references, duplicate identity reservation across lifecycle states, ownership checks, bounded indexed reads, and selected/shadowed/suppressed diagnostics.
+- `resolverUnidadesEfectivas` is the single pure Type-over-Family precedence implementation: inactive Type overrides suppress inheritance per Unit while unrelated Family Units continue to inherit.
+- Aggregate loading now uses the resolver before principal counting, preserving W6 effective hierarchy and bounded-row behavior; active aggregate failures remain transactional through Convex mutations.
+
+## Files and rollback boundary
+
+- Added `convex/catalogoAdmin/unidades.ts`, `convex/catalogoAdmin/unidades.test.ts`, `src/catalogoRecursos/dominio/unidadesEfectivas.ts`, and `src/catalogoRecursos/dominio/unidadesEfectivas.test.ts`.
+- Updated `convex/catalogoAdmin/lib/cargarAgregado.ts`, generated `convex/_generated/api.d.ts`, this progress record, and only W7 task checkbox rows.
+- Authored W7 diff is approximately 237 changed lines before this progress record, below the 380-attempt and 400-review-line limits; generated changes are derived only.
+- Rollback boundary: remove the W7 unit/policy module and pure resolver/tests, revert the W7 aggregate-loader selection change and generated binding through normal codegen, and restore only the four W7 checkbox flips; retain schema metadata, stored rows, and W6 hierarchy APIs.
+
+## Deviations and remaining work
+
+- No schema change was needed because W2 already supplied the required unit-policy indexes and optional sort metadata.
+- `validarComando.ts` remains outside the explicitly allowed W7 surfaces; validation is kept in the module over the shared pure resolver and W6 loader hook.
+- Next unchecked implementation rows remain W8, beginning exactly with:
+  - [ ] **RED** — Add failing Convex tests for nonnumeric Unit references, wrong-type options, duplicate definition/option identities including inactive rows, immutable owners, stale/no-op lifecycle, effective dependency blockers, and default ALL lists; evidence is focused RED failures, focused command `pnpm exec vitest run convex/catalogoAdmin/atributos.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove W8 tests, estimate 30 authored lines. <!-- sdd-owner: implementation -->
+  - [ ] **GREEN** — Implement definition and option create/detail/list/update/activate/deactivate commands in `convex/catalogoAdmin/atributos.ts` with indexed filters and reference validation; acceptance evidence is all ownership/type/identity/lifecycle scenarios passing with no hard delete, focused command `pnpm exec vitest run convex/catalogoAdmin/atributos.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove definition/option exports and W8-specific logic, estimate 54 authored lines. <!-- sdd-owner: implementation -->
+  - [ ] **TRIANGULATE** — Integrate dependency checks against active assignments/rules/presentation/compatibility/resource values and verify inactive/parent-inert options never affect public behavior; acceptance evidence is focused/full pass, `pnpm typecheck`, codegen, and runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `pnpm exec vitest run convex/catalogoAdmin/atributos.test.ts convex/catalogoRecursos/recursos.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove W8 integration only, estimate 30 authored lines. <!-- sdd-owner: implementation -->
+  - [ ] **REFACTOR** — Share definition/option reference validators and stable scope ordering; acceptance evidence is unchanged coded errors and generated output only from codegen, focused command `pnpm exec vitest run convex/catalogoAdmin/atributos.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback revert W8 refactor, estimate 16 authored lines. <!-- sdd-owner: implementation -->
+- Parent-owned lifecycle rows remain unchanged and deferred byte-for-byte:
+  - [ ] After apply, collect ordinary SDD status evidence by running `sdd-verify`, `pnpm exec vitest run`, `pnpm typecheck`, `git diff --check`, and `git status --short` over `convex/catalogoAdmin/**`, `convex/schema.ts`, `src/catalogoRecursos/**`, `convex/_generated/*`, and `contract-tests/**`; acceptance evidence is the recorded command/status output, including runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the verification/status record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+  - [ ] After post-apply verification, confirm the lifecycle gate in `openspec/changes/complete-catalog-administration/tasks.md`; acceptance evidence is all RED/GREEN/TRIANGULATE/REFACTOR results recorded, no authored work unit exceeds 400 changed lines, and every rollback boundary remains actionable, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the lifecycle decision record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+
+## Status produced
+
+- Native artifact status remains `applyState: ready` because W8–W16 implementation tasks remain; `verify` remains blocked pending parent lifecycle approval.
+- `nextRecommended: parent-lifecycle`; no review, receipt, validation actor, commit, stage, push, PR, or delivery gate was started by this executor. The provider attempt settlement returned `complete` after the passed runtime evidence.
