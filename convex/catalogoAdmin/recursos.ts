@@ -1,14 +1,17 @@
 import { paginationOptsValidator, paginationResultValidator, type PaginationResult } from "convex/server";
-import { v, type Infer } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { query } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { resourceDetailValidator, resourceSummaryValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
-import { adminInvalidArgument } from "./lib/errors";
+import { resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
+import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference } from "./lib/errors";
 import { cargarAgregado } from "./lib/cargarAgregado";
 import { loadResourceValuesBounded, projectResourceDetail } from "./lib/recursoDetalle";
 import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
-import { lifecycleFilterValidator } from "./validators";
+import { lifecycleFilterValidator, createResultValidator } from "./validators";
+import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarRecursoAdministrativo } from "./lib/recursoPersistencia";
+import { derivarIdentidadRecurso, validarRecursoAdministrativo, type CrearRecursoEntrada } from "../catalogoRecursos/validacionRecurso";
+import { mapResourceValidationFailure } from "./lib/recursoValidacion";
 
 const resourceScopeValidator = v.union(
   v.object({ kind: v.literal("ALL") }),
@@ -78,6 +81,86 @@ async function summaryForResource(ctx: QueryCtx, resource: Doc<"recursos">): Pro
 
 function projectResourcePage(ctx: QueryCtx, page: Doc<"recursos">[]): Promise<ResourceSummary[]> {
   return Promise.all(page.map((resource) => summaryForResource(ctx, resource)));
+}
+
+function normalizeAdminText(value: string): string {
+  return value.normalize("NFC").trim().replace(/\s+/gu, " ");
+}
+
+export const crearRecurso = mutation({
+  args: {
+    claseRecursoId: v.id("clasesRecurso"),
+    familiaRecursoId: v.id("familiasRecurso"),
+    tipoRecursoId: v.id("tiposRecurso"),
+    unidadId: v.id("unidades"),
+    nombre: v.string(),
+    descripcion: v.optional(v.string()),
+    valores: v.array(resourceValueInputValidator),
+    ownership: resourceOwnershipInputValidator,
+  },
+  returns: createResultValidator(resourceSummaryValidator),
+  handler: async (ctx, args) => {
+    const nombre = normalizeAdminText(args.nombre);
+    if (nombre.length === 0) adminInvalidArgument({ field: "nombre", reason: "must not be blank after normalization" });
+    const descripcion = args.descripcion === undefined ? undefined : normalizeAdminText(args.descripcion);
+    const organizacionId = args.ownership.kind === "ORGANIZATION" ? args.ownership.organizacionId : undefined;
+    const resourceEntity = { kind: "tiposRecurso" as const, id: args.tipoRecursoId };
+
+    if (organizacionId !== undefined) {
+      const organizacion = await ctx.db.get(organizacionId);
+      if (!organizacion || !organizacion.activo) {
+        adminInvalidReference({ entityKind: "recursos", field: "organizacionId", reference: { kind: "organizaciones", id: organizacionId }, reason: "RESOURCE_ORGANIZATION_MISSING_OR_INACTIVE" });
+      }
+    }
+
+    const entrada: CrearRecursoEntrada = {
+      claseRecursoId: args.claseRecursoId,
+      familiaRecursoId: args.familiaRecursoId,
+      tipoRecursoId: args.tipoRecursoId,
+      unidadId: args.unidadId,
+      nombre,
+      ...(descripcion === undefined ? {} : { descripcion }),
+      valores: args.valores,
+    };
+    const validacion = await validarRecursoAdministrativo(ctx, entrada);
+    if (!validacion.ok) throw new ConvexError(mapResourceValidationFailure(validacion.code, resourceEntity));
+
+    const aggregate = await cargarAgregado(ctx, args.tipoRecursoId);
+    if (!aggregate.effective) {
+      adminInvalidReference({ entityKind: "recursos", field: "classification", reference: resourceEntity, reason: "RESOURCE_CATALOG_NOT_EFFECTIVE" });
+    }
+    if (aggregate.status !== "VALID") {
+      const violations = aggregate.violations.length > 0
+        ? aggregate.violations.map(violation => ({ ...violation, entity: resourceEntity, field: "catalog" }))
+        : [{ code: "ASSIGNMENT_SELECTION_INVALID" as const, entity: resourceEntity, field: "catalog", detail: "effective aggregate was not evaluated" }];
+      adminAggregateIncomplete({ entity: resourceEntity, violations });
+    }
+
+    const identificadorTecnico = await derivarIdentidadRecurso(ctx, validacion.value, args.valores);
+    const duplicate = await buscarRecursoPorIdentidad(ctx, { organizacionId, identificadorTecnico });
+    if (duplicate) adminDuplicateKey({ entityKind: "recursos", normalizedIdentity: identificadorTecnico, scope: deriveScopeKey(organizacionId) });
+    if (organizacionId !== undefined) {
+      const alias = await buscarAliasExacto(ctx, { organizacionId, version: 1, clave: identificadorTecnico });
+      if (alias) adminConflict({ entity: resourceEntity, conflictKind: "resource-alias", conflictingEntity: { kind: "identidadesRecurso", id: alias._id }, normalizedIdentity: identificadorTecnico });
+    }
+
+    const recursoId = await insertarRecursoAdministrativo(ctx, {
+      tipoRecursoId: args.tipoRecursoId,
+      unidadId: args.unidadId,
+      identificadorTecnico,
+      nombre,
+      descripcion,
+      ownership: { organizacionId },
+      valores: args.valores,
+    });
+    const recurso = await ctx.db.get(recursoId);
+    if (!recurso) throw new Error("Resource disappeared after insertion");
+    return { disposition: "CREATED" as const, item: await summaryForResource(ctx, recurso) };
+  },
+});
+
+function deriveScopeKey(organizacionId: Id<"organizaciones"> | undefined): string {
+  return organizacionId === undefined ? "GLOBAL" : `ORG:${organizacionId}`;
 }
 
 export const listarRecursosResumen = query({

@@ -2252,6 +2252,43 @@ export declare const api: {
           splitCursor?: string | null;
         }
       >;
+      crearRecurso: FunctionReference<
+        "mutation",
+        "public",
+        {
+          claseRecursoId: Id<"clasesRecurso">;
+          descripcion?: string;
+          familiaRecursoId: Id<"familiasRecurso">;
+          nombre: string;
+          ownership:
+            | { kind: "GLOBAL" }
+            | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+          tipoRecursoId: Id<"tiposRecurso">;
+          unidadId: Id<"unidades">;
+          valores: Array<{
+            atributoRecursoId: Id<"atributosRecurso">;
+            opcionAtributoId?: Id<"opcionesAtributo">;
+            valor: string | number | boolean;
+          }>;
+        },
+        {
+          disposition: "CREATED";
+          item: {
+            activo: boolean;
+            classificationStatus: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            id: Id<"recursos">;
+            identificadorTecnico: string;
+            nombre: string;
+            organizacionId?: Id<"organizaciones">;
+            revision: number;
+            tipoRecursoId: Id<"tiposRecurso">;
+            unidadId: Id<"unidades">;
+          };
+        }
+      >;
       listarRecursosResumen: FunctionReference<
         "query",
         "public",

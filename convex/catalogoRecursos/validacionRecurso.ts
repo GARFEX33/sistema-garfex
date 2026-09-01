@@ -2,7 +2,7 @@ import type { Id, Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { identidadRecurso as identidadDominio } from "../../src/catalogoRecursos/dominio/identidadRecurso";
 import { validarRecurso as validarDominio } from "../../src/catalogoRecursos/dominio/validarRecurso";
-import type { Atributo, CatalogoSnapshot, EntradaRecurso, Opcion, Definicion, ValorEntrada as ValorDominio, ResultadoDominio } from "../../src/catalogoRecursos/dominio/tipos";
+import type { Aplicabilidad, Atributo, CatalogoSnapshot, EntradaRecurso, FalloValidacion, Opcion, Definicion, ValorEntrada as ValorDominio, ResultadoDominio } from "../../src/catalogoRecursos/dominio/tipos";
 import { MAX_RESOURCE_VALUES } from "../catalogoAdmin/resourceValidators";
 
 export type ValorEntrada = Omit<ValorDominio, "atributoRecursoId" | "opcionAtributoId"> & {
@@ -20,6 +20,14 @@ export type CrearRecursoEntrada = Omit<EntradaRecurso, "claseRecursoId" | "famil
 };
 
 type AtributoValidado = Doc<"atributosRecurso"> & { definicion: Doc<"definicionesAtributo"> };
+export type RecursoValidado = {
+  clase: Doc<"clasesRecurso">;
+  familia: Doc<"familiasRecurso">;
+  tipo: Doc<"tiposRecurso">;
+  atributos: Map<Id<"definicionesAtributo">, AtributoValidado>;
+  byAttr: Map<Id<"atributosRecurso">, ValorEntrada>;
+  aplicabilidad: Map<string, Aplicabilidad>;
+};
 
 /** Pure, bounded evaluation seam; unlike validarRecurso it never throws. */
 export function evaluarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecurso, limit = MAX_RESOURCE_VALUES): ResultadoDominio | { ok: false; code: "RESOURCE_VALUE_LIMIT_EXCEEDED" } {
@@ -50,17 +58,20 @@ function entradaDominio(entrada: CrearRecursoEntrada): EntradaRecurso {
   };
 }
 
-export async function validarRecurso(ctx: MutationCtx, entrada: CrearRecursoEntrada) {
+export async function validarRecurso(ctx: MutationCtx, entrada: CrearRecursoEntrada): Promise<RecursoValidado> {
   const snapshot = await cargarSnapshot(ctx, entrada);
   const resultado = validarDominio(snapshot, entradaDominio(entrada));
   if (!resultado.ok) throw new Error(mensajes[resultado.code]);
+  return construirRecursoValidado(snapshot, resultado, entrada);
+}
+
+function construirRecursoValidado(snapshot: SnapshotConDocumentos, resultado: Extract<ResultadoDominio, { ok: true }>, entrada: CrearRecursoEntrada): RecursoValidado {
   const clase = snapshot.claseOriginal;
   const familia = snapshot.familiaOriginal;
   const tipo = snapshot.tipoOriginal;
   const unidad = snapshot.unidadOriginal;
   if (!clase || !familia || !tipo || !unidad)
     throw new Error(mensajes.JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA);
-
   const atributos = new Map<Id<"definicionesAtributo">, AtributoValidado>();
   for (const [definicionId, atributo] of resultado.value.atributos) {
     const original = snapshot.atributosOriginales.get(atributo.id);
@@ -74,6 +85,17 @@ export async function validarRecurso(ctx: MutationCtx, entrada: CrearRecursoEntr
     byAttr: new Map(entrada.valores.map(v => [v.atributoRecursoId, v])),
     aplicabilidad: resultado.value.aplicabilidad,
   };
+}
+
+export type ResultadoRecursoAdministrativo =
+  | { ok: true; value: RecursoValidado }
+  | { ok: false; code: FalloValidacion | "RESOURCE_VALUE_LIMIT_EXCEEDED" };
+
+export async function validarRecursoAdministrativo(ctx: MutationCtx, entrada: CrearRecursoEntrada): Promise<ResultadoRecursoAdministrativo> {
+  const snapshot = await cargarSnapshot(ctx, entrada);
+  const resultado = evaluarRecurso(snapshot, entradaDominio(entrada), MAX_RESOURCE_VALUES);
+  if (!resultado.ok) return resultado;
+  return { ok: true, value: construirRecursoValidado(snapshot, resultado, entrada) };
 }
 
 type SnapshotConDocumentos = CatalogoSnapshot & {
@@ -114,6 +136,17 @@ async function cargarSnapshot(ctx: MutationCtx, entrada: CrearRecursoEntrada): P
     reglas: reglas.map(r => ({ id: id(r._id), activo: r.activo, atributoCondicionId: id(r.atributoCondicionId), opcionCondicionId: r.opcionCondicionId === undefined ? undefined : id(r.opcionCondicionId), atributoAfectadoId: id(r.atributoAfectadoId), aplicabilidad: r.aplicabilidad })),
     opciones: opciones.map(o => ({ id: id(o._id), activo: o.activo, definicionAtributoId: id(o.definicionAtributoId), clave: o.clave })),
   };
+}
+
+export async function derivarIdentidadRecurso(ctx: MutationCtx, validado: RecursoValidado, valores: ValorEntrada[]): Promise<string> {
+  const definiciones = new Map<Id<"definicionesAtributo">, { clave: string }>();
+  for (const atributo of validado.atributos.values()) definiciones.set(atributo.definicionAtributoId, atributo.definicion);
+  const opciones = new Map<Id<"opcionesAtributo">, { clave: string }>();
+  for (const value of valores) if (value.opcionAtributoId) {
+    const option = await ctx.db.get(value.opcionAtributoId);
+    if (option) opciones.set(value.opcionAtributoId, option);
+  }
+  return identidadRecurso(validado.tipo, validado.familia, validado.clase, validado.atributos, validado.byAttr, definiciones, opciones);
 }
 
 export function identidadRecurso(tipo: { clave: string }, familia: { clave: string }, clase: { clave: string }, atributos: Map<Id<"definicionesAtributo">, { _id: Id<"atributosRecurso">; definicionAtributoId: Id<"definicionesAtributo">; participaIdentidad: boolean }>, valores: Map<Id<"atributosRecurso">, ValorEntrada>, definiciones: Map<Id<"definicionesAtributo">, { clave: string }>, opciones: Map<Id<"opcionesAtributo">, { clave: string }>) {
