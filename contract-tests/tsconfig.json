@@ -8,5 +8,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["./catalog-admin-consumer.ts"]
+  "include": ["./catalog-admin-consumer.ts", "./resource-admin-consumer.ts"]
 }
