@@ -682,3 +682,60 @@ Prior codegen under active development emitted native CLI download/upload messag
 - Current worktree accounting against `HEAD` for the three tracked OpenSpec files is `apply-progress.md +106/-5`, `design.md +30/-11`, and `tasks.md +28/-13`; this includes preserved historical evidence already present in the worktree. The dedicated test is untracked at 227 total lines, with the correction hunk limited to the assertion block above.
 - Recommended parent staging hunk boundary: `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`, immediately after `expect(result.item.nombre).toBe("With value");` and before the existing `valoresAtributoRecurso` assertion.
 - Rollback boundary: remove only the added dedicated assertions and the WU6a/WU6b documentation/evidence reconciliation; do not alter product behavior, generated files, parent lifecycle state, or stored data.
+
+## WU7 Apply Evidence — `sdd-apply-wu7`
+
+### Structured status consumed
+
+- Native status was authoritative OpenSpec status for `resource-master-administration`: `applyState: ready`, `nextRecommended: apply`, proposal/specs/design/tasks/apply-progress present, `artifactStore: openspec`, and no blocked reasons.
+- Action context was `repo-local` with workspace `/home/garfex/PROGRAMACION/sistema-garfex` and that workspace as the allowed edit root.
+- The active native attempt was continued with token `sha256:ec3115027bb82f832bf1c8a59af3210283001af95261051f8d1ce57bd9ebe582`; no second attempt was acquired.
+- Workload gate was consumed from `tasks.md`: `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, and `400-line budget risk: High` across the stack but low for WU7. WU7 remained the only implementation slice applied; authored review accounting is below 400 lines and no size exception was used.
+- Skill resolution: `paths-injected`; all five parent-injected skill paths were read before implementation.
+
+### Completed WU7 tasks and persisted checkbox updates
+
+- WU7 RED, GREEN, TRIANGULATE, and REFACTOR rows were marked `[x]` in `openspec/changes/resource-master-administration/tasks.md` immediately after completion.
+- RED added missing/stale-first, normalized no-op, invalid-equal, immutable, identity, duplicate, value-bound, alias, and final-state tests.
+- GREEN added the thin `actualizarRecurso` mutation, revision-first checks, complete candidate validation, bounded identity lookup, atomic replacement helper, and one Resource revision patch.
+- TRIANGULATE covered stale precedence, mutable changes, global identity changes, organization identity drift, inactive duplicate reservation, aliases, 0/200/201 value boundaries, replacement rollback, no partial state, and revision increments.
+- REFACTOR kept candidate equality and aggregate validation in small seams without locks, retries, compensating writes, caches, coordinators, or publication writes.
+
+### TDD Cycle Evidence
+
+| Cycle | Evidence |
+|---|---|
+| RED | `pnpm typecheck` failed because the generated admin API did not yet expose `actualizarRecurso`; the focused test suite also recorded the missing surface before implementation. |
+| GREEN | `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts` passed after implementation and generated API exposure; focused WU7 tests passed. |
+| TRIANGULATE | Four-file focused suite passed with 135 tests, including final Resource/value/alias snapshots after failures and native transaction rollback. |
+| REFACTOR | Full suite and both typechecks passed after consolidating validators/imports and isolating the update/value-replacement seams. |
+
+### Verification and accounting
+
+- Focused command: `pnpm exec vitest run convex/catalogoAdmin/recursos.test.ts convex/catalogoAdmin/lib/recursoPersistencia.test.ts convex/catalogoAdmin/lib/recursoValidacion.test.ts convex/catalogoRecursos/recursos.test.ts` — 4 files, 135 tests passed.
+- Full command: `pnpm exec vitest run` — 35 files, 317 tests passed.
+- Typechecks: `pnpm typecheck` passed; `pnpm typecheck:consumer` passed.
+- Generated verification: `pnpm exec convex codegen --typecheck enable` passed. `convex/_generated/api.d.ts` changed by CLI only, with 39 generated additions; hash remained stable across the post-codegen check (`5a084a82d712f39ce0fab033ec4e270d46f8521ab6c5baad3f5d54ab82d14c62`).
+- Diff verification: `git diff --check` passed.
+- Authored WU7 diff accounting: 276 additions plus 7 deletions across the update mutation, persistence helper, and tests; generated declaration accounting is separate and excluded. The authored review unit is below 400 lines.
+- Runtime boundary: no `convex dev --once` or active development stop was run; no runtime evidence is claimed. Codegen was run as explicitly requested and did not mutate Resource data.
+- Changed allowed surfaces: `convex/catalogoAdmin/recursos.ts`, `convex/catalogoAdmin/recursos.test.ts`, `convex/catalogoAdmin/lib/recursoPersistencia.ts`, `convex/catalogoAdmin/lib/recursoPersistencia.test.ts`, `convex/_generated/api.d.ts`, and this apply-progress/task metadata.
+- Rollback boundary: remove the WU7 admin update export, replacement helper, generated API output through normal codegen after reverting the source export, and WU7 tests; preserve all Resource, value, alias, catalog, publication, and legacy data/contracts.
+- Minor test-harness adjustment: bounded the existing search source assertion at the search endpoint so it does not inspect later WU7 mutation code; no product behavior changed.
+
+### Remaining work
+
+WU8, WU9, and both parent-owned lifecycle gates remain unchecked and deferred to the parent lifecycle. Exact unchecked task lines currently remaining in `tasks.md` are:
+
+- [ ] **RED** — Add lifecycle tests for missing/stale/current same-state, exactly-one revision increment, activation against effective/inert/invalid state, deactivation preservation, blocker visibility, and final state after failures; estimate 35 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement thin activate/deactivate mutations with revision-first handling; activation validates bounded current aggregate and identity, deactivation patches only state/revision; rely on native atomicity/OCC; estimate 75 lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Verify current versus stale same-state, failed activation remains unchanged, values/aliases/catalog/publication remain preserved, and blockers observe active state; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Reuse revision/effective-validation seams and remove any transaction/cache/retry abstraction; estimate 10 lines. <!-- sdd-owner: implementation -->
+- [ ] **RED** — Add a consumer fixture using generated references, `FunctionArgs`, `FunctionReturnType`, `Id<"recursos">`, direct `usePaginatedQuery` list/search calls, native results/status/load-more, detail, seven functions, dispositions, and `AdminErrorData`; assert no Unit/token/DTO/adapter/cache; estimate 25 lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Add only required package exposure and regenerate through Convex codegen; make the fixture compile without backend imports, manual DTOs, page adapters, or duplicated validation; estimate 40 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Run complete legacy Resource suite and generated contract fixture; narrow `AdminErrorData` by discriminant, typecheck every new function/result/page/detail/ID, verify no excluded operation is exported, confirm generated declarations match source, and record rollout order plus runtime evidence; estimate 30 lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Keep exports limited to generated Convex/API/data-model/error contracts and concise consumer documentation; rollback removes fixture/export/docs after API exports; estimate 15 authored lines. <!-- sdd-owner: implementation -->
+- [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 56 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+
+Next recommended action: `parent-lifecycle`. `sdd-apply` does not start review, refutation, correction, validation, or delivery actors and does not create or approve receipts.

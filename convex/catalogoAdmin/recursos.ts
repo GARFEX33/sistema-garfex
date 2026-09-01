@@ -3,13 +3,13 @@ import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
-import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference } from "./lib/errors";
+import { MAX_RESOURCE_VALUES, resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
+import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference, adminImmutableField, adminInvalidState, adminNotFound, adminStaleRevision } from "./lib/errors";
 import { cargarAgregado } from "./lib/cargarAgregado";
 import { loadResourceValuesBounded, projectResourceDetail } from "./lib/recursoDetalle";
 import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
-import { lifecycleFilterValidator, createResultValidator } from "./validators";
-import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarRecursoAdministrativo } from "./lib/recursoPersistencia";
+import { lifecycleFilterValidator, createResultValidator, changeResultValidator } from "./validators";
+import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarRecursoAdministrativo, reemplazarValoresRecurso } from "./lib/recursoPersistencia";
 import { derivarIdentidadRecurso, validarRecursoAdministrativo, type CrearRecursoEntrada } from "../catalogoRecursos/validacionRecurso";
 import { mapResourceValidationFailure } from "./lib/recursoValidacion";
 
@@ -250,5 +250,121 @@ export const obtenerDetalleRecurso = query({
       },
       valores,
     });
+  },
+});
+
+function resourceValuesEqual(left: Array<{ atributoRecursoId: Id<"atributosRecurso">; valor: string | number | boolean; opcionAtributoId?: Id<"opcionesAtributo"> }>, right: Array<{ atributoRecursoId: Id<"atributosRecurso">; valor: string | number | boolean; opcionAtributoId?: Id<"opcionesAtributo"> }>): boolean {
+  if (left.length !== right.length) return false;
+  const ordered = (values: typeof left) => [...values].sort((a, b) => String(a.atributoRecursoId).localeCompare(String(b.atributoRecursoId)));
+  const rightOrdered = ordered(right);
+  return ordered(left).every((value, index) => {
+    const other = rightOrdered[index];
+    return value.atributoRecursoId === other.atributoRecursoId && value.valor === other.valor && value.opcionAtributoId === other.opcionAtributoId;
+  });
+}
+
+async function validateCurrentResourceAggregate(ctx: QueryCtx, tipoRecursoId: Id<"tiposRecurso">, entity: { kind: "recursos"; id: Id<"recursos"> }): Promise<void> {
+  const aggregate = await cargarAgregado(ctx, tipoRecursoId);
+  if (!aggregate.effective) adminInvalidReference({ entityKind: "recursos", field: "classification", reference: { kind: "tiposRecurso", id: tipoRecursoId }, reason: "RESOURCE_CATALOG_NOT_EFFECTIVE" });
+  if (aggregate.status !== "VALID") {
+    const violations = aggregate.violations.length > 0
+      ? aggregate.violations.map(violation => ({ ...violation, entity, field: "catalog" }))
+      : [{ code: "ASSIGNMENT_SELECTION_INVALID" as const, entity, field: "catalog", detail: "effective aggregate was not evaluated" }];
+    adminAggregateIncomplete({ entity, violations });
+  }
+}
+
+export const actualizarRecurso = mutation({
+  args: {
+    recursoId: v.id("recursos"),
+    expectedRevision: v.number(),
+    claseRecursoId: v.optional(v.id("clasesRecurso")),
+    familiaRecursoId: v.optional(v.id("familiasRecurso")),
+    tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    unidadId: v.optional(v.id("unidades")),
+    nombre: v.optional(v.string()),
+    descripcion: v.optional(v.string()),
+    valores: v.optional(v.array(resourceValueInputValidator)),
+    ownership: v.optional(resourceOwnershipInputValidator),
+  },
+  returns: changeResultValidator(resourceSummaryValidator),
+  handler: async (ctx, args) => {
+    const actual = await ctx.db.get(args.recursoId);
+    const entity = { kind: "recursos" as const, id: args.recursoId };
+    if (!actual) adminNotFound({ entity });
+    if (!Number.isInteger(args.expectedRevision) || args.expectedRevision <= 0) {
+      adminInvalidArgument({ field: "expectedRevision", reason: "must be a positive integer" });
+    }
+    if (actual!.revision !== args.expectedRevision) {
+      adminStaleRevision({ entity, expectedRevision: args.expectedRevision, currentRevision: actual!.revision });
+    }
+
+    const tipo = await ctx.db.get(actual!.tipoRecursoId);
+    const familia = tipo ? await ctx.db.get(tipo.familiaRecursoId) : null;
+    const clase = familia ? await ctx.db.get(familia.claseRecursoId) : null;
+    if (!tipo || !familia || !clase) {
+      adminInvalidReference({ entityKind: "recursos", field: "classification", reference: { kind: "tiposRecurso", id: actual!.tipoRecursoId }, reason: "RESOURCE_HIERARCHY_OR_UNIT_INVALID" });
+    }
+    if (args.claseRecursoId !== undefined && args.claseRecursoId !== clase!._id) adminImmutableField({ entity, field: "claseRecursoId" });
+    if (args.familiaRecursoId !== undefined && args.familiaRecursoId !== familia!._id) adminImmutableField({ entity, field: "familiaRecursoId" });
+    if (args.tipoRecursoId !== undefined && args.tipoRecursoId !== actual!.tipoRecursoId) adminImmutableField({ entity, field: "tipoRecursoId" });
+    const currentOwnership = actual!.organizacionId === undefined
+      ? { kind: "GLOBAL" as const }
+      : { kind: "ORGANIZATION" as const, organizacionId: actual!.organizacionId };
+    if (args.ownership !== undefined && (args.ownership.kind !== currentOwnership.kind || (args.ownership.kind === "ORGANIZATION" && args.ownership.organizacionId !== currentOwnership.organizacionId))) {
+      adminImmutableField({ entity, field: "ownership" });
+    }
+
+    if (actual!.organizacionId !== undefined) {
+      const organization = await ctx.db.get(actual!.organizacionId);
+      if (!organization || !organization.activo) {
+        adminInvalidReference({ entityKind: "recursos", field: "organizacionId", reference: { kind: "organizaciones", id: actual!.organizacionId }, reason: "RESOURCE_ORGANIZATION_MISSING_OR_INACTIVE" });
+      }
+    }
+    const previousValues = await loadResourceValuesBounded(ctx, actual!._id);
+    const candidateValues = args.valores === undefined
+      ? previousValues.map(({ atributoRecursoId, valor, opcionAtributoId }) => ({ atributoRecursoId, valor, ...(opcionAtributoId === undefined ? {} : { opcionAtributoId }) }))
+      : args.valores;
+    if (candidateValues.length > MAX_RESOURCE_VALUES) {
+      adminInvalidState({ entity, field: "valores", reason: "RESOURCE_VALUE_LIMIT_EXCEEDED: maximum 200 rows", violations: [{ code: "RESOURCE_VALUE_LIMIT_EXCEEDED", entity, field: "valores", count: candidateValues.length, detail: "maximum 200 rows" }] });
+    }
+    const candidate: CrearRecursoEntrada = {
+      claseRecursoId: clase!._id,
+      familiaRecursoId: familia!._id,
+      tipoRecursoId: actual!.tipoRecursoId,
+      unidadId: args.unidadId ?? actual!.unidadId,
+      nombre: args.nombre === undefined ? actual!.nombre : normalizeAdminText(args.nombre),
+      descripcion: args.descripcion === undefined ? actual!.descripcion : normalizeAdminText(args.descripcion),
+      valores: candidateValues,
+    };
+    if (candidate.nombre.length === 0) adminInvalidArgument({ field: "nombre", reason: "must not be blank after normalization" });
+    const validacion = await validarRecursoAdministrativo(ctx, candidate);
+    if (!validacion.ok) throw new ConvexError(mapResourceValidationFailure(validacion.code, entity));
+    await validateCurrentResourceAggregate(ctx, actual!.tipoRecursoId, entity);
+
+    if (candidate.nombre === actual!.nombre && candidate.descripcion === actual!.descripcion && candidate.unidadId === actual!.unidadId && resourceValuesEqual(candidate.valores, previousValues)) {
+      return { disposition: "UNCHANGED" as const, item: await summaryForResource(ctx, actual!) };
+    }
+
+    const identificadorTecnico = await derivarIdentidadRecurso(ctx, validacion.value, candidate.valores);
+    if (actual!.organizacionId !== undefined && identificadorTecnico !== actual!.identificadorTecnico) {
+      adminImmutableField({ entity, field: "identificadorTecnico" });
+    }
+    if (identificadorTecnico !== actual!.identificadorTecnico) {
+      const duplicate = await buscarRecursoPorIdentidad(ctx, { organizacionId: actual!.organizacionId, identificadorTecnico });
+      if (duplicate && duplicate._id !== actual!._id) adminDuplicateKey({ entityKind: "recursos", normalizedIdentity: identificadorTecnico, scope: deriveScopeKey(actual!.organizacionId) });
+    }
+
+    await reemplazarValoresRecurso(ctx, actual!._id, previousValues, candidate.valores);
+    await ctx.db.patch(actual!._id, {
+      unidadId: candidate.unidadId,
+      identificadorTecnico,
+      nombre: candidate.nombre,
+      ...(candidate.descripcion === undefined ? {} : { descripcion: candidate.descripcion }),
+      revision: actual!.revision + 1,
+    });
+    const updated = await ctx.db.get(actual!._id);
+    if (!updated) throw new Error("Resource disappeared after update");
+    return { disposition: "UPDATED" as const, item: await summaryForResource(ctx, updated) };
   },
 });

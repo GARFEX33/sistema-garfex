@@ -2,7 +2,7 @@ import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { registrarAlias, resolverAlias } from "../../catalogoRecursos/identidadesRecurso";
 import { deriveResourceMetadata } from "./backfillMetadatos";
-import type { ResourceValueInput } from "../resourceValidators";
+import type { ResourceValue, ResourceValueInput } from "../resourceValidators";
 
 type Ownership = { organizacionId?: Id<"organizaciones"> };
 
@@ -69,4 +69,22 @@ export async function insertarRecursoAdministrativo(
     });
   }
   return recursoId;
+}
+
+/** Replace the bounded Resource value set inside the caller's Convex transaction. */
+export async function reemplazarValoresRecurso(
+  ctx: MutationCtx,
+  recursoId: Id<"recursos">,
+  anteriores: ResourceValue[],
+  valores: ResourceValueInput[],
+): Promise<void> {
+  for (const anterior of anteriores) await ctx.db.delete(anterior._id);
+  for (const valor of valores) {
+    await ctx.db.insert("valoresAtributoRecurso", {
+      recursoId,
+      atributoRecursoId: valor.atributoRecursoId,
+      valor: valor.valor,
+      ...(valor.opcionAtributoId === undefined ? {} : { opcionAtributoId: valor.opcionAtributoId }),
+    });
+  }
 }
