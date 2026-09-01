@@ -4,7 +4,7 @@ import { api } from "../../_generated/api";
 import schema from "../../schema";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { insertarRecursoAdministrativo } from "./recursoPersistencia";
+import { insertarRecursoAdministrativo, reemplazarValoresRecurso } from "./recursoPersistencia";
 
 const generatedModules = (import.meta as ImportMeta & {
   glob: (pattern: string) => Record<string, () => Promise<unknown>>;
@@ -225,3 +225,14 @@ describe("recursoPersistencia / crearRecurso", () => {
     }))).toMatchObject({ resources: 1, revisions: [], snapshots: [] });
   });
 });
+
+    describe("recursoPersistencia / WU7 replacement", () => {
+      it("rolls back a failed replacement without changing prior values", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedFixture(t);
+        const recursoId = await t.run(async ctx => ctx.db.insert("recursos", { tipoRecursoId: fixture.tipo, unidadId: fixture.unidad, identificadorTecnico: "existing", nombre: "Existing", activo: false, revision: 1 }));
+        const old = await t.run(async ctx => ctx.db.insert("valoresAtributoRecurso", { recursoId, atributoRecursoId: fixture.attribute, valor: "old" }));
+        await expect(t.run(async ctx => reemplazarValoresRecurso(ctx as never, recursoId, [await ctx.db.get(old) as never], [{ atributoRecursoId: fixture.attribute, valor: undefined } as never]))).rejects.toThrow();
+        await expect(t.run(async ctx => ctx.db.get(old))).resolves.toMatchObject({ recursoId, valor: "old" });
+      });
+    });

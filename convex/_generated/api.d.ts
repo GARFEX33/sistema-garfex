@@ -2211,6 +2211,45 @@ export declare const api: {
       >;
     };
     recursos: {
+      actualizarRecurso: FunctionReference<
+        "mutation",
+        "public",
+        {
+          claseRecursoId?: Id<"clasesRecurso">;
+          descripcion?: string;
+          expectedRevision: number;
+          familiaRecursoId?: Id<"familiasRecurso">;
+          nombre?: string;
+          ownership?:
+            | { kind: "GLOBAL" }
+            | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+          recursoId: Id<"recursos">;
+          tipoRecursoId?: Id<"tiposRecurso">;
+          unidadId?: Id<"unidades">;
+          valores?: Array<{
+            atributoRecursoId: Id<"atributosRecurso">;
+            opcionAtributoId?: Id<"opcionesAtributo">;
+            valor: string | number | boolean;
+          }>;
+        },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
+          item: {
+            activo: boolean;
+            classificationStatus: {
+              reasons: Array<string>;
+              state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+            };
+            id: Id<"recursos">;
+            identificadorTecnico: string;
+            nombre: string;
+            organizacionId?: Id<"organizaciones">;
+            revision: number;
+            tipoRecursoId: Id<"tiposRecurso">;
+            unidadId: Id<"unidades">;
+          };
+        }
+      >;
       buscarRecursosResumen: FunctionReference<
         "query",
         "public",
