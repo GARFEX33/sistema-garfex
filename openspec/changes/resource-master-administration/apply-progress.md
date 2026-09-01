@@ -6,14 +6,14 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `WU8 complete; WU9 next` |
-| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, WU7b, WU8` |
-| Current work unit | `WU8 — lifecycle gate corrections complete` |
+| Apply state | `Implementation complete; parent verification next` |
+| Historical completion | `W0, WU1, WU2a, WU2b, WU2c, WU3a, WU3b, WU4, WU5, WU6a, WU6b, WU7a, WU7b, WU8, WU9` |
+| Current work unit | `WU9 — native React contract complete` |
 | Delivery | `stacked-to-main` |
 | Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending parent lifecycle after WU8` |
+| Parent decision gate | `Pending post-apply verification and lifecycle acceptance` |
 
-WU3a native query/tests, WU3b's real installed React-hook correction, WU4 native search, WU5 direct bounded detail, the corrected WU6a/WU6b slices, WU7a/WU7b, and WU8 are complete. Existing historical receipts remain preserved. WU9 is next; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
+All implementation work units W0–WU9 are complete. Existing historical receipts remain preserved; the current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts. The two parent-owned verification/lifecycle rows remain intentionally unchecked.
 
 OpenSpec CLI remains absent in this environment; it was not installed or used.
 
@@ -836,5 +836,43 @@ Next recommended action: `parent-lifecycle`. `sdd-apply` does not start review, 
 - [ ] **GREEN** — Add only required package exposure and regenerate through Convex codegen; make the fixture compile without backend imports, manual DTOs, page adapters, or duplicated validation; estimate 40 lines. <!-- sdd-owner: implementation -->
 - [ ] **TRIANGULATE** — Typecheck every native query/mutation shape, run full legacy Resource regressions, verify generated declarations match source, and confirm existing catalog-admin pagination was not changed; full verification and runtime-or-N/A; estimate 30 lines. <!-- sdd-owner: implementation -->
 - [ ] **REFACTOR** — Keep exports limited to generated Convex/API/data-model/error contracts and concise consumer documentation; rollback removes fixture/export/docs after API exports; estimate 15 lines. <!-- sdd-owner: implementation -->
+- [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
+- [ ] After verification, confirm all 60 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
+
+## WU9 Apply Evidence — generated native React contract and regressions
+
+### Structured status consumed and produced
+
+- Consumed authoritative native status for `resource-master-administration`: OpenSpec, `applyState: ready`, `nextRecommended: apply`, all required proposal/spec/design/tasks/apply-progress artifacts present, and no blocked reasons.
+- Action context was `repo-local` at `/home/garfex/PROGRAMACION/sistema-garfex`, with the repository root as the allowed edit root and no edit-root warning. The workload forecast was `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: stacked-to-main`, and `400-line budget risk: High` across the completed stack; this execution remained the assigned WU9 slice.
+- Continued the active native attempt with token `sha256:63e5cef46d6befac01bf8699005572e22c853fbd6c95021d1cfaad2c646895dc`; no second attempt was created.
+- Produced status after task persistence: 60 completed implementation rows and 2 unchecked parent-owned rows. Parent lifecycle remains `parent-lifecycle`; no review, receipt, validation, delivery, or archive actor was started.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence |
+|---|---|
+| RED | `pnpm typecheck:consumer` failed with one deliberate incompatible generated-summary assertion (`TS2322`); fixture construction errors were corrected before the confirming RED rerun. |
+| GREEN | `pnpm typecheck:consumer` passed after replacing the deliberate incompatible assertion with the generated `Summary` type. |
+| TRIANGULATE | `pnpm exec vitest run convex/catalogoRecursos/recursos.test.ts` passed: 1 file, 38 tests. Full `pnpm exec vitest run` passed: 35 files, 334 tests. `pnpm typecheck` and `pnpm typecheck:consumer` passed. |
+| REFACTOR | Consumer typecheck, full Vitest, backend typecheck, and `git diff --check` passed after native list/search state inspection and README cleanup. |
+
+### Implementation and accounting
+
+- `contract-tests/resource-admin-consumer.ts` now imports the installed `convex/react` `usePaginatedQuery`, `useQuery`, and `useMutation`, generated API/data-model exports, `FunctionArgs`, `FunctionReturnType`, native `PaginationResult`, and `AdminErrorData`. It directly covers list/search native pages and hook status/results/loadMore, bounded detail diagnostics and values, Resource IDs/revisions, all four mutations, `CREATED`/`UPDATED`/`UNCHANGED`, all generated mutation arguments, all generated ADMIN error discriminants, and legacy Resource references.
+- Type-level exclusions prove no Unit, custom cursor/envelope, plan, order/version token, DTO, adapter, cache, or backend implementation import is present. Existing `package.json` static exports and `convex.json` required no change; existing catalog-admin pagination files were not changed.
+- `contract-tests/README.md` documents direct native consumption and pins the private backend to `ee560ea4904f81bae46a700d0157ddaa93a35192`. Codegen/hash comparison ran `pnpm exec convex codegen --typecheck enable`; `api.d.ts` stayed `103334a0b4856a068347aba0ba55763b1e3214e699f5fa812f80a35552b0a717` and `dataModel.d.ts` stayed `9a8b61204ae45f57599118e070485b5a11ad2329ea7304259e0d63303c0f15f1`.
+- Authored WU9 implementation/doc/task diff is **270 changed lines** (233 additions + 37 deletions), below 400. Generated declaration diff is **0 lines** and remains CLI-owned. No package/config/generated declaration edit was required.
+- Runtime boundary: no `convex dev` lifecycle command was started, stopped, or restarted, and no data operation was intentionally run. The requested codegen command reported Convex's `Uploading functions to Convex` step; this deployment interaction is recorded as a risk rather than claimed as runtime smoke evidence. Active development was not stopped.
+- Rollback boundary: remove only the WU9 consumer fixture, README contract example, and WU9 checkbox/evidence metadata; revert generated output only through normal codegen after API exports are reverted. Preserve all backend APIs, stored data, legacy Resource behavior, and existing catalog-admin pagination.
+
+### Remaining work
+
+- Parent-owned lifecycle actions remain deferred and must stay unchecked: `After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in apply-progress.md; rollback is evidence-only.`
+- Parent-owned post-verification acceptance remains deferred: `After verification, confirm all 60 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance.`
+- Exact persisted-task re-read confirms only those two parent rows are unchecked; all four WU9 implementation rows are visibly `[x]`.
+
+### Exact unchecked task lines after WU9
+
 - [ ] After apply, collect focused/full/runtime evidence, generated-versus-authored accounting, WU2c deployment audit/cleanup result, native list/search traversal, final-state mutation failures, legacy compatibility, and unchanged catalog-admin pagination in `apply-progress.md`; rollback is evidence-only. <!-- sdd-owner: parent -->
 - [ ] After verification, confirm all 60 implementation rows have evidence, every pending authored unit remained below 400 lines, generated output is separate, WU2c preceded WU3a/WU3b, no Resource custom pagination/cache/Unit filter exists, and every rollback boundary is actionable; keep this gate unchecked until parent acceptance. <!-- sdd-owner: parent -->
