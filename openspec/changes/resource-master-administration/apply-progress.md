@@ -6,15 +6,16 @@
 |---|---|
 | Change | `resource-master-administration` |
 | Artifact store | `openspec` |
-| Apply state | `planning completed; apply pending — not ready` |
-| Current work unit | `W0` |
+| Apply state | `native-first artifact rescope complete; WU2c correction pending before further product work` |
+| Historical completion | `W0, WU1, WU2a, WU2b` |
+| Current work unit | `WU2c — native-first Resource schema/backfill correction` |
 | Delivery | `stacked-to-main` |
 | Active branch/PR | `<record by parent>` |
-| Parent decision gate | `Pending parent validation/commit/runtime start` |
+| Parent decision gate | `Pending parent start of WU2c; WU3 is blocked on WU2c` |
 
-Apply is not ready to start until the parent validates and commits the planning artifacts, then explicitly starts runtime/apply work.
+This artifact-only rescope changed no product/generated code, Git state, runtime, branch, or commit. Existing W0/WU1/WU2a/WU2b receipts below remain historical evidence and are not invalidated. The current task sequence in `tasks.md` supersedes old cumulative “exact unchecked task lines” snapshots embedded in earlier receipts.
 
-OpenSpec CLI is absent in this environment; it was not installed or used.
+OpenSpec CLI remains absent in this environment; it was not installed or used.
 
 ## Work-unit receipt
 
@@ -35,7 +36,9 @@ OpenSpec CLI is absent in this environment; it was not installed or used.
 ## Final parent gates
 
 - After parent validation and apply/runtime start, record `sdd-verify`, full Vitest, typecheck, consumer typecheck, codegen, `git diff --check`, and `git status --short` results.
-- Record native Convex 1.45.0 search traversal proof; if it fails, stop for an explicit design/specification revision and do not implement a fallback.
+- Confirm WU2c completed before WU3, including deployment audit/cleanup evidence, equality-prefix index coverage, scope-only Resource backfill behavior, and unchanged non-Resource catalog-admin behavior.
+- Record native list/search traversal and direct `usePaginatedQuery` consumer typing; confirm no Resource `AdminPage`, custom cursor/token/cache, Unit filter, collect/sort fallback, or manual accumulation exists.
+- Record final-state mutation failure/OCC evidence and confirm GARFEX revision/domain rules and every legacy Resource contract remain protected.
 - Confirm every task checkbox and parent lifecycle gate in `tasks.md` has its required owner and evidence.
 
 ## W0 Apply Evidence — `W0-resource-admin-tdd-metadata`
@@ -237,4 +240,31 @@ WU2a and WU2b implementation rows are complete. WU3–WU9 implementation rows an
 - WU2a is the completed validator/value-free summary/detail/diagnostics slice: `resourceValidators*`, `recursoResumen*`, and `recursoDetalle*`, with shared violation-validator additions where required. Its forecast is below 400 authored lines; rollback removes only those contracts/projections/diagnostics and their focused tests/violation additions.
 - WU2b is the completed non-throwing validation seam and complete domain-to-ADMIN mapping slice: `recursoValidacion*`, the narrow `catalogoRecursos/validacionRecurso.ts` seam, shared/derived contract updates, and focused tests. Its forecast is below 400 authored lines; rollback removes only that seam/mapping and focused tests while preserving the legacy wrapper and Spanish messages.
 - WU2a focused commands were the Resource validator, summary, and detail suites; WU2b focused commands were the Resource validation seam plus legacy validation/Resource suites. Existing evidence is retained above; no additional test execution is claimed by this record.
-- Dependencies now read WU1 → WU2a → WU2b → WU3; WU3 depends on both WU2 slices, WU5 on WU2a, and WU6 on WU2b plus WU5. Parent gates remain unchecked.
+- Dependencies at the time of this historical split read WU1 → WU2a → WU2b → WU3; the later native-first rescope below inserts WU2c before WU3. WU5 still depends on WU2a, and WU6 on WU2b plus WU5. Parent gates remain unchecked.
+
+## Native-first artifact rescope — `resource-native-pagination-decision`
+
+### Decision and audit record
+
+- The user selected native Convex pagination as mandatory for Resource administration: `paginationOptsValidator`, native `PaginationResult`, query `.paginate()`, and direct React `usePaginatedQuery` compatibility.
+- Resource `AdminPage`, custom cursor envelopes/hashes, manual page accumulation, query-plan/order/version tokens, and custom cache behavior are no longer authorized.
+- Essential Resource list/search filters are lifecycle, Type, and organization scope. Unit filtering is excluded until a demonstrated UI requirement produces a separate decision.
+- Equality-prefix analysis uses existing unscoped indexes and exactly two additional scope index shapes: `[adminScopeKey, tipoRecursoId, activo]` and `[adminScopeKey, activo]`. This is a field-prefix proof, not an arbitrary index-count target.
+- Resource `adminSortId` is unnecessary because native index pagination has stable implicit ordering. WU2c removes its Resource read/write/index/backfill dependency and safely removes stored/schema state if deployment inspection shows WU1 data reached a backend.
+- The pre-existing generic catalog metadata backfill remains intact. Its appended Resource branch is corrected to repair only `adminScopeKey`; any one-time obsolete-field cleanup is separate migration hygiene, not generic backfill behavior.
+- `MAX_RESOURCE_VALUES` already has one production definition in `resourceValidators.ts`, imported by the detail loader. No extra consolidation unit is needed; WU2c verifies later units reuse it.
+- Convex mutation atomicity and OCC are authoritative for create/update/lifecycle rollback and races. Pending tests assert final database state while retaining GARFEX revision, identity, ownership, alias, effective-catalog, and lifecycle rules.
+- Existing custom catalog-admin pagination is explicitly outside this Resource rescope and is not authorized for rewrite.
+
+### Historical and pending state
+
+- Completed W0, WU1, WU2a, and WU2b checkboxes and receipts remain unchanged as historical truth.
+- WU1’s completed behavior is partially superseded by a new pending WU2c correction; WU1 was not unchecked or rewritten as if it had never happened.
+- Revised sequence: `W0 ✓ → WU1 ✓ → WU2a ✓ → WU2b ✓ → WU2c → WU3 → WU4 → WU5 → WU6 → WU7 → WU8 → WU9`.
+- Revised counts: 48 implementation-owned TDD rows total, 16 historically complete and 32 pending; both parent-owned gates remain unchecked, for 50 task rows total.
+- Pending authored forecast is approximately 1,240 changed lines. Every pending unit is forecast below 400 authored additions plus deletions; generated declarations remain separate.
+- No product, generated, package, Git, runtime, branch, or commit mutation was performed by this artifact rescope. No verification command or runtime evidence is claimed.
+
+### Next boundary
+
+WU2c must complete before WU3. Its rollback boundary is limited to Resource-specific schema/index/search-filter/scope-backfill/write corrections and focused tests; it must preserve non-Resource catalog-admin behavior and all stored Resource business data.
