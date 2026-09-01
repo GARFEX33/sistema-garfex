@@ -335,3 +335,70 @@ No review, receipt, verification actor, refutation, correction, settle, commit, 
 
 - W3 implementation-owned task progress: 4 W3 rows complete; W4–W16 implementation work remains.
 - Parent lifecycle actions remain deferred; parent owns review/verify/settle/delivery.
+
+# Apply progress — W4
+
+## Status consumed
+
+- Native status: `gentle-ai.sdd-status` v2, `openspec` authoritative, `applyState: ready`, change `complete-catalog-administration`.
+- `actionContext.mode`: `repo-local`; workspace and allowed edit root `/home/garfex/PROGRAMACION/sistema-garfex`; warnings: none.
+- Active attempt authenticated with native token `sha256:f399d12af443b12c8fce4a2f6ae05e954631bc94a678734043381785fa831759`; bounds: 2 attempts / 380 changed lines.
+- Workload gate: decision needed `No`; chained delivery `Yes`; strategy `stacked-to-main`; W4 forecast 90 lines and actual authored diff 198 lines before task/progress records, under the 400-line branch boundary.
+- Strict TDD is active. Skill resolution: `paths-injected` for all five requested skill paths; strict-TDD guidance loaded from the global support path.
+
+## TDD Cycle Evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| Safety net | `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts` before edits | PASS — 1 file, 2 tests |
+| RED | Added W4 lifecycle/blocker tests, then focused run before Class commands existed | Expected RED — missing `crearClase`, `actualizarClase`, `activarClase`, and `desactivarClase` exports |
+| GREEN | `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts` | PASS — 1 file, 6 tests |
+| TRIANGULATE | Added material update, inactive duplicate, valid parent fan-out, exact blocker context, active-resource and inert-branch cases; focused run | PASS — 1 file, 6 tests |
+| TRIANGULATE regression | `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts convex/catalogoRecursos/catalogo.test.ts` | PASS — 2 files, 17 tests |
+| Full suite | `pnpm exec vitest run` | PASS — 17 files, 143 tests |
+| Root typecheck | `pnpm typecheck` | PASS — `tsc --noEmit` |
+| Convex codegen/typecheck | `pnpm exec convex codegen --typecheck enable` | PASS — generated bindings and Convex functions typechecked; no generated diff required |
+| Runtime | `pnpm exec convex dev --once` | PASS — local Convex functions ready on port 3210; no linked account |
+| REFACTOR | Narrowed update patch fields, deferred immutable echo normalization until after revision guard, removed unused descendant count, reran focused/full evidence | PASS — behavior unchanged |
+| Diff hygiene | `git diff --check` | PASS — no whitespace errors |
+
+## W4 implementation evidence
+
+- Added `crearClase`, `actualizarClase`, `activarClase`, and `desactivarClase` while preserving W3 `obtenerClase`/`listarClases` exports.
+- Class creation normalizes nonblank keys/names, reserves duplicate keys across active and inactive rows through the indexed `porClave` path, initializes revision 1, and populates derived `adminSortId` atomically.
+- Updates use the shared revision helper for stale-before-immutable/no-op ordering, normalized descriptive no-ops, single-step revision increments, and immutable key echoes.
+- Activation validates bounded active Family/Type descendants before the one Class patch; invalid active descendant revisions return `ADMIN_AGGREGATE_INCOMPLETE` and leave Class, Family, and Type rows unchanged.
+- Deactivation checks bounded indexed `porClase`, `porFamilia`, and `porTipoYActivo` paths. Active stored Families, Types, and resources block with `ADMIN_DEPENDENCY_BLOCKED`; inactive descendants/resources are ignored; no cascade or hard-delete path exists.
+- Same-state lifecycle requests return `UNCHANGED` only after the expected-revision check and bypass blockers/aggregate checks.
+- No shared loader file was required; Class-specific bounded predicates remain in `jerarquia.ts` as allowed.
+
+## Completed tasks and persisted checkbox updates
+
+- W4 RED, GREEN, TRIANGULATE, and REFACTOR are marked `- [x]` in `tasks.md` and were re-read after persistence.
+- W0–W3 history and parent-owned rows were preserved. No generated file, schema, public catalog function, hard-delete command, review, receipt, verification actor, commit, push, PR, or settle action was started.
+
+## Files and rollback boundary
+
+- Changed: `convex/catalogoAdmin/jerarquia.ts`, `convex/catalogoAdmin/jerarquia.test.ts`, `openspec/changes/complete-catalog-administration/tasks.md`, and this cumulative progress record.
+- Generated API output was regenerated and remained unchanged because the existing module binding already covered `jerarquia.ts`.
+- Authored implementation/test diff is 198 changed lines before task/progress bookkeeping; total branch diff remains below 400 changed lines.
+- Rollback boundary: remove the four Class command exports and W4 test additions from `jerarquia.ts`/`jerarquia.test.ts`, restore the four W4 checkbox flips, and retain W3 read exports plus W2 schema/index metadata. Stored rows are never deleted or cascaded.
+
+## Remaining tasks and deferred lifecycle actions
+
+The next exact unchecked implementation rows are W5 and remain unchanged in `tasks.md`:
+
+- [ ] **RED** — Add failing Family tests for scoped duplicate versus another Class, cross-Class reference, immutable parent, stale and same-state lifecycle, active Type/resource blockers, inactive descendants allowed, and activation validating effective Types; evidence is focused RED output, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove W5 test additions, estimate 20 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **GREEN** — Implement Family create/update/activate/deactivate plus direct/list behavior and blocker checks in `convex/catalogoAdmin/jerarquia.ts`; acceptance evidence is all Family scenarios passing atomically with stored descendants untouched, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove Family exports and Family-only logic while retaining Class/W3 behavior, estimate 38 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE** — Test Class filter cursor traversal, inactive branch effectiveness, parent activation fan-out, stale checks before aggregate/blocker checks, and existing public calls; acceptance evidence is focused/full pass, `pnpm typecheck`, codegen, and runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts convex/catalogoRecursos/catalogo.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback remove W5 Family code/tests only, estimate 14 authored lines. <!-- sdd-owner: implementation -->
+- [ ] **REFACTOR** — Reuse scoped hierarchy loaders and common result shapes without widening mutable fields; acceptance evidence is unchanged Family ordering and errors, focused command `pnpm exec vitest run convex/catalogoAdmin/jerarquia.test.ts`, full command `pnpm exec vitest run && pnpm typecheck`, rollback revert W5 refactor, estimate 8 authored lines. <!-- sdd-owner: implementation -->
+
+All later W6–W16 implementation rows remain unchecked byte-for-byte in `tasks.md`. Parent-owned lifecycle rows remain deferred byte-for-byte:
+
+- [ ] After apply, collect ordinary SDD status evidence by running `sdd-verify`, `pnpm exec vitest run`, `pnpm typecheck`, `git diff --check`, and `git status --short` over `convex/catalogoAdmin/**`, `convex/schema.ts`, `src/catalogoRecursos/**`, `convex/_generated/*`, and `contract-tests/**`; acceptance evidence is the recorded command/status output, including runtime `pnpm exec convex dev --once` or `N/A — no deployment available`, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the verification/status record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+- [ ] After post-apply verification, confirm the lifecycle gate in `openspec/changes/complete-catalog-administration/tasks.md`; acceptance evidence is all RED/GREEN/TRIANGULATE/REFACTOR results recorded, no authored work unit exceeds 400 changed lines, and every rollback boundary remains actionable, focused command `git diff --check`, full command `pnpm exec vitest run && pnpm typecheck`, rollback boundary is the lifecycle decision record only, estimate 0 authored lines. <!-- sdd-owner: parent -->
+
+## Status produced
+
+- W4 implementation-owned task progress: 4 W4 rows complete; W5–W16 remain for later work units.
+- Parent lifecycle actions remain deferred; `nextRecommended: parent-lifecycle`.
