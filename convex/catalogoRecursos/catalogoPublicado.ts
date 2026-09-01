@@ -4,6 +4,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { canonicalizeCatalog, sha256Hex, type CanonicalCatalog, type CanonicalSnapshot } from "../../src/catalogoRecursos/dominio/catalogoPublicado";
 import { snapshotResultadoValidator, type Snapshot } from "./catalogoPublicadoValidators";
+import { resolverCatalogoEfectivo, resolverJerarquiaEfectiva } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
 
 const claveArgs = { organizacionClave: v.string() };
 const revisionResultado = v.object({
@@ -38,30 +39,36 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
   const allRelations = await ctx.db.query("relacionesOpcionesAtributo").withIndex("porActivo", query => query.eq("activo", true)).collect();
   const compatibilityPolicyRows = await ctx.db.query("politicasCompatibilidadOpciones").collect();
   const compatibilityPoliciesById = new Map(compatibilityPolicyRows.map(policy => [policy._id, policy]));
-  if (allRelations.some(relation => {
-    const policyId = relation.politicaCompatibilidadId;
-    return policyId === undefined || !compatibilityPoliciesById.get(policyId)?.activo;
-  })) {
-    throw new Error("Relación activa sin política de compatibilidad activa");
-  }
   const types = await ctx.db.query("tiposRecurso").withIndex("porFamilia").collect();
-  const activeTypes = types.filter(type => type.activo).sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
+  const effectiveTypeIds = new Set<string>();
+  for (const type of types) {
+    const family = await ctx.db.get(type.familiaRecursoId);
+    const classDocument = family ? await ctx.db.get(family.claseRecursoId) : null;
+    if (resolverJerarquiaEfectiva({ classId: String(classDocument?._id), familyId: String(family?._id), typeId: String(type._id), familyClassId: String(family?.claseRecursoId), typeFamilyId: String(type.familiaRecursoId), classActive: classDocument?.activo, familyActive: family?.activo, typeActive: type.activo }).effective) effectiveTypeIds.add(String(type._id));
+  }
+  if (allRelations.some(relation => {
+    const policy = relation.politicaCompatibilidadId === undefined ? undefined : compatibilityPoliciesById.get(relation.politicaCompatibilidadId);
+    return policy === undefined || (!policy.activo && effectiveTypeIds.has(String(policy.tipoRecursoId)));
+  })) throw new Error("Relación activa sin política de compatibilidad activa");
+  const activeTypes = types.filter(type => effectiveTypeIds.has(String(type._id))).sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
   const snapshots: SnapshotEntry[] = [];
   const canonical: CanonicalCatalog = [];
 
   for (const type of activeTypes) {
     const family = await ctx.db.get(type.familiaRecursoId);
     const classDocument = family ? await ctx.db.get(family.claseRecursoId) : null;
-    if (!family?.activo || !classDocument?.activo) continue;
+    if (!family || !classDocument || !resolverJerarquiaEfectiva({ classId: String(classDocument._id), familyId: String(family._id), typeId: String(type._id), familyClassId: String(family.claseRecursoId), typeFamilyId: String(type.familiaRecursoId), classActive: classDocument.activo, familyActive: family.activo, typeActive: type.activo }).effective) continue;
 
     const policies = await ctx.db.query("politicasUnidadRecurso")
       .withIndex("porFamilia", query => query.eq("familiaRecursoId", family._id))
       .collect();
-    const familyPolicies = policies.filter(policy => policy.tipoRecursoId === undefined);
-    const typePolicies = policies.filter(policy => policy.tipoRecursoId === type._id);
-    const effectiveByUnit = new Map<Id<"unidades">, typeof policies[number]>();
-    for (const policy of familyPolicies) effectiveByUnit.set(policy.unidadId, policy);
-    for (const policy of typePolicies) effectiveByUnit.set(policy.unidadId, policy);
+    const effectivePolicies = resolverCatalogoEfectivo({
+      clase: { id: String(classDocument._id), clave: classDocument.clave, activo: classDocument.activo },
+      familia: { id: String(family._id), clave: family.clave, activo: family.activo, claseRecursoId: String(family.claseRecursoId) },
+      tipo: { id: String(type._id), clave: type.clave, activo: type.activo, familiaRecursoId: String(type.familiaRecursoId) },
+      unidad: null, politicas: policies.map(policy => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal })), atributos: [], reglas: [], opciones: [],
+    } as never);
+    const effectiveByUnit = new Map(policies.filter(policy => effectivePolicies.policies.some(selected => String(selected.id) === String(policy._id))).map(policy => [policy.unidadId, policy]));
     const principals = [...effectiveByUnit.values()].filter(policy => policy.activo && policy.principal);
     if (principals.length !== 1) {
       throw new Error(`Tipo ${type.clave}: se requiere exactamente una unidad natural efectiva`);
@@ -73,9 +80,13 @@ async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const attributes = await ctx.db.query("atributosRecurso")
       .withIndex("porFamilia", query => query.eq("familiaRecursoId", family._id))
       .collect();
-    const selected = new Map<Id<"definicionesAtributo">, AttributeDoc>();
-    for (const attribute of attributes.filter(item => item.tipoRecursoId === undefined)) selected.set(attribute.definicionAtributoId, attribute);
-    for (const attribute of attributes.filter(item => item.tipoRecursoId === type._id)) selected.set(attribute.definicionAtributoId, attribute);
+    const effectiveAssignments = resolverCatalogoEfectivo({
+      clase: { id: String(classDocument._id), clave: classDocument.clave, activo: classDocument.activo },
+      familia: { id: String(family._id), clave: family.clave, activo: family.activo, claseRecursoId: String(family.claseRecursoId) },
+      tipo: { id: String(type._id), clave: type.clave, activo: type.activo, familiaRecursoId: String(type.familiaRecursoId) },
+      unidad: null, politicas: [], atributos: attributes.map(attribute => ({ ...attribute, id: String(attribute._id), familiaId: String(attribute.familiaRecursoId), tipoId: attribute.tipoRecursoId === undefined ? undefined : String(attribute.tipoRecursoId), definicionId: String(attribute.definicionAtributoId), definicionClave: String(attribute.definicionAtributoId) })), reglas: [], opciones: [],
+    } as never);
+    const selected = new Map<Id<"definicionesAtributo">, AttributeDoc>(attributes.filter(attribute => effectiveAssignments.assignments.some(row => String(row.id) === String(attribute._id))).map(attribute => [attribute.definicionAtributoId, attribute]));
 
     const snapshotAttributes: Snapshot["atributos"] = [];
     const optionDefinitions = new Map<Id<"opcionesAtributo">, { attribute: AttributeDoc; definition: DefinitionDoc; option: OptionDoc }>();

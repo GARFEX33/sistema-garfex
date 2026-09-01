@@ -8,6 +8,7 @@ import {
   type CrearRecursoEntrada,
 } from "./validacionRecurso";
 import { registrarAlias } from "./identidadesRecurso";
+import { resolverJerarquiaEfectiva } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
 
 const valor = v.object({
   atributoRecursoId: v.id("atributosRecurso"),
@@ -472,7 +473,7 @@ export const reactivarRecurso = mutation({
     const tipo = await ctx.db.get(recurso.tipoRecursoId);
     const familia = tipo ? await ctx.db.get(tipo.familiaRecursoId) : null;
     const clase = familia ? await ctx.db.get(familia.claseRecursoId) : null;
-    if (!tipo || !familia || !clase) throw new Error("Jerarquía inexistente");
+    if (!tipo || !familia || !clase || !resolverJerarquiaEfectiva({ classId: String(clase._id), familyId: String(familia._id), typeId: String(tipo._id), familyClassId: String(familia.claseRecursoId), typeFamilyId: String(tipo.familiaRecursoId), classActive: clase.activo, familyActive: familia.activo, typeActive: tipo.activo }).effective) throw new Error("Jerarquía inexistente");
     const valores = await conValores(ctx, recurso._id);
     const entradaActual: CrearRecursoEntrada = {
       claseRecursoId: clase._id,

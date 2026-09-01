@@ -994,3 +994,20 @@ A final post-settlement focused rerun after the narrow active-option scan correc
 - Final focused run: `pnpm exec vitest run convex/catalogoAdmin/compatibilidad.test.ts src/catalogoRecursos/dominio/compatibilidadOpciones.test.ts` — PASS, 2 files / 17 tests.
 - Final required boundary run: `pnpm exec vitest run && pnpm typecheck && pnpm exec convex codegen --typecheck enable && pnpm exec convex dev --once && git diff --check` — PASS, 27 files / 193 tests; root typecheck, codegen, local runtime readiness, and diff hygiene passed.
 - Re-read persisted W13 rows: all four implementation checkboxes are visibly `- [x]`; native status remains `taskProgress.completed: 61`, `pending: 14`, `applyState: ready`, `verify: blocked`, `nextRecommended: apply` because W14-W16 and parent lifecycle rows remain.
+
+## W14 — effective resolver seams
+
+- Status consumed: authoritative OpenSpec, `applyState: ready`, `repo-local`, allowed root is the repository; active attempt token is `sha256:156612f5c3013167697a4a54f0ac130229b7ba8a3200b79f641783764964a78c`.
+- Workload boundary: W14 only, stacked-to-main slice, 2 attempts / 380 changed-line limit; actual authored diff remains below 400 lines.
+- RED: new pure matrix and cross-seam test failed before implementation because `catalogoEfectivo` was absent; focused W14 command recorded in tasks.
+- GREEN: shared resolver and hierarchy guard now pass the focused catalog/resource/publication suites without changing validators or return shapes.
+- TRIANGULATE: `pnpm exec vitest run` passed 28 files / 198 tests; `pnpm typecheck` passed; codegen passed; local runtime passed.
+- REFACTOR: source search finds the shared resolver path and `git diff -U0` shows no new unbounded `.collect()` additions; `git diff --check` passed.
+- Files changed: `catalogoEfectivo.ts` and test, pure resource validation, bounded aggregate loader, catalog/publication/resource seams and co-located regression tests.
+- The resolver preserves snapshot immutability, Type-over-Family and per-unit precedence, inactive hierarchy inertness, and false/zero/empty presence semantics.
+- Existing historical resource/detail and publication snapshot contracts remain unchanged; no generated file required a retained delta.
+- Remaining exact task rows: `- [ ] **RED** — W15`; `- [ ] **GREEN** — W15`; `- [ ] **TRIANGULATE** — W15`; `- [ ] **REFACTOR** — W15`; `- [ ] **RED** — W16`; `- [ ] **GREEN** — W16`; `- [ ] **TRIANGULATE** — W16`; `- [ ] **REFACTOR** — W16`; parent-owned `- [ ] After apply...`; parent-owned `- [ ] After post-apply...`.
+- Persisted W14 RED, GREEN, TRIANGULATE, and REFACTOR rows are visibly `- [x]` in `tasks.md`; no parent-owned row was changed.
+- Rollback boundary: revert only W14 resolver/seam adapters/tests and W14 checkbox flips; retain additive admin data and APIs.
+- No review, receipt, verification actor, refutation, correction, validation, settle, commit, push, PR, or lifecycle settlement was started.
+- `nextRecommended: parent-lifecycle`; remaining W15/W16 implementation and parent lifecycle work is deferred.

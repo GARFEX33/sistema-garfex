@@ -671,4 +671,20 @@ describe("consultas públicas del catálogo", () => {
     expect((await t.query(api.catalogoRecursos.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoCompacto })).length).toBe(0);
     expect((await t.query(api.catalogoRecursos.catalogo.obtenerReglasValidacion, { tipoRecursoId: f.tipoValvula })).length).toBe(0);
   });
+
+  it("mantiene inertes los descendientes activos de una rama inactiva", async () => {
+    const t = convexTest(schema, modules); const f = await seedFixture(t);
+    const type = await t.run(async ctx => {
+      await ctx.db.insert("familiasRecurso", { claseRecursoId: f.claseInactiva, clave: "FAMILIA_HUERFANA", nombre: "Huérfana", activo: true, revision: 1 });
+      return await ctx.db.insert("tiposRecurso", { familiaRecursoId: f.familiaInactiva, clave: "TIPO_HUERFANO", nombre: "Huérfano", activo: true, revision: 1 });
+    });
+    await t.run(async ctx => {
+      await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: f.familiaInactiva, tipoRecursoId: type, unidadId: f.unidadBase, principal: true, activo: true, revision: 1 });
+      await ctx.db.insert("atributosRecurso", { familiaRecursoId: f.familiaInactiva, tipoRecursoId: type, definicionAtributoId: f.definicionNota, aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 1, activo: true, revision: 1 });
+    });
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarFamiliasDeClase, { claseRecursoId: f.claseInactiva })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarTiposDeFamilia, { familiaRecursoId: f.familiaInactiva })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarUnidadesValidas, { familiaRecursoId: f.familiaInactiva, tipoRecursoId: type })).toEqual([]);
+    expect(await t.query(api.catalogoRecursos.catalogo.consultarAtributosAplicables, { familiaRecursoId: f.familiaInactiva, tipoRecursoId: type })).toEqual([]);
+  });
 });

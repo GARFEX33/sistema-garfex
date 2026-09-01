@@ -2,6 +2,7 @@ import { mutation, query } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
+import { resolverJerarquiaEfectiva, resolverCatalogoEfectivo } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
 
 const clase = v.object({
   id: v.id("clasesRecurso"),
@@ -293,6 +294,8 @@ export const consultarFamiliasDeClase = query({
   args: { claseRecursoId: v.id("clasesRecurso") },
   returns: v.array(familia),
   handler: async (ctx, { claseRecursoId }) => {
+    const claseDoc = await ctx.db.get(claseRecursoId);
+    if (!claseDoc?.activo) return [];
     const registros = await ctx.db
       .query("familiasRecurso")
       .withIndex("porClase", (q) => q.eq("claseRecursoId", claseRecursoId))
@@ -313,12 +316,15 @@ export const consultarTiposDeFamilia = query({
   args: { familiaRecursoId: v.id("familiasRecurso") },
   returns: v.array(tipo),
   handler: async (ctx, { familiaRecursoId }) => {
+    const familiaDoc = await ctx.db.get(familiaRecursoId);
+    const claseDoc = familiaDoc ? await ctx.db.get(familiaDoc.claseRecursoId) : null;
+    if (!familiaDoc || !claseDoc) return [];
     const registros = await ctx.db
       .query("tiposRecurso")
       .withIndex("porFamilia", (q) => q.eq("familiaRecursoId", familiaRecursoId))
       .collect();
     return registros
-      .filter((registro) => registro.activo)
+      .filter((registro) => resolverJerarquiaEfectiva({ classId: String(claseDoc._id), familyId: String(familiaDoc._id), typeId: String(registro._id), familyClassId: String(familiaDoc.claseRecursoId), typeFamilyId: String(registro.familiaRecursoId), classActive: claseDoc.activo, familyActive: familiaDoc.activo, typeActive: registro.activo }).effective)
       .map(({ _id, familiaRecursoId: familiaId, clave, nombre, descripcion }) => ({
         id: _id,
         familiaRecursoId: familiaId,
@@ -336,19 +342,27 @@ export const consultarUnidadesValidas = query({
   },
   returns: v.array(unidad),
   handler: async (ctx, { familiaRecursoId, tipoRecursoId }) => {
+    const familiaDoc = await ctx.db.get(familiaRecursoId);
+    const claseDoc = familiaDoc ? await ctx.db.get(familiaDoc.claseRecursoId) : null;
+    const tipoDoc = tipoRecursoId ? await ctx.db.get(tipoRecursoId) : null;
+    const hierarchy = resolverJerarquiaEfectiva({
+      classId: String(claseDoc?._id), familyId: String(familiaDoc?._id), typeId: String(tipoDoc?._id ?? familiaRecursoId),
+      familyClassId: String(familiaDoc?.claseRecursoId), typeFamilyId: tipoRecursoId ? String(tipoDoc?.familiaRecursoId) : String(familiaRecursoId),
+      classActive: claseDoc?.activo, familyActive: familiaDoc?.activo, typeActive: tipoDoc?.activo ?? true,
+    });
+    if (!hierarchy.effective) return [];
     const familiares = await ctx.db
       .query("politicasUnidadRecurso")
       .withIndex("porFamilia", (q) => q.eq("familiaRecursoId", familiaRecursoId))
       .collect();
-    const especificas = tipoRecursoId
-      ? familiares.filter((politica) => politica.tipoRecursoId === tipoRecursoId)
-      : [];
-    const permitidas = new Map(
-      familiares
-        .filter((politica) => politica.tipoRecursoId === undefined)
-        .map((politica) => [politica.unidadId, politica]),
-    );
-    for (const politica of especificas) permitidas.set(politica.unidadId, politica);
+    const resolved = resolverCatalogoEfectivo({
+      clase: claseDoc ? { id: String(claseDoc._id), clave: claseDoc.clave, activo: claseDoc.activo } : null,
+      familia: familiaDoc ? { id: String(familiaDoc._id), clave: familiaDoc.clave, activo: familiaDoc.activo, claseRecursoId: String(familiaDoc.claseRecursoId) } : null,
+      tipo: { id: String(tipoDoc?._id ?? familiaRecursoId), clave: String(tipoDoc?.clave ?? ""), activo: tipoDoc?.activo ?? true, familiaRecursoId: String(tipoDoc?.familiaRecursoId ?? familiaRecursoId) },
+      unidad: null, politicas: familiares.map(policy => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal })), atributos: [], reglas: [], opciones: [],
+    } as never);
+    const selectedIds = new Set(resolved.policies.map(policy => String(policy.id)));
+    const permitidas = new Map(familiares.filter(policy => selectedIds.has(String(policy._id))).map(policy => [policy.unidadId, policy]));
 
     const resultado = [];
     for (const politica of permitidas.values()) {
@@ -376,22 +390,27 @@ export const consultarAtributosAplicables = query({
   },
   returns: v.array(atributo),
   handler: async (ctx, { familiaRecursoId, tipoRecursoId }) => {
+    const familiaDoc = await ctx.db.get(familiaRecursoId);
+    const claseDoc = familiaDoc ? await ctx.db.get(familiaDoc.claseRecursoId) : null;
+    const tipoDoc = tipoRecursoId ? await ctx.db.get(tipoRecursoId) : null;
+    const hierarchy = resolverJerarquiaEfectiva({
+      classId: String(claseDoc?._id), familyId: String(familiaDoc?._id), typeId: String(tipoDoc?._id ?? familiaRecursoId),
+      familyClassId: String(familiaDoc?.claseRecursoId), typeFamilyId: tipoRecursoId ? String(tipoDoc?.familiaRecursoId) : String(familiaRecursoId),
+      classActive: claseDoc?.activo, familyActive: familiaDoc?.activo, typeActive: tipoDoc?.activo ?? true,
+    });
+    if (!hierarchy.effective) return [];
     const registros = await ctx.db
       .query("atributosRecurso")
       .withIndex("porFamilia", (q) => q.eq("familiaRecursoId", familiaRecursoId))
       .collect();
-    const seleccionados = new Map(
-      registros
-        .filter((registro) => registro.tipoRecursoId === undefined)
-        .map((registro) => [registro.definicionAtributoId, registro]),
-    );
-    if (tipoRecursoId) {
-      for (const registro of registros) {
-        if (registro.tipoRecursoId === tipoRecursoId) {
-          seleccionados.set(registro.definicionAtributoId, registro);
-        }
-      }
-    }
+    const resolved = resolverCatalogoEfectivo({
+      clase: claseDoc ? { id: String(claseDoc._id), clave: claseDoc.clave, activo: claseDoc.activo } : null,
+      familia: familiaDoc ? { id: String(familiaDoc._id), clave: familiaDoc.clave, activo: familiaDoc.activo, claseRecursoId: String(familiaDoc.claseRecursoId) } : null,
+      tipo: { id: String(tipoDoc?._id ?? familiaRecursoId), clave: String(tipoDoc?.clave ?? ""), activo: tipoDoc?.activo ?? true, familiaRecursoId: String(tipoDoc?.familiaRecursoId ?? familiaRecursoId) },
+      unidad: null, politicas: [], atributos: registros.map(row => ({ ...row, id: String(row._id), familiaId: String(row.familiaRecursoId), tipoId: row.tipoRecursoId === undefined ? undefined : String(row.tipoRecursoId), definicionId: String(row.definicionAtributoId), definicionClave: String(row.definicionAtributoId) })), reglas: [], opciones: [],
+    } as never);
+    const selectedIds = new Set(resolved.assignments.map(row => String(row.id)));
+    const seleccionados = new Map(registros.filter(row => selectedIds.has(String(row._id))).map(row => [row.definicionAtributoId, row]));
 
     const resultado = [];
     for (const registro of seleccionados.values()) {
@@ -441,6 +460,10 @@ export const obtenerReglasValidacion = query({
   args: { tipoRecursoId: v.id("tiposRecurso") },
   returns: v.array(regla),
   handler: async (ctx, { tipoRecursoId }) => {
+    const tipoDoc = await ctx.db.get(tipoRecursoId);
+    const familiaDoc = tipoDoc ? await ctx.db.get(tipoDoc.familiaRecursoId) : null;
+    const claseDoc = familiaDoc ? await ctx.db.get(familiaDoc.claseRecursoId) : null;
+    if (!resolverJerarquiaEfectiva({ classId: String(claseDoc?._id), familyId: String(familiaDoc?._id), typeId: String(tipoDoc?._id), familyClassId: String(familiaDoc?.claseRecursoId), typeFamilyId: String(tipoDoc?.familiaRecursoId), classActive: claseDoc?.activo, familyActive: familiaDoc?.activo, typeActive: tipoDoc?.activo }).effective) return [];
     const registros = await ctx.db
       .query("reglasAtributoRecurso")
       .withIndex("porTipo", (q) => q.eq("tipoRecursoId", tipoRecursoId))
