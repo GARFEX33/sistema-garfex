@@ -3,8 +3,10 @@ import { v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
-import { resourceSummaryValidator, type ResourceSummary } from "./resourceValidators";
+import { resourceDetailValidator, resourceSummaryValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
 import { adminInvalidArgument } from "./lib/errors";
+import { cargarAgregado } from "./lib/cargarAgregado";
+import { loadResourceValuesBounded, projectResourceDetail } from "./lib/recursoDetalle";
 import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
 import { lifecycleFilterValidator } from "./validators";
 
@@ -114,5 +116,56 @@ export const buscarRecursosResumen = query({
       ...page,
       page: await projectResourcePage(ctx, page.page),
     };
+  },
+});
+
+type ResourceReferenceTable = "clasesRecurso" | "familiasRecurso" | "tiposRecurso" | "unidades" | "organizaciones";
+
+function resourceReference<T extends ResourceReferenceTable>(document: {
+  _id: Id<T>;
+  clave: string;
+  nombre: string;
+  activo: boolean;
+  revision: number;
+}) {
+  return { id: document._id, clave: document.clave, nombre: document.nombre, activo: document.activo, revision: document.revision };
+}
+
+function resourceUnitReference(document: Doc<"unidades">): ResourceDetail["unidad"] {
+  return { ...resourceReference(document), simbolo: document.simbolo ?? null };
+}
+
+export const obtenerDetalleRecurso = query({
+  args: { recursoId: v.id("recursos") },
+  returns: v.union(resourceDetailValidator, v.null()),
+  handler: async (ctx, { recursoId }): Promise<ResourceDetail | null> => {
+    const recurso = await ctx.db.get(recursoId);
+    if (!recurso) return null;
+
+    const tipo = await ctx.db.get(recurso.tipoRecursoId);
+    const familia = tipo ? await ctx.db.get(tipo.familiaRecursoId) : null;
+    const clase = familia ? await ctx.db.get(familia.claseRecursoId) : null;
+    const unidad = await ctx.db.get(recurso.unidadId);
+    const organizacion = recurso.organizacionId ? await ctx.db.get(recurso.organizacionId) : null;
+    const classificationStatus = classificationStatusFromReferences(recurso, { type: tipo, family: familia, clazz: clase });
+    const summary = projectResourceSummary(recurso, classificationStatus);
+    const aggregate = await cargarAgregado(ctx, recurso.tipoRecursoId);
+    const valores = await loadResourceValuesBounded(ctx, recursoId);
+
+    return projectResourceDetail(summary, {
+      descripcion: recurso.descripcion ?? null,
+      identidadVersion: recurso.identidadVersion ?? null,
+      clase: clase ? resourceReference(clase) : null,
+      familia: familia ? resourceReference(familia) : null,
+      tipo: tipo ? resourceReference(tipo) : null,
+      unidad: unidad ? resourceUnitReference(unidad) : null,
+      organizacion: organizacion ? resourceReference(organizacion) : null,
+      catalogDiagnostics: {
+        hierarchy: classificationStatus,
+        aggregateStatus: aggregate.status,
+        violations: aggregate.violations,
+      },
+      valores,
+    });
   },
 });
