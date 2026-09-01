@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
-import { stateAfterLoad, type Resource, type ResourceDataSource, type ResourceDetail, type ResourceQuery, type ViewState } from "./types";
+import { stateAfterLoad, type Resource, type ResourceBrowserDataSource, type ResourceDetail, type ResourceQuery, type ViewState } from "./types";
 
 export { stateAfterLoad } from "./types";
 
@@ -22,11 +22,11 @@ export class ResourceBrowser {
   private cachedWidth?: number;
   private cachedLines?: string[];
   private detailAttempt = 0;
-  private readonly source: ResourceDataSource;
+  private readonly source: ResourceBrowserDataSource;
 
   constructor(
     query: ResourceQuery,
-    source: ResourceDataSource,
+    source: ResourceBrowserDataSource,
     private readonly theme: Pick<Theme, "fg" | "bold">,
     private readonly tui: Tui,
     private readonly keybindings: Keybindings,

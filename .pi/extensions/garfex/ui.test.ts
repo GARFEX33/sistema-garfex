@@ -46,7 +46,8 @@ it("routes list and search queries without side effects", () => {
 
 it("uses exact generated references for list, search, and detail requests", async () => {
   const query = vi.fn().mockResolvedValue([]);
-  const source = createResourceDataSource({ GARFEX_CONVEX_URL: "https://example" }, () => ({ query }));
+  const mutation = vi.fn();
+  const source = createResourceDataSource({ GARFEX_CONVEX_URL: "https://example" }, () => ({ query, mutation }));
   await source.list(); await source.search("bomba"); await source.getDetail(fakeId<"recursos">("r1"));
   expect(query).toHaveBeenNthCalledWith(1, api.catalogoRecursos.recursos.listarRecursos, { activo: true });
   expect(query).toHaveBeenNthCalledWith(2, api.catalogoRecursos.recursos.buscarRecursos, { texto: "bomba", activo: true });
