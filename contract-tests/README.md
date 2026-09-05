@@ -5,12 +5,12 @@ The private backend package is consumed at an exact approved revision:
 ```json
 {
   "dependencies": {
-    "sistema-garfex": "git+https://github.com/GARFEX33/sistema-garfex.git#<BACKEND_COMMIT_WITH_CLASS_FAMILY_FILTERS>"
+    "sistema-garfex": "git+https://github.com/GARFEX33/sistema-garfex.git#8a8203b124891e78e56503d18cade125f0023647"
   }
 }
 ```
 
-Replace the placeholder with the delivered backend commit that contains this contract. Do not keep an older revision: generated argument types are revision-specific.
+This revision contains the Class/Family pagination contract; generated argument types are revision-specific, so do not keep an older backend revision.
 
 Use the generated API and native Convex React hooks directly; no Resource DTO or pagination adapter is needed:
 
