@@ -2278,6 +2278,8 @@ export declare const api: {
         "query",
         "public",
         {
+          claseRecursoId?: Id<"clasesRecurso">;
+          familiaRecursoId?: Id<"familiasRecurso">;
           lifecycle?: "ALL" | "ACTIVE" | "INACTIVE";
           paginationOpts: {
             cursor: string | null;
@@ -2378,6 +2380,8 @@ export declare const api: {
         "query",
         "public",
         {
+          claseRecursoId?: Id<"clasesRecurso">;
+          familiaRecursoId?: Id<"familiasRecurso">;
           lifecycle?: "ALL" | "ACTIVE" | "INACTIVE";
           paginationOpts: {
             cursor: string | null;

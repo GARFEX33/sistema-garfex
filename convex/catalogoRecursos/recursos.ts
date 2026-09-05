@@ -205,8 +205,11 @@ export const crearRecurso = mutation({
       : await ctx.db.query("recursos").withIndex("porOrganizacionYIdentificadorTecnico", (q) => q.eq("organizacionId", args.organizacionId).eq("identificadorTecnico", identificadorTecnico)).first();
     if (existente)
       throw new Error("Recurso duplicado por identificador técnico");
+    const { adminScopeKey } = deriveResourceMetadata({ organizacionId: args.organizacionId });
     const recursoId = await ctx.db.insert("recursos", {
       tipoRecursoId: args.tipoRecursoId,
+      claseRecursoId: args.claseRecursoId,
+      familiaRecursoId: args.familiaRecursoId,
       unidadId: args.unidadId,
       identificadorTecnico,
       nombre: args.nombre,
@@ -215,8 +218,8 @@ export const crearRecurso = mutation({
       revision: 1,
       organizacionId: args.organizacionId,
       identidadVersion: args.organizacionId === undefined ? undefined : 1,
+      adminScopeKey,
     });
-    await ctx.db.patch(recursoId, deriveResourceMetadata({ organizacionId: args.organizacionId }));
     if (args.organizacionId !== undefined)
       await registrarAlias(ctx, { organizacionId: args.organizacionId, recursoId, version: 1, clave: identificadorTecnico });
     for (const item of args.valores)
@@ -445,6 +448,8 @@ export const actualizarRecurso = mutation({
       await ctx.db.delete(v._id);
     await ctx.db.patch(actual._id, {
       tipoRecursoId: args.tipoRecursoId,
+      claseRecursoId: args.claseRecursoId,
+      familiaRecursoId: args.familiaRecursoId,
       unidadId: args.unidadId,
       identificadorTecnico,
       nombre: args.nombre,

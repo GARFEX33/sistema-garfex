@@ -12,9 +12,12 @@ const plans = [
 type Row = { _id: string; [key: string]: unknown };
 type PlanCursor = { plan: number; cursor: string | null };
 
-export type ResourceMetadataSource = { organizacionId?: string };
-export function deriveResourceMetadata(source: ResourceMetadataSource): { adminScopeKey: string } {
-  return { adminScopeKey: source.organizacionId === undefined ? "GLOBAL" : `ORG:${source.organizacionId}` };
+export type ResourceMetadataSource = { organizacionId?: string; claseRecursoId?: string; familiaRecursoId?: string };
+export function deriveResourceMetadata(source: ResourceMetadataSource): { adminScopeKey: string; claseRecursoId?: string; familiaRecursoId?: string } {
+  return {
+    adminScopeKey: source.organizacionId === undefined ? "GLOBAL" : `ORG:${source.organizacionId}`,
+    ...(source.claseRecursoId === undefined || source.familiaRecursoId === undefined ? {} : { claseRecursoId: source.claseRecursoId, familiaRecursoId: source.familiaRecursoId }),
+  };
 }
 type DuplicateReport = { table: string; identity: string; ids: string[] };
 
@@ -42,9 +45,9 @@ function sortedPair(left: string, right: string): [string, string] {
   return compareCodePoints(left, right) <= 0 ? [left, right] : [right, left];
 }
 
-export function metadataPatch(table: string, row: Row, definitionKey?: string, policy?: Row): Record<string, string | undefined> {
+export function metadataPatch(table: string, row: Row, definitionKey?: string, policy?: Row, resourceLineage?: { claseRecursoId: string; familiaRecursoId: string }): Record<string, string | undefined> {
   const patch: Record<string, string | undefined> = table === "recursos"
-    ? deriveResourceMetadata({ organizacionId: row.organizacionId as string | undefined })
+    ? deriveResourceMetadata({ organizacionId: row.organizacionId as string | undefined, ...resourceLineage })
     : { adminSortId: row._id };
   if (table === "atributosRecurso") patch.definicionClave = definitionKey;
   if (table === "politicasCompatibilidadOpciones") {
@@ -103,9 +106,16 @@ export const backfillMetadatos = internalMutation({
     for (const row of page.page as Row[]) {
       let definitionKey: string | undefined;
       let policy: Row | undefined;
+      let resourceLineage: { claseRecursoId: string; familiaRecursoId: string } | undefined;
       if (table === "atributosRecurso") definitionKey = (await db.get(row.definicionAtributoId))?.clave;
       if (table === "relacionesOpcionesAtributo" && row.politicaCompatibilidadId) policy = (await db.get(row.politicaCompatibilidadId)) ?? undefined;
-      const patch = metadataPatch(table, row, definitionKey, policy);
+      if (table === "recursos") {
+        const type = await db.get(row.tipoRecursoId);
+        const family = type === null ? null : await db.get(type.familiaRecursoId);
+        const clazz = family === null ? null : await db.get(family.claseRecursoId);
+        if (type && family && clazz && type.familiaRecursoId === family._id && family.claseRecursoId === clazz._id) resourceLineage = { claseRecursoId: String(clazz._id), familiaRecursoId: String(family._id) };
+      }
+      const patch = metadataPatch(table, row, definitionKey, policy, resourceLineage);
       prepared.push({ row, patch });
       const duplicateCandidates = table === "recursos" ? [] : await candidatesForDuplicateIdentity(db, table, row);
       for (const candidate of duplicateCandidates) {

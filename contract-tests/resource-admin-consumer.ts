@@ -43,13 +43,13 @@ const searchHasOnlyNativeControls: NoExcludedQueryKeys<SearchArgs> = true;
 
 const listArgs = {
   lifecycle: "ACTIVE",
-  tipoRecursoId: typeId,
+  claseRecursoId: classId,
   scope: { kind: "ORGANIZATION", organizacionId: organizationId },
 } satisfies ListArgs;
 const searchArgs = {
   searchText: "  Bomba\t Norte  ",
   lifecycle: "INACTIVE",
-  tipoRecursoId: typeId,
+  familiaRecursoId: familyId,
   scope: { kind: "GLOBAL" },
 } satisfies SearchArgs;
 

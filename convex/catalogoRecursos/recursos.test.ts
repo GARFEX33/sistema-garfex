@@ -89,7 +89,7 @@ describe("recursos", () => {
     const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f));
     expect(Object.keys(creado).sort()).toEqual(["_creationTime", "_id", "activo", "identificadorTecnico", "nombre", "revision", "tipoRecursoId", "unidadId", "valores"].sort());
     const stored = await t.run(async ctx => ctx.db.get(creado._id));
-    expect(stored).toMatchObject({ adminScopeKey: "GLOBAL" });
+    expect(stored).toMatchObject({ adminScopeKey: "GLOBAL", claseRecursoId: f.clase, familiaRecursoId: f.familia, tipoRecursoId: f.tipo });
     expect(stored).not.toHaveProperty("adminSortId");
     expect(MAX_RESOURCE_VALUES).toBe(200);
     const searchable = await t.run(async ctx => ctx.db.query("recursos").withSearchIndex("buscar", (q: any) => q.search("nombre", "Bomba").eq("tipoRecursoId", f.tipo).eq("activo", true).eq("adminScopeKey", "GLOBAL")).take(1));
@@ -294,6 +294,17 @@ describe("recursos", () => {
         const valores = [...input(f).valores, { atributoRecursoId: f.peso, valor: 8 }];
         const cambiado = await t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, { ...input(f, { valores }), recursoId: original._id, revisionEsperada: 2 });
         expect(cambiado.revision).toBe(3); expect(cambiado.identificadorTecnico).not.toBe(original.identificadorTecnico);
+      });
+
+      it("updates denormalized lineage atomically with a legacy classification change", async () => {
+        const t = convexTest(schema, modules); const f = await seedFixture(t);
+        const resource = await crear(t, f);
+        const updated = await t.mutation(api.catalogoRecursos.recursos.actualizarRecurso, {
+          ...input(f, { claseRecursoId: f.otraClase, familiaRecursoId: f.otraFamilia, tipoRecursoId: f.otroTipo, nombre: "Válvula actualizada", valores: [] }),
+          recursoId: resource._id, revisionEsperada: 1,
+        });
+        expect(updated.revision).toBe(2);
+        expect(await t.run(async ctx => ctx.db.get(resource._id))).toMatchObject({ claseRecursoId: f.otraClase, familiaRecursoId: f.otraFamilia, tipoRecursoId: f.otroTipo });
       });
 
       it("rechaza actualización obsoleta y duplicada sin cambiar valores", async () => {

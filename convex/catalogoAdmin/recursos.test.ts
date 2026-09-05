@@ -29,6 +29,8 @@ type ListArgs = {
   paginationOpts: { numItems: number; cursor: string | null };
   lifecycle?: "ALL" | "ACTIVE" | "INACTIVE";
   tipoRecursoId?: Id<"tiposRecurso">;
+  claseRecursoId?: Id<"clasesRecurso">;
+  familiaRecursoId?: Id<"familiasRecurso">;
   scope?:
     | { kind: "ALL" }
     | { kind: "GLOBAL" }
@@ -102,6 +104,8 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
     ) {
       return ctx.db.insert("recursos", {
         tipoRecursoId,
+        claseRecursoId: clazz,
+        familiaRecursoId: family,
         unidadId: unit,
         identificadorTecnico: `RESOURCE_${index}`,
         nombre: `Resource ${index}`,
@@ -216,6 +220,34 @@ describe("catalogoAdmin.recursos.listarRecursosResumen", () => {
     expect(listSource).not.toMatch(/\.collect\(|\.filter\(/);
   });
 
+  it("narrows Class and Family selectors before native pagination", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const alternate = await t.run(async (ctx) => {
+      const family = await ctx.db.insert("familiasRecurso", { claseRecursoId: fixture.clazz, clave: "FAMILY_2", nombre: "Family 2", activo: true, revision: 1 });
+      const type = await ctx.db.insert("tiposRecurso", { familiaRecursoId: family, clave: "TYPE_2", nombre: "Type 2", activo: true, revision: 1 });
+      await ctx.db.insert("recursos", { tipoRecursoId: type, claseRecursoId: fixture.clazz, familiaRecursoId: family, unidadId: fixture.unit, identificadorTecnico: "RESOURCE_9", nombre: "Resource 9", activo: true, revision: 1, adminScopeKey: "GLOBAL" });
+      return { family };
+    });
+    const ids = (result: Awaited<ReturnType<typeof list>>) => result.page.map(item => Number(item.identificadorTecnico.replace("RESOURCE_", ""))).sort((a, b) => a - b);
+    expect(ids(await list(t, pageArgs({ claseRecursoId: fixture.clazz })))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(ids(await list(t, pageArgs({ familiaRecursoId: alternate.family })))).toEqual([9]);
+    expect(ids(await list(t, pageArgs({ claseRecursoId: fixture.clazz, lifecycle: "ACTIVE", scope: { kind: "GLOBAL" } })))).toEqual([1, 3, 9]);
+    const familySearch = await search(t, { searchText: "Resource", paginationOpts: { numItems: 25, cursor: null }, familiaRecursoId: alternate.family, lifecycle: "ACTIVE", scope: { kind: "GLOBAL" } });
+    expect(familySearch.page.map(item => item.identificadorTecnico)).toEqual(["RESOURCE_9"]);
+  });
+
+  it("rejects ambiguous hierarchy selectors with a classification argument error", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    for (const request of [
+      list(t, pageArgs({ claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family })),
+      search(t, { searchText: "Resource", paginationOpts: { numItems: 1, cursor: null }, familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA }),
+    ]) {
+      await expect(request).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_ARGUMENT", context: { field: "classification" } } });
+    }
+  });
+
   it("traverses more than 1,000 unchanged Resources without duplicates or omissions", async () => {
     const t = convexTest(schema, modules);
     const fixture = await seedFixture(t);
@@ -223,6 +255,8 @@ describe("catalogoAdmin.recursos.listarRecursosResumen", () => {
       for (let index = 100; index < 1201; index += 1) {
         await ctx.db.insert("recursos", {
           tipoRecursoId: fixture.typeA,
+          claseRecursoId: fixture.clazz,
+          familiaRecursoId: fixture.family,
           unidadId: fixture.unit,
           identificadorTecnico: `RESOURCE_${index}`,
           nombre: `Resource ${index}`,
@@ -238,6 +272,7 @@ describe("catalogoAdmin.recursos.listarRecursosResumen", () => {
     do {
       const result = await list(t, {
         paginationOpts: { numItems: 37, cursor },
+        claseRecursoId: fixture.clazz,
       });
       seen.push(...result.page.map((item) => item.id));
       cursor = result.isDone ? null : result.continueCursor;
@@ -298,12 +333,12 @@ describe("catalogoAdmin.recursos.buscarRecursosResumen", () => {
 
   it.each([1, 2, 3])("traverses unchanged equal-relevance results exactly once with page size %s", async (numItems) => {
     const t = convexTest(schema, modules);
-    await seedFixture(t);
+    const fixture = await seedFixture(t);
     const traverse = async () => {
       const seen: string[] = [];
       let cursor: string | null = null;
       do {
-        const result = await search(t, { searchText: "Resource", paginationOpts: { numItems, cursor } });
+        const result = await search(t, { searchText: "Resource", paginationOpts: { numItems, cursor }, familiaRecursoId: fixture.family });
         seen.push(...result.page.map((item) => item.id));
         cursor = result.isDone ? null : result.continueCursor;
       } while (cursor !== null);

@@ -169,6 +169,28 @@ describe("backfill de metadatos administrativos", () => {
     });
   });
 
+  it("backfills Resource lineage only from an intact hierarchy and is idempotent", async () => {
+    const t = convexTest(schema, modules);
+    const f = await seed(t);
+    const ids = await t.run(async ctx => {
+      const valid = await ctx.db.insert("recursos", { tipoRecursoId: f.tipo, unidadId: f.unidad, identificadorTecnico: "valid", nombre: "Valid", activo: true, revision: 1 });
+      const clazz = await ctx.db.insert("clasesRecurso", { clave: "BROKEN_CLASS", nombre: "Broken class", activo: true, revision: 1 });
+      const family = await ctx.db.insert("familiasRecurso", { claseRecursoId: clazz, clave: "BROKEN_FAMILY", nombre: "Broken family", activo: true, revision: 1 });
+      const type = await ctx.db.insert("tiposRecurso", { familiaRecursoId: family, clave: "BROKEN_TYPE", nombre: "Broken type", activo: true, revision: 1 });
+      const broken = await ctx.db.insert("recursos", { tipoRecursoId: type, unidadId: f.unidad, identificadorTecnico: "broken", nombre: "Broken", activo: true, revision: 1 });
+      await ctx.db.delete(type);
+      return { valid, broken };
+    });
+    await runToCompletion(t, 1);
+    const first = await t.run(async ctx => ({ valid: await ctx.db.get(ids.valid), broken: await ctx.db.get(ids.broken) }));
+    expect(first.valid).toMatchObject({ claseRecursoId: f.clase, familiaRecursoId: f.familia, adminScopeKey: "GLOBAL" });
+    expect(first.broken).toMatchObject({ adminScopeKey: "GLOBAL" });
+    expect(first.broken).not.toHaveProperty("claseRecursoId");
+    expect(first.broken).not.toHaveProperty("familiaRecursoId");
+    await runToCompletion(t, 1);
+    expect(await t.run(async ctx => ({ valid: await ctx.db.get(ids.valid), broken: await ctx.db.get(ids.broken) }))).toEqual(first);
+  });
+
   it("repara solo el alcance de recursos en lotes repetibles", async () => {
     const t = convexTest(schema, modules);
     const f = await seed(t);

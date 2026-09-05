@@ -202,6 +202,9 @@ export default defineSchema({
 
   recursos: defineTable({
     tipoRecursoId: v.id("tiposRecurso"),
+    // Optional while bounded lineage backfill repairs historical Resources.
+    claseRecursoId: v.optional(v.id("clasesRecurso")),
+    familiaRecursoId: v.optional(v.id("familiasRecurso")),
     unidadId: v.id("unidades"),
     identificadorTecnico: v.string(),
     nombre: v.string(),
@@ -220,12 +223,16 @@ export default defineSchema({
     .index("porTipo", ["tipoRecursoId"])
     .index("porActivo", ["activo"])
         .index("porTipoYActivo", ["tipoRecursoId", "activo"])
+    .index("porClaseYActivo", ["claseRecursoId", "activo"])
+    .index("porFamiliaYActivo", ["familiaRecursoId", "activo"])
     .index("porUnidad", ["unidadId"])
     .index("adminPorScopeYTipoYActivo", ["adminScopeKey", "tipoRecursoId", "activo"])
+    .index("adminPorScopeYClaseYActivo", ["adminScopeKey", "claseRecursoId", "activo"])
+    .index("adminPorScopeYFamiliaYActivo", ["adminScopeKey", "familiaRecursoId", "activo"])
     .index("adminPorScopeYActivo", ["adminScopeKey", "activo"])
     .searchIndex("buscar", {
       searchField: "nombre",
-      filterFields: ["tipoRecursoId", "activo", "adminScopeKey"],
+      filterFields: ["tipoRecursoId", "claseRecursoId", "familiaRecursoId", "activo", "adminScopeKey"],
     }),
 
 

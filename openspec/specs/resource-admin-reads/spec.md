@@ -15,10 +15,10 @@ The Resource administration API MUST provide a summary list whose registered que
 The list MAY accept only:
 
 - lifecycle `ALL`, `ACTIVE`, or `INACTIVE`;
-- optional `tipoRecursoId`; and
+- zero or one hierarchy selector: `tipoRecursoId`, `claseRecursoId`, or `familiaRecursoId`; and
 - organization scope `ALL`, `GLOBAL`, or one organization.
 
-Every supplied filter MUST be enforced by index equality. Unit filtering MUST NOT be exposed by this change. Native index order is the list order; the API MUST NOT add `adminSortId`, a product sort token, a plan token, a cursor envelope/hash, manual page accumulation, or a custom cache.
+Supplying more than one hierarchy selector MUST fail with structured `ADMIN_INVALID_ARGUMENT` on `classification`. Every supplied filter MUST be enforced by index equality. Unit filtering MUST NOT be exposed by this change. Native index order is the list order; the API MUST NOT add `adminSortId`, a product sort token, a plan token, a cursor envelope/hash, manual page accumulation, or a custom cache.
 
 The generated query reference MUST be directly compatible with React `usePaginatedQuery`, which owns native continuation, page accumulation, reactive updates, and query reset when non-pagination arguments change.
 
@@ -61,13 +61,15 @@ The required coverage is:
 | none | existing unfiltered stable traversal |
 | lifecycle | existing lifecycle prefix |
 | Type | existing Type prefix |
-| lifecycle + Type | existing Type/lifecycle equality prefix |
+| Class | Class/lifecycle prefix |
+| Family | Family/lifecycle prefix |
+| lifecycle + hierarchy selector | selector/lifecycle equality prefix |
 | scope | scope prefix |
-| scope + Type | scope/Type prefix |
+| scope + hierarchy selector | scope/selector prefix |
 | scope + lifecycle | scope/lifecycle prefix |
-| scope + Type + lifecycle | scope/Type/lifecycle prefix |
+| scope + hierarchy selector + lifecycle | scope/selector/lifecycle prefix |
 
-One new index beginning `[adminScopeKey, tipoRecursoId, activo]` MUST cover scope, scope + Type, and scope + Type + lifecycle. One new index beginning `[adminScopeKey, activo]` MUST cover scope + lifecycle. Equivalent names are allowed; extra Resource list indexes MUST NOT be added without a distinct equality-prefix requirement.
+The Type, Class, and Family selector prefixes MUST each cover their lifecycle variant. One scope-prefixed selector/lifecycle index per hierarchy level, plus `[adminScopeKey, activo]`, covers scoped combinations. Equivalent names are allowed; extra Resource list indexes MUST NOT be added without a distinct equality-prefix requirement.
 
 `adminScopeKey` MUST be repaired for historical Resources. Resource `adminSortId` MUST NOT be required for native list pagination.
 
@@ -86,11 +88,11 @@ Search MUST:
 
 1. normalize text to NFC, trim it, and collapse internal whitespace;
 2. reject blank normalized text with `ADMIN_INVALID_ARGUMENT`;
-3. use `withSearchIndex` with equality filters for supplied lifecycle, Type, and scope values;
+3. use `withSearchIndex` with equality filters for supplied lifecycle, one Type/Class/Family selector, and scope values;
 4. call `.paginate(paginationOpts)` directly; and
 5. return value-free summaries in Convex native relevance order.
 
-The search index MUST expose only the essential filter fields `tipoRecursoId`, `activo`, and `adminScopeKey`. Unit MUST NOT be a search filter. The implementation MUST NOT wrap native cursors, add runtime version/order tokens, collect all matches, perform an in-memory sort, or add a fallback traversal.
+The search index MUST expose only the essential filter fields `tipoRecursoId`, `claseRecursoId`, `familiaRecursoId`, `activo`, and `adminScopeKey`. Unit MUST NOT be a search filter. The implementation MUST NOT wrap native cursors, add runtime version/order tokens, collect all matches, perform an in-memory sort, or add a fallback traversal.
 
 #### Scenario: Search traverses native relevance pages
 
@@ -152,7 +154,7 @@ Values MUST be loaded exactly once through `valoresAtributoRecurso.porRecurso` w
 ## Acceptance Criteria
 
 - List and search use `paginationOptsValidator`, native pagination results, `.paginate()`, and generated `usePaginatedQuery` compatibility.
-- Only lifecycle, Type, and organization scope are accepted as Resource list/search filters.
+- Only lifecycle, zero or one Type/Class/Family selector, and organization scope are accepted as Resource list/search filters.
 - Equality-prefix analysis, not an arbitrary target, determines Resource indexes.
 - Resource reads add no `AdminPage`, custom cursor/token/cache, Unit filter, collect/sort fallback, or manual accumulation.
 - Detail uses the single centralized value limit and one bounded indexed value read.

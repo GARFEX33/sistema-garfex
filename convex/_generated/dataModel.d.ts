@@ -691,7 +691,9 @@ export type DataModel = {
       activo: boolean;
       adminScopeKey?: string;
       adminSortId?: string;
+      claseRecursoId?: Id<"clasesRecurso">;
       descripcion?: string;
+      familiaRecursoId?: Id<"familiasRecurso">;
       identidadVersion?: number;
       identificadorTecnico: string;
       nombre: string;
@@ -708,7 +710,9 @@ export type DataModel = {
       | "activo"
       | "adminScopeKey"
       | "adminSortId"
+      | "claseRecursoId"
       | "descripcion"
+      | "familiaRecursoId"
       | "identidadVersion"
       | "identificadorTecnico"
       | "nombre"
@@ -720,6 +724,18 @@ export type DataModel = {
       by_id: ["_id"];
       by_creation_time: ["_creationTime"];
       adminPorScopeYActivo: ["adminScopeKey", "activo", "_creationTime"];
+      adminPorScopeYClaseYActivo: [
+        "adminScopeKey",
+        "claseRecursoId",
+        "activo",
+        "_creationTime",
+      ];
+      adminPorScopeYFamiliaYActivo: [
+        "adminScopeKey",
+        "familiaRecursoId",
+        "activo",
+        "_creationTime",
+      ];
       adminPorScopeYTipoYActivo: [
         "adminScopeKey",
         "tipoRecursoId",
@@ -727,6 +743,8 @@ export type DataModel = {
         "_creationTime",
       ];
       porActivo: ["activo", "_creationTime"];
+      porClaseYActivo: ["claseRecursoId", "activo", "_creationTime"];
+      porFamiliaYActivo: ["familiaRecursoId", "activo", "_creationTime"];
       porIdentificadorTecnico: ["identificadorTecnico", "_creationTime"];
       porOrganizacionYIdentificadorTecnico: [
         "organizacionId",
@@ -740,7 +758,12 @@ export type DataModel = {
     searchIndexes: {
       buscar: {
         searchField: "nombre";
-        filterFields: "activo" | "adminScopeKey" | "tipoRecursoId";
+        filterFields:
+          | "activo"
+          | "adminScopeKey"
+          | "claseRecursoId"
+          | "familiaRecursoId"
+          | "tipoRecursoId";
       };
     };
     vectorIndexes: {};

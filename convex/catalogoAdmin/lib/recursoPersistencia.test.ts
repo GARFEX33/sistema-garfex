@@ -96,6 +96,7 @@ describe("recursoPersistencia / crearRecurso", () => {
     expect(persistedResource).not.toBeNull();
     expect(persistedResource?.activo).toBe(false);
     expect(persistedResource?.revision).toBe(1);
+    expect(persistedResource).toMatchObject({ claseRecursoId: fixture.clase, familiaRecursoId: fixture.familia, tipoRecursoId: fixture.tipo });
     expect(persistedResource?.organizacionId).toBe(fixture.organization);
     expect(persistedResource?.identificadorTecnico).toBe("v1|CLASS|FAMILY|TYPE|");
     expect(await t.run(async (ctx) => ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", result.item.id)).collect())).toEqual([
@@ -187,6 +188,8 @@ describe("recursoPersistencia / crearRecurso", () => {
     const before = await state(t);
     await expect(t.run(async (ctx) => insertarRecursoAdministrativo(ctx as never, {
       tipoRecursoId: fixture.tipo,
+      claseRecursoId: fixture.clase,
+      familiaRecursoId: fixture.familia,
       unidadId: fixture.unidad,
       identificadorTecnico: "v1|CLASS|FAMILY|TYPE|",
       nombre: "Injected value failure",
@@ -202,6 +205,8 @@ describe("recursoPersistencia / crearRecurso", () => {
     const aliasBefore = await state(t);
     await expect(t.run(async (ctx) => insertarRecursoAdministrativo(ctx as never, {
       tipoRecursoId: fixture.tipo,
+      claseRecursoId: fixture.clase,
+      familiaRecursoId: fixture.familia,
       unidadId: fixture.unidad,
       identificadorTecnico: "v1|CLASS|FAMILY|TYPE|",
       nombre: "Injected alias failure",

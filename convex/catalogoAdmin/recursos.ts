@@ -24,6 +24,8 @@ type ResourceListArgs = {
   paginationOpts: Infer<typeof paginationOptsValidator>;
   lifecycle?: Infer<typeof lifecycleFilterValidator>;
   tipoRecursoId?: Id<"tiposRecurso">;
+  claseRecursoId?: Id<"clasesRecurso">;
+  familiaRecursoId?: Id<"familiasRecurso">;
   scope?: ResourceScope;
 };
 function scopeKey(scope: ResourceScope): string | undefined {
@@ -31,42 +33,39 @@ function scopeKey(scope: ResourceScope): string | undefined {
   return scope.kind === "GLOBAL" ? "GLOBAL" : `ORG:${scope.organizacionId}`;
 }
 
+function hierarchySelector(args: ResourceListArgs): "tipo" | "clase" | "familia" | undefined {
+  const count = Number(args.tipoRecursoId !== undefined) + Number(args.claseRecursoId !== undefined) + Number(args.familiaRecursoId !== undefined);
+  if (count > 1) adminInvalidArgument({ field: "classification", reason: "only one hierarchy selector may be supplied" });
+  if (args.tipoRecursoId !== undefined) return "tipo";
+  if (args.claseRecursoId !== undefined) return "clase";
+  return args.familiaRecursoId === undefined ? undefined : "familia";
+}
+
 function resourceIndexQuery(ctx: QueryCtx, args: ResourceListArgs) {
-  const lifecycle = args.lifecycle ?? "ALL";
-  const typeId = args.tipoRecursoId;
+  const active = args.lifecycle === "ACTIVE" ? true : args.lifecycle === "INACTIVE" ? false : undefined;
   const key = scopeKey(args.scope ?? { kind: "ALL" });
-  const active = lifecycle === "ACTIVE" ? true : lifecycle === "INACTIVE" ? false : undefined;
-
+  const selector = hierarchySelector(args);
   if (key === undefined) {
-    if (typeId === undefined) {
-      return active === undefined
-        ? ctx.db.query("recursos").withIndex("porIdentificadorTecnico")
-        : ctx.db.query("recursos").withIndex("porActivo", (q) => q.eq("activo", active));
-    }
-    return active === undefined
-      ? ctx.db.query("recursos").withIndex("porTipo", (q) => q.eq("tipoRecursoId", typeId))
-      : ctx.db.query("recursos").withIndex("porTipoYActivo", (q) => q.eq("tipoRecursoId", typeId).eq("activo", active));
+    if (selector === "tipo") return active === undefined ? ctx.db.query("recursos").withIndex("porTipo", q => q.eq("tipoRecursoId", args.tipoRecursoId!)) : ctx.db.query("recursos").withIndex("porTipoYActivo", q => q.eq("tipoRecursoId", args.tipoRecursoId!).eq("activo", active));
+    if (selector === "clase") return ctx.db.query("recursos").withIndex("porClaseYActivo", q => active === undefined ? q.eq("claseRecursoId", args.claseRecursoId!) : q.eq("claseRecursoId", args.claseRecursoId!).eq("activo", active));
+    if (selector === "familia") return ctx.db.query("recursos").withIndex("porFamiliaYActivo", q => active === undefined ? q.eq("familiaRecursoId", args.familiaRecursoId!) : q.eq("familiaRecursoId", args.familiaRecursoId!).eq("activo", active));
+    return active === undefined ? ctx.db.query("recursos").withIndex("porIdentificadorTecnico") : ctx.db.query("recursos").withIndex("porActivo", q => q.eq("activo", active));
   }
-
-  if (typeId === undefined) {
-    return active === undefined
-      ? ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", (q) => q.eq("adminScopeKey", key))
-      : ctx.db.query("recursos").withIndex("adminPorScopeYActivo", (q) => q.eq("adminScopeKey", key).eq("activo", active));
-  }
-  return active === undefined
-    ? ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", (q) => q.eq("adminScopeKey", key).eq("tipoRecursoId", typeId))
-    : ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", (q) => q.eq("adminScopeKey", key).eq("tipoRecursoId", typeId).eq("activo", active));
+  if (selector === "tipo") return ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", q => active === undefined ? q.eq("adminScopeKey", key).eq("tipoRecursoId", args.tipoRecursoId!) : q.eq("adminScopeKey", key).eq("tipoRecursoId", args.tipoRecursoId!).eq("activo", active));
+  if (selector === "clase") return ctx.db.query("recursos").withIndex("adminPorScopeYClaseYActivo", q => active === undefined ? q.eq("adminScopeKey", key).eq("claseRecursoId", args.claseRecursoId!) : q.eq("adminScopeKey", key).eq("claseRecursoId", args.claseRecursoId!).eq("activo", active));
+  if (selector === "familia") return ctx.db.query("recursos").withIndex("adminPorScopeYFamiliaYActivo", q => active === undefined ? q.eq("adminScopeKey", key).eq("familiaRecursoId", args.familiaRecursoId!) : q.eq("adminScopeKey", key).eq("familiaRecursoId", args.familiaRecursoId!).eq("activo", active));
+  return active === undefined ? ctx.db.query("recursos").withIndex("adminPorScopeYTipoYActivo", q => q.eq("adminScopeKey", key)) : ctx.db.query("recursos").withIndex("adminPorScopeYActivo", q => q.eq("adminScopeKey", key).eq("activo", active));
 }
 
 function resourceSearchQuery(ctx: QueryCtx, args: ResourceListArgs, searchText: string) {
-  const lifecycle = args.lifecycle ?? "ALL";
-  const active = lifecycle === "ACTIVE" ? true : lifecycle === "INACTIVE" ? false : undefined;
-  const typeId = args.tipoRecursoId;
+  const active = args.lifecycle === "ACTIVE" ? true : args.lifecycle === "INACTIVE" ? false : undefined;
   const key = scopeKey(args.scope ?? { kind: "ALL" });
-
+  const selector = hierarchySelector(args);
   return ctx.db.query("recursos").withSearchIndex("buscar", (q) => {
     let search = q.search("nombre", searchText);
-    if (typeId !== undefined) search = search.eq("tipoRecursoId", typeId);
+    if (selector === "tipo") search = search.eq("tipoRecursoId", args.tipoRecursoId!);
+    if (selector === "clase") search = search.eq("claseRecursoId", args.claseRecursoId!);
+    if (selector === "familia") search = search.eq("familiaRecursoId", args.familiaRecursoId!);
     if (active !== undefined) search = search.eq("activo", active);
     if (key !== undefined) search = search.eq("adminScopeKey", key);
     return search;
@@ -147,6 +146,8 @@ export const crearRecurso = mutation({
 
     const recursoId = await insertarRecursoAdministrativo(ctx, {
       tipoRecursoId: args.tipoRecursoId,
+      claseRecursoId: args.claseRecursoId,
+      familiaRecursoId: args.familiaRecursoId,
       unidadId: args.unidadId,
       identificadorTecnico,
       nombre,
@@ -169,6 +170,8 @@ export const listarRecursosResumen = query({
     paginationOpts: paginationOptsValidator,
     lifecycle: v.optional(lifecycleFilterValidator),
     tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    claseRecursoId: v.optional(v.id("clasesRecurso")),
+    familiaRecursoId: v.optional(v.id("familiasRecurso")),
     scope: v.optional(resourceScopeValidator),
   },
   returns: paginationResultValidator(resourceSummaryValidator),
@@ -187,6 +190,8 @@ export const buscarRecursosResumen = query({
     searchText: v.string(),
     lifecycle: v.optional(lifecycleFilterValidator),
     tipoRecursoId: v.optional(v.id("tiposRecurso")),
+    claseRecursoId: v.optional(v.id("clasesRecurso")),
+    familiaRecursoId: v.optional(v.id("familiasRecurso")),
     scope: v.optional(resourceScopeValidator),
   },
   returns: paginationResultValidator(resourceSummaryValidator),

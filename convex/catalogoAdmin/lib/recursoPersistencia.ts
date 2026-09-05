@@ -30,6 +30,8 @@ export async function insertarRecursoAdministrativo(
   ctx: MutationCtx,
   input: {
     tipoRecursoId: Id<"tiposRecurso">;
+    claseRecursoId: Id<"clasesRecurso">;
+    familiaRecursoId: Id<"familiasRecurso">;
     unidadId: Id<"unidades">;
     identificadorTecnico: string;
     nombre: string;
@@ -38,8 +40,11 @@ export async function insertarRecursoAdministrativo(
     valores: ResourceValueInput[];
   },
 ): Promise<Id<"recursos">> {
+  const { adminScopeKey } = deriveResourceMetadata(input.ownership);
   const recursoId = await ctx.db.insert("recursos", {
     tipoRecursoId: input.tipoRecursoId,
+    claseRecursoId: input.claseRecursoId,
+    familiaRecursoId: input.familiaRecursoId,
     unidadId: input.unidadId,
     identificadorTecnico: input.identificadorTecnico,
     nombre: input.nombre,
@@ -50,7 +55,7 @@ export async function insertarRecursoAdministrativo(
       organizacionId: input.ownership.organizacionId,
       identidadVersion: 1,
     }),
-    ...deriveResourceMetadata(input.ownership),
+    adminScopeKey,
   });
   for (const value of input.valores) {
     await ctx.db.insert("valoresAtributoRecurso", {
