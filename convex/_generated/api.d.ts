@@ -65,6 +65,7 @@ export declare const api: {
             effective: boolean;
             effectiveReasons: Array<string>;
             id: Id<"definicionesAtributo">;
+            modoCaptura: "SELECCION" | "LIBRE";
             nombre: string;
             revision: number;
             tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -88,6 +89,34 @@ export declare const api: {
             id: Id<"opcionesAtributo">;
             nombre: string;
             revision: number;
+          };
+        }
+      >;
+      activarValorPermitidoAtributo: FunctionReference<
+        "mutation",
+        "public",
+        {
+          expectedRevision: number;
+          valorPermitidoId: Id<"valoresPermitidosAtributo">;
+        },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
+          item: {
+            activo: boolean;
+            clave: string;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            descripcion?: string;
+            effective: boolean;
+            effectiveReasons: Array<string>;
+            id: Id<"valoresPermitidosAtributo">;
+            nombre: string;
+            orden: number;
+            revision: number;
+            valor:
+              | { kind: "TEXTO"; value: string }
+              | { kind: "NUMERO"; value: number }
+              | { kind: "BOOLEANO"; value: boolean }
+              | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
           };
         }
       >;
@@ -140,6 +169,7 @@ export declare const api: {
           definicionAtributoId: Id<"definicionesAtributo">;
           descripcion?: string;
           expectedRevision: number;
+          modoCaptura?: "SELECCION" | "LIBRE";
           nombre?: string;
           tipoDato?: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
           unidadId?: Id<"unidades"> | null;
@@ -153,6 +183,7 @@ export declare const api: {
             effective: boolean;
             effectiveReasons: Array<string>;
             id: Id<"definicionesAtributo">;
+            modoCaptura: "SELECCION" | "LIBRE";
             nombre: string;
             revision: number;
             tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -183,6 +214,44 @@ export declare const api: {
             id: Id<"opcionesAtributo">;
             nombre: string;
             revision: number;
+          };
+        }
+      >;
+      actualizarValorPermitidoAtributo: FunctionReference<
+        "mutation",
+        "public",
+        {
+          clave?: string;
+          definicionAtributoId?: Id<"definicionesAtributo">;
+          descripcion?: string;
+          expectedRevision: number;
+          nombre?: string;
+          orden?: number;
+          valor?:
+            | { kind: "TEXTO"; value: string }
+            | { kind: "NUMERO"; value: number }
+            | { kind: "BOOLEANO"; value: boolean }
+            | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
+          valorPermitidoId: Id<"valoresPermitidosAtributo">;
+        },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
+          item: {
+            activo: boolean;
+            clave: string;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            descripcion?: string;
+            effective: boolean;
+            effectiveReasons: Array<string>;
+            id: Id<"valoresPermitidosAtributo">;
+            nombre: string;
+            orden: number;
+            revision: number;
+            valor:
+              | { kind: "TEXTO"; value: string }
+              | { kind: "NUMERO"; value: number }
+              | { kind: "BOOLEANO"; value: boolean }
+              | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
           };
         }
       >;
@@ -233,6 +302,7 @@ export declare const api: {
           activo?: boolean;
           clave: string;
           descripcion?: string;
+          modoCaptura?: "SELECCION" | "LIBRE";
           nombre: string;
           tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
           unidadId?: Id<"unidades">;
@@ -246,6 +316,7 @@ export declare const api: {
             effective: boolean;
             effectiveReasons: Array<string>;
             id: Id<"definicionesAtributo">;
+            modoCaptura: "SELECCION" | "LIBRE";
             nombre: string;
             revision: number;
             tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -275,6 +346,43 @@ export declare const api: {
             id: Id<"opcionesAtributo">;
             nombre: string;
             revision: number;
+          };
+        }
+      >;
+      crearValorPermitidoAtributo: FunctionReference<
+        "mutation",
+        "public",
+        {
+          activo?: boolean;
+          clave: string;
+          definicionAtributoId: Id<"definicionesAtributo">;
+          descripcion?: string;
+          nombre: string;
+          orden: number;
+          valor:
+            | { kind: "TEXTO"; value: string }
+            | { kind: "NUMERO"; value: number }
+            | { kind: "BOOLEANO"; value: boolean }
+            | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
+        },
+        {
+          disposition: "CREATED";
+          item: {
+            activo: boolean;
+            clave: string;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            descripcion?: string;
+            effective: boolean;
+            effectiveReasons: Array<string>;
+            id: Id<"valoresPermitidosAtributo">;
+            nombre: string;
+            orden: number;
+            revision: number;
+            valor:
+              | { kind: "TEXTO"; value: string }
+              | { kind: "NUMERO"; value: number }
+              | { kind: "BOOLEANO"; value: boolean }
+              | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
           };
         }
       >;
@@ -321,6 +429,7 @@ export declare const api: {
             effective: boolean;
             effectiveReasons: Array<string>;
             id: Id<"definicionesAtributo">;
+            modoCaptura: "SELECCION" | "LIBRE";
             nombre: string;
             revision: number;
             tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -344,6 +453,34 @@ export declare const api: {
             id: Id<"opcionesAtributo">;
             nombre: string;
             revision: number;
+          };
+        }
+      >;
+      desactivarValorPermitidoAtributo: FunctionReference<
+        "mutation",
+        "public",
+        {
+          expectedRevision: number;
+          valorPermitidoId: Id<"valoresPermitidosAtributo">;
+        },
+        {
+          disposition: "UPDATED" | "UNCHANGED";
+          item: {
+            activo: boolean;
+            clave: string;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            descripcion?: string;
+            effective: boolean;
+            effectiveReasons: Array<string>;
+            id: Id<"valoresPermitidosAtributo">;
+            nombre: string;
+            orden: number;
+            revision: number;
+            valor:
+              | { kind: "TEXTO"; value: string }
+              | { kind: "NUMERO"; value: number }
+              | { kind: "BOOLEANO"; value: boolean }
+              | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
           };
         }
       >;
@@ -409,6 +546,7 @@ export declare const api: {
             effective: boolean;
             effectiveReasons: Array<string>;
             id: Id<"definicionesAtributo">;
+            modoCaptura: "SELECCION" | "LIBRE";
             nombre: string;
             revision: number;
             tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -438,6 +576,37 @@ export declare const api: {
             id: Id<"opcionesAtributo">;
             nombre: string;
             revision: number;
+          }>;
+        }
+      >;
+      listarValoresPermitidosAtributo: FunctionReference<
+        "query",
+        "public",
+        {
+          cursor?: string | null;
+          definicionAtributoId: Id<"definicionesAtributo">;
+          modo?: "ALL" | "ACTIVE" | "INACTIVE";
+          pageSize?: number;
+        },
+        {
+          continuationCursor: string | null;
+          isExhausted: boolean;
+          items: Array<{
+            activo: boolean;
+            clave: string;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            descripcion?: string;
+            effective: boolean;
+            effectiveReasons: Array<string>;
+            id: Id<"valoresPermitidosAtributo">;
+            nombre: string;
+            orden: number;
+            revision: number;
+            valor:
+              | { kind: "TEXTO"; value: string }
+              | { kind: "NUMERO"; value: number }
+              | { kind: "BOOLEANO"; value: boolean }
+              | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
           }>;
         }
       >;
@@ -479,6 +648,7 @@ export declare const api: {
           effective: boolean;
           effectiveReasons: Array<string>;
           id: Id<"definicionesAtributo">;
+          modoCaptura: "SELECCION" | "LIBRE";
           nombre: string;
           revision: number;
           tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -499,6 +669,28 @@ export declare const api: {
           id: Id<"opcionesAtributo">;
           nombre: string;
           revision: number;
+        } | null
+      >;
+      obtenerValorPermitidoAtributo: FunctionReference<
+        "query",
+        "public",
+        { valorPermitidoId: Id<"valoresPermitidosAtributo"> },
+        {
+          activo: boolean;
+          clave: string;
+          definicionAtributoId: Id<"definicionesAtributo">;
+          descripcion?: string;
+          effective: boolean;
+          effectiveReasons: Array<string>;
+          id: Id<"valoresPermitidosAtributo">;
+          nombre: string;
+          orden: number;
+          revision: number;
+          valor:
+            | { kind: "TEXTO"; value: string }
+            | { kind: "NUMERO"; value: number }
+            | { kind: "BOOLEANO"; value: boolean }
+            | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
         } | null
       >;
     };
@@ -901,6 +1093,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -944,6 +1140,10 @@ export declare const api: {
                   }
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
                 | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
@@ -1093,6 +1293,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -1136,6 +1340,10 @@ export declare const api: {
                   }
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
                 | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
@@ -1282,6 +1490,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -1325,6 +1537,10 @@ export declare const api: {
                   }
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
                 | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
@@ -1454,6 +1670,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -1498,6 +1718,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -1522,6 +1746,12 @@ export declare const api: {
             }>;
           };
         }
+      >;
+      eliminarTipo: FunctionReference<
+        "mutation",
+        "public",
+        { expectedRevision: number; tipoRecursoId: Id<"tiposRecurso"> },
+        { disposition: "DELETED"; id: Id<"tiposRecurso"> }
       >;
       listarClases: FunctionReference<
         "query",
@@ -1643,6 +1873,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -1686,6 +1920,10 @@ export declare const api: {
                   }
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
                 | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
@@ -1804,6 +2042,10 @@ export declare const api: {
               | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
               | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
               | {
+                  id: Id<"valoresPermitidosAtributo">;
+                  kind: "valoresPermitidosAtributo";
+                }
+              | {
                   id: Id<"politicasPresentacionCanonica">;
                   kind: "politicasPresentacionCanonica";
                 }
@@ -1844,6 +2086,10 @@ export declare const api: {
               | { id: Id<"definicionesAtributo">; kind: "definicionesAtributo" }
               | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
               | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+              | {
+                  id: Id<"valoresPermitidosAtributo">;
+                  kind: "valoresPermitidosAtributo";
+                }
               | {
                   id: Id<"politicasPresentacionCanonica">;
                   kind: "politicasPresentacionCanonica";
@@ -2479,6 +2725,10 @@ export declare const api: {
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
                 | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
+                | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
                   }
@@ -2522,6 +2772,10 @@ export declare const api: {
                   }
                 | { id: Id<"atributosRecurso">; kind: "atributosRecurso" }
                 | { id: Id<"opcionesAtributo">; kind: "opcionesAtributo" }
+                | {
+                    id: Id<"valoresPermitidosAtributo">;
+                    kind: "valoresPermitidosAtributo";
+                  }
                 | {
                     id: Id<"politicasPresentacionCanonica">;
                     kind: "politicasPresentacionCanonica";
@@ -2622,6 +2876,7 @@ export declare const api: {
             opcionAtributoId?: Id<"opcionesAtributo">;
             recursoId: Id<"recursos">;
             valor: string | number | boolean;
+            valorPermitidoId?: Id<"valoresPermitidosAtributo">;
           }>;
         } | null
       >;
@@ -3010,6 +3265,21 @@ export declare const api: {
           };
         }
       >;
+      eliminarPoliticaUnidad: FunctionReference<
+        "mutation",
+        "public",
+        {
+          expectedRevision: number;
+          politicaUnidadId: Id<"politicasUnidadRecurso">;
+        },
+        { disposition: "DELETED"; id: Id<"politicasUnidadRecurso"> }
+      >;
+      eliminarUnidad: FunctionReference<
+        "mutation",
+        "public",
+        { expectedRevision: number; unidadId: Id<"unidades"> },
+        { disposition: "DELETED"; id: Id<"unidades"> }
+      >;
       listarPoliticasUnidad: FunctionReference<
         "query",
         "public",
@@ -3265,28 +3535,6 @@ export declare const api: {
           nombre: string;
         },
         { id: Id<"opcionesAtributo">; revision: number }
-      >;
-      crearTipoRecurso: FunctionReference<
-        "mutation",
-        "public",
-        {
-          clave: string;
-          descripcion?: string;
-          familiaRecursoId: Id<"familiasRecurso">;
-          nombre: string;
-        },
-        { id: Id<"tiposRecurso">; revision: number }
-      >;
-      crearUnidad: FunctionReference<
-        "mutation",
-        "public",
-        {
-          clave: string;
-          descripcion?: string;
-          nombre: string;
-          simbolo?: string;
-        },
-        { id: Id<"unidades">; revision: number }
       >;
       obtenerReglasValidacion: FunctionReference<
         "query",
@@ -3781,6 +4029,21 @@ export declare const internal: {
               table: string;
             }>;
             nextCursor: string | null;
+            processed: number;
+            updated: number;
+          }
+        >;
+      };
+      backfillSeleccionCatalogo: {
+        backfillSeleccionCatalogo: FunctionReference<
+          "mutation",
+          "internal",
+          { batchSize?: number; cursor?: string | null },
+          {
+            conflicts: Array<{ code: string; id: string }>;
+            diagnostics: Array<{ code: string; id: string }>;
+            nextCursor: string | null;
+            phase: "DEFINITIONS" | "OPTIONS" | "RULES" | "VERIFY";
             processed: number;
             updated: number;
           }

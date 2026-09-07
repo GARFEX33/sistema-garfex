@@ -339,8 +339,47 @@ export const crearTipo = mutation({
 export const actualizarTipo = mutation({
   args: { tipoRecursoId: v.id("tiposRecurso"), expectedRevision: v.number(), familiaRecursoId: v.optional(v.id("familiasRecurso")), clave: v.optional(v.string()), nombre: v.optional(v.string()), descripcion: v.optional(v.string()) }, returns: changeResultValidator(tipoDetalle),
   handler: async (ctx, args) => {
-    const result = await applyRevisionedUpdate<TypeDoc, typeof args, Record<string, string>>({ load: () => ctx.db.get(args.tipoRecursoId), expectedRevision: args.expectedRevision, entity: typeEntity(args.tipoRecursoId), immutable: { familiaRecursoId: args.familiaRecursoId, clave: args.clave }, changes: args, normalize: changes => ({ ...(changes.nombre === undefined ? {} : { nombre: normalizedName(changes.nombre) }), ...(changes.descripcion === undefined ? {} : { descripcion: normalizeText(changes.descripcion) }) }), current: record => ({ ...(args.nombre === undefined ? {} : { nombre: normalizeText(record.nombre) }), ...(args.descripcion === undefined ? {} : { descripcion: normalizeText(record.descripcion ?? "") }) }), patch: next => ctx.db.patch(next._id, { ...(args.nombre === undefined ? {} : { nombre: next.nombre }), ...(args.descripcion === undefined ? {} : { descripcion: next.descripcion }), revision: next.revision }) });
+    const result = await applyRevisionedUpdate<TypeDoc, typeof args, Record<string, string>>({
+      load: () => ctx.db.get(args.tipoRecursoId), expectedRevision: args.expectedRevision, entity: typeEntity(args.tipoRecursoId), immutable: { familiaRecursoId: args.familiaRecursoId }, changes: args,
+      normalize: changes => ({ ...(changes.clave === undefined ? {} : { clave: normalizedKey(changes.clave) }), ...(changes.nombre === undefined ? {} : { nombre: normalizedName(changes.nombre) }), ...(changes.descripcion === undefined ? {} : { descripcion: normalizeText(changes.descripcion) }) }),
+      current: record => ({ ...(args.clave === undefined ? {} : { clave: normalizeText(record.clave) }), ...(args.nombre === undefined ? {} : { nombre: normalizeText(record.nombre) }), ...(args.descripcion === undefined ? {} : { descripcion: normalizeText(record.descripcion ?? "") }) }),
+      validate: async (next, normalized) => {
+        if (normalized.clave === undefined) return;
+        const existing = await ctx.db.query("tiposRecurso").withIndex("porFamiliaYClave", q => q.eq("familiaRecursoId", next.familiaRecursoId).eq("clave", normalized.clave)).first();
+        if (existing && existing._id !== next._id) adminDuplicateKey({ entityKind: "tiposRecurso", key: normalized.clave, scope: next.familiaRecursoId });
+      },
+      patch: next => ctx.db.patch(next._id, { ...(args.clave === undefined ? {} : { clave: next.clave }), ...(args.nombre === undefined ? {} : { nombre: next.nombre }), ...(args.descripcion === undefined ? {} : { descripcion: next.descripcion }), revision: next.revision }),
+    });
     return { disposition: result.disposition, item: await toTypeDetail(ctx, result.item) };
+  },
+});
+
+export const eliminarTipo = mutation({
+  args: { tipoRecursoId: v.id("tiposRecurso"), expectedRevision: v.number() },
+  returns: v.object({ disposition: v.literal("DELETED"), id: v.id("tiposRecurso") }),
+  handler: async (ctx, args) => {
+    const entity = typeEntity(args.tipoRecursoId);
+    const result = await applyRevisionedUpdate<TypeDoc, undefined, Record<string, boolean>>({
+      load: () => ctx.db.get(args.tipoRecursoId), expectedRevision: args.expectedRevision, entity, changes: undefined,
+      normalize: () => ({ deleting: true }), current: () => ({}),
+      validate: async next => {
+        if (next.activo) adminInvalidState({ entity, field: "activo", reason: "type must be inactive before deletion" });
+        const resource = await ctx.db.query("recursos").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (resource[0]) adminDependencyBlocked({ entity, relationKind: "resource", blocker: { kind: "recursos", id: resource[0]._id } });
+        const unitPolicy = await ctx.db.query("politicasUnidadRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (unitPolicy[0]) adminDependencyBlocked({ entity, relationKind: "unit-policy", blocker: { kind: "politicasUnidadRecurso", id: unitPolicy[0]._id } });
+        const presentation = await ctx.db.query("politicasPresentacionCanonica").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (presentation[0]) adminDependencyBlocked({ entity, relationKind: "canonical-presentation-policy", blocker: { kind: "politicasPresentacionCanonica", id: presentation[0]._id } });
+        const compatibility = await ctx.db.query("politicasCompatibilidadOpciones").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (compatibility[0]) adminDependencyBlocked({ entity, relationKind: "option-compatibility-policy", blocker: { kind: "politicasCompatibilidadOpciones", id: compatibility[0]._id } });
+        const rule = await ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (rule[0]) adminDependencyBlocked({ entity, relationKind: "resource-attribute-rule", blocker: { kind: "reglasAtributoRecurso", id: rule[0]._id } });
+        const attribute = await ctx.db.query("atributosRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", next._id)).take(1);
+        if (attribute[0]) adminDependencyBlocked({ entity, relationKind: "resource-attribute", blocker: { kind: "atributosRecurso", id: attribute[0]._id } });
+      },
+      patch: next => ctx.db.delete(next._id),
+    });
+    return { disposition: "DELETED" as const, id: result.item._id };
   },
 });
 

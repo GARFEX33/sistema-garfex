@@ -2,7 +2,7 @@ import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { adminAggregateIncomplete, adminConflict, adminDependencyBlocked, adminDuplicateKey, adminInvalidArgument, adminInvalidReference } from "./lib/errors";
+import { adminAggregateIncomplete, adminConflict, adminDependencyBlocked, adminDuplicateKey, adminInvalidArgument, adminInvalidReference, adminInvalidState } from "./lib/errors";
 import { applyLifecycleChange, applyRevisionedUpdate, normalizeText } from "./lib/revisions";
 import { adminPageValidator, changeResultValidator, createResultValidator, lifecycleFilterValidator } from "./validators";
 import { consumeCursor, createCursor, ORDERING_VERSION, validatePageSize } from "./lib/pagination";
@@ -54,8 +54,36 @@ export const crearUnidad = mutation({ args: { clave: v.string(), nombre: v.strin
   await ctx.db.patch(id, { adminSortId: id }); return { disposition: "CREATED" as const, item: unitItem((await ctx.db.get(id))!) };
 } });
 export const actualizarUnidad = mutation({ args: { unidadId: v.id("unidades"), expectedRevision: v.number(), clave: v.optional(v.string()), nombre: v.optional(v.string()), descripcion: v.optional(v.string()), simbolo: v.optional(v.string()) }, returns: changeResultValidator(unidadDetalle), handler: async (ctx, args) => {
-  const result = await applyRevisionedUpdate<UnitDoc, typeof args, Record<string, string>>({ load: () => ctx.db.get(args.unidadId), expectedRevision: args.expectedRevision, entity: unitEntity(args.unidadId), immutable: { clave: args.clave }, changes: args, normalize: changes => ({ ...(changes.nombre === undefined ? {} : { nombre: key(changes.nombre, "nombre") }), ...(changes.descripcion === undefined ? {} : { descripcion: normalizeText(changes.descripcion) }), ...(changes.simbolo === undefined ? {} : { simbolo: normalizeText(changes.simbolo) }) }), current: row => ({ ...(args.nombre === undefined ? {} : { nombre: normalizeText(row.nombre) }), ...(args.descripcion === undefined ? {} : { descripcion: normalizeText(row.descripcion ?? "") }), ...(args.simbolo === undefined ? {} : { simbolo: normalizeText(row.simbolo ?? "") }) }), patch: next => ctx.db.patch(next._id, { ...(args.nombre === undefined ? {} : { nombre: next.nombre }), ...(args.descripcion === undefined ? {} : { descripcion: next.descripcion }), ...(args.simbolo === undefined ? {} : { simbolo: next.simbolo }), revision: next.revision }) });
+  const result = await applyRevisionedUpdate<UnitDoc, typeof args, Record<string, string>>({
+    load: () => ctx.db.get(args.unidadId), expectedRevision: args.expectedRevision, entity: unitEntity(args.unidadId), changes: args,
+    normalize: changes => ({ ...(changes.clave === undefined ? {} : { clave: key(changes.clave, "clave") }), ...(changes.nombre === undefined ? {} : { nombre: key(changes.nombre, "nombre") }), ...(changes.descripcion === undefined ? {} : { descripcion: normalizeText(changes.descripcion) }), ...(changes.simbolo === undefined ? {} : { simbolo: normalizeText(changes.simbolo) }) }),
+    current: row => ({ ...(args.clave === undefined ? {} : { clave: normalizeText(row.clave) }), ...(args.nombre === undefined ? {} : { nombre: normalizeText(row.nombre) }), ...(args.descripcion === undefined ? {} : { descripcion: normalizeText(row.descripcion ?? "") }), ...(args.simbolo === undefined ? {} : { simbolo: normalizeText(row.simbolo ?? "") }) }),
+    validate: async (next, normalized) => {
+      if (normalized.clave === undefined) return;
+      const existing = await ctx.db.query("unidades").withIndex("porClave", q => q.eq("clave", normalized.clave)).first();
+      if (existing && existing._id !== next._id) adminDuplicateKey({ entityKind: "unidades", key: normalized.clave, scope: "global" });
+    },
+    patch: next => ctx.db.patch(next._id, { ...(args.clave === undefined ? {} : { clave: next.clave }), ...(args.nombre === undefined ? {} : { nombre: next.nombre }), ...(args.descripcion === undefined ? {} : { descripcion: next.descripcion }), ...(args.simbolo === undefined ? {} : { simbolo: next.simbolo }), revision: next.revision }),
+  });
   return { disposition: result.disposition, item: unitItem(result.item) };
+} });
+export const eliminarUnidad = mutation({ args: { unidadId: v.id("unidades"), expectedRevision: v.number() }, returns: v.object({ disposition: v.literal("DELETED"), id: v.id("unidades") }), handler: async (ctx, args) => {
+  const entity = unitEntity(args.unidadId);
+  const result = await applyRevisionedUpdate<UnitDoc, undefined, Record<string, boolean>>({
+    load: () => ctx.db.get(args.unidadId), expectedRevision: args.expectedRevision, entity, changes: undefined,
+    normalize: () => ({ deleting: true }), current: () => ({}),
+    validate: async next => {
+      if (next.activo) adminInvalidState({ entity, field: "activo", reason: "unit must be inactive before deletion" });
+      const resource = await ctx.db.query("recursos").withIndex("porUnidad", q => q.eq("unidadId", next._id)).take(1);
+      if (resource[0]) adminDependencyBlocked({ entity, relationKind: "resource", blocker: { kind: "recursos", id: resource[0]._id } });
+      const definition = await ctx.db.query("definicionesAtributo").withIndex("porUnidad", q => q.eq("unidadId", next._id)).take(1);
+      if (definition[0]) adminDependencyBlocked({ entity, relationKind: "attribute-definition", blocker: { kind: "definicionesAtributo", id: definition[0]._id } });
+      const policy = await ctx.db.query("politicasUnidadRecurso").withIndex("porUnidad", q => q.eq("unidadId", next._id)).take(1);
+      if (policy[0]) adminDependencyBlocked({ entity, relationKind: "unit-policy", blocker: { kind: "politicasUnidadRecurso", id: policy[0]._id } });
+    },
+    patch: next => ctx.db.delete(next._id),
+  });
+  return { disposition: "DELETED" as const, id: result.item._id };
 } });
 export const obtenerUnidad = query({ args: { unidadId: v.id("unidades") }, returns: v.union(unidadDetalle, v.null()), handler: async (ctx, args) => { const row = await ctx.db.get(args.unidadId); return row ? unitItem(row) : null; } });
 export const listarUnidades = query({ args: { cursor: v.optional(v.union(v.string(), v.null())), pageSize: v.optional(v.number()), modo: v.optional(lifecycleFilterValidator) }, returns: adminPageValidator(unidadDetalle), handler: async (ctx, args) => {
@@ -90,6 +118,16 @@ async function duplicate(ctx: MutationCtx, familyId: Id<"familiasRecurso">, type
 }
 export const crearPoliticaUnidad = mutation({ args: policyArgs, returns: createResultValidator(politicaDetalle), handler: async (ctx, args) => {
   await references(ctx, args.familiaRecursoId, args.tipoRecursoId, args.unidadId); await duplicate(ctx, args.familiaRecursoId, args.tipoRecursoId, args.unidadId); const id = await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: args.familiaRecursoId, tipoRecursoId: args.tipoRecursoId, unidadId: args.unidadId, principal: args.principal, activo: args.activo ?? false, revision: 1 }); await ctx.db.patch(id, { adminSortId: id }); const candidate = { _id: id, ...args, activo: args.activo ?? false }; if (candidate.activo && args.tipoRecursoId) await validateTypePolicy(ctx, args.tipoRecursoId, candidate); if (candidate.activo && !args.tipoRecursoId) await validateFamilyPolicies(ctx, args.familiaRecursoId, candidate); return { disposition: "CREATED" as const, item: await policyItem(ctx, (await ctx.db.get(id))!) };
+} });
+export const eliminarPoliticaUnidad = mutation({ args: { politicaUnidadId: v.id("politicasUnidadRecurso"), expectedRevision: v.number() }, returns: v.object({ disposition: v.literal("DELETED"), id: v.id("politicasUnidadRecurso") }), handler: async (ctx, args) => {
+  const entity = policyEntity(args.politicaUnidadId);
+  const result = await applyRevisionedUpdate<PolicyDoc, undefined, Record<string, boolean>>({
+    load: () => ctx.db.get(args.politicaUnidadId), expectedRevision: args.expectedRevision, entity, changes: undefined,
+    normalize: () => ({ deleting: true }), current: () => ({}),
+    validate: next => { if (next.activo) adminInvalidState({ entity, field: "activo", reason: "policy must be inactive before deletion" }); },
+    patch: next => ctx.db.delete(next._id),
+  });
+  return { disposition: "DELETED" as const, id: result.item._id };
 } });
 export const obtenerPoliticaUnidad = query({ args: { politicaUnidadId: v.id("politicasUnidadRecurso"), paraTipoRecursoId: v.optional(v.id("tiposRecurso")) }, returns: v.union(politicaDetalle, v.null()), handler: async (ctx, args) => { const row = await ctx.db.get(args.politicaUnidadId); return row ? policyItem(ctx, row, args.paraTipoRecursoId) : null; } });
 export const listarPoliticasUnidad = query({ args: { familiaRecursoId: v.optional(v.id("familiasRecurso")), tipoRecursoId: v.optional(v.id("tiposRecurso")), unidadId: v.optional(v.id("unidades")), paraTipoRecursoId: v.optional(v.id("tiposRecurso")), cursor: v.optional(v.union(v.string(), v.null())), pageSize: v.optional(v.number()), modo: v.optional(lifecycleFilterValidator) }, returns: adminPageValidator(politicaDetalle), handler: async (ctx, args) => {

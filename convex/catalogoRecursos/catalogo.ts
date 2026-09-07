@@ -87,8 +87,6 @@ const identificacionArgs = {
 };
 const resultadoClaseCreada = v.object({ id: v.id("clasesRecurso"), revision: v.number() });
 const resultadoFamiliaCreada = v.object({ id: v.id("familiasRecurso"), revision: v.number() });
-const resultadoTipoCreado = v.object({ id: v.id("tiposRecurso"), revision: v.number() });
-const resultadoUnidadCreada = v.object({ id: v.id("unidades"), revision: v.number() });
 const resultadoPoliticaUnidadCreada = v.object({ id: v.id("politicasUnidadRecurso"), revision: v.number() });
 const resultadoDefinicionCreada = v.object({ id: v.id("definicionesAtributo"), revision: v.number() });
 const resultadoAtributoCreado = v.object({ id: v.id("atributosRecurso"), revision: v.number() });
@@ -162,29 +160,6 @@ export const crearFamiliaRecurso = mutation({
     const existente = await ctx.db.query("familiasRecurso").withIndex("porClaseYClave", (q) => q.eq("claseRecursoId", args.claseRecursoId).eq("clave", args.clave)).first();
     if (existente) throw new Error("Clave de familia duplicada en la clase");
     const id = await ctx.db.insert("familiasRecurso", { ...args, activo: true, revision: 1 });
-    return { id, revision: 1 };
-  },
-});
-
-export const crearTipoRecurso = mutation({
-  args: { ...identificacionArgs, familiaRecursoId: v.id("familiasRecurso") },
-  returns: resultadoTipoCreado,
-  handler: async (ctx, args) => {
-    await exigirFamiliaActiva(ctx, args.familiaRecursoId);
-    const existente = await ctx.db.query("tiposRecurso").withIndex("porFamiliaYClave", (q) => q.eq("familiaRecursoId", args.familiaRecursoId).eq("clave", args.clave)).first();
-    if (existente) throw new Error("Clave de tipo duplicada en la familia");
-    const id = await ctx.db.insert("tiposRecurso", { ...args, activo: true, revision: 1 });
-    return { id, revision: 1 };
-  },
-});
-
-export const crearUnidad = mutation({
-  args: { ...identificacionArgs, simbolo: v.optional(v.string()) },
-  returns: resultadoUnidadCreada,
-  handler: async (ctx, args) => {
-    const existente = await ctx.db.query("unidades").withIndex("porClave", (q) => q.eq("clave", args.clave)).first();
-    if (existente) throw new Error("Clave de unidad duplicada");
-    const id = await ctx.db.insert("unidades", { ...args, activo: true, revision: 1 });
     return { id, revision: 1 };
   },
 });

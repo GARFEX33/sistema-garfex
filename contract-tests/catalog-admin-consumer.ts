@@ -7,7 +7,10 @@ declare function useQuery<Q extends FunctionReference<"query">>(reference: Q, ar
 declare function useMutation<M extends FunctionReference<"mutation">>(reference: M, args: FunctionArgs<M>): Promise<FunctionReturnType<M>>;
 declare const organizationId: Id<"organizaciones">;
 declare const classId: Id<"clasesRecurso">;
+declare const familyId: Id<"familiasRecurso">;
 declare const typeId: Id<"tiposRecurso">;
+declare const unitId: Id<"unidades">;
+declare const policyId: Id<"politicasUnidadRecurso">;
 declare const revisionId: Id<"catalogoRevisiones">;
 
 const classesArgs = {
@@ -33,9 +36,29 @@ const snapshot = useQuery(api.catalogoAdmin.publicacion.obtenerSnapshotTipo, {
   tipoClave: "chair",
 });
 const published = useMutation(api.catalogoAdmin.publicacion.publicarCatalogo, { organizacionId: organizationId });
+const rekeyedType = useMutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: typeId, expectedRevision: 1, clave: "REKEYED" });
+const deletedType = useMutation(api.catalogoAdmin.jerarquia.eliminarTipo, { tipoRecursoId: typeId, expectedRevision: 2 });
+const rekeyedUnit = useMutation(api.catalogoAdmin.unidades.actualizarUnidad, { unidadId: unitId, expectedRevision: 1, clave: "REKEYED" });
+const deletedUnit = useMutation(api.catalogoAdmin.unidades.eliminarUnidad, { unidadId: unitId, expectedRevision: 2 });
+const deletedPolicy = useMutation(api.catalogoAdmin.unidades.eliminarPoliticaUnidad, { politicaUnidadId: policyId, expectedRevision: 1 });
 
 async function publishedLabel(): Promise<string> {
   return publicationLabel(await published);
+}
+
+async function typeMutationLabel(): Promise<string> {
+  const rekeyed = await rekeyedType;
+  const deleted = await deletedType;
+  const immutableFamily: Id<"familiasRecurso"> = rekeyed.item.familiaRecursoId;
+  void [familyId, immutableFamily];
+  return `${rekeyed.item.clave}:${deleted.disposition}:${deleted.id}`;
+}
+
+async function unitMutationLabel(): Promise<string> {
+  const rekeyed = await rekeyedUnit;
+  const deleted = await deletedUnit;
+  const policy = await deletedPolicy;
+  return `${rekeyed.item.clave}:${deleted.disposition}:${deleted.id}:${policy.disposition}:${policy.id}`;
 }
 
 const checkPagination = [
@@ -68,4 +91,4 @@ function handleAdminError(error: AdminErrorData): string {
 }
 
 const table: DataModel["tiposRecurso"] = {} as DataModel["tiposRecurso"];
-void [publishedLabel, typeId, table, publicationLabel, handleAdminError];
+void [publishedLabel, typeMutationLabel, unitMutationLabel, typeId, unitId, policyId, table, publicationLabel, handleAdminError];

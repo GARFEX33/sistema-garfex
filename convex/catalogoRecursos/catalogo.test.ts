@@ -367,7 +367,7 @@ async function seedFixture(t: ReturnType<typeof convexTest>) {
 }
 
 describe("administración pública mínima del catálogo", () => {
-  it("permite arrancar un catálogo vacío y crear un recurso sólo con mutaciones públicas", async () => {
+  it("permite crear un recurso con las mutaciones públicas restantes y un tipo administrado", async () => {
     const t = convexTest(schema, modules);
     const clase = await t.mutation(api.catalogoRecursos.catalogo.crearClaseRecurso, {
       clave: "CLASE_BOMBAS", nombre: "Bombas",
@@ -375,11 +375,13 @@ describe("administración pública mínima del catálogo", () => {
     const familia = await t.mutation(api.catalogoRecursos.catalogo.crearFamiliaRecurso, {
       claseRecursoId: clase.id, clave: "FAMILIA_CENTRIFUGAS", nombre: "Centrífugas",
     });
-    const tipo = await t.mutation(api.catalogoRecursos.catalogo.crearTipoRecurso, {
-      familiaRecursoId: familia.id, clave: "TIPO_INDUSTRIAL", nombre: "Industrial",
+    const tipo = await t.run(async ctx => {
+      const id = await ctx.db.insert("tiposRecurso", { familiaRecursoId: familia.id, clave: "TIPO_INDUSTRIAL", nombre: "Industrial", activo: true, revision: 1 });
+      return { id, revision: 1 };
     });
-    const unidad = await t.mutation(api.catalogoRecursos.catalogo.crearUnidad, {
-      clave: "UNIDAD_BASE", nombre: "Unidad base", simbolo: "ub",
+    const unidad = await t.run(async ctx => {
+      const id = await ctx.db.insert("unidades", { clave: "UNIDAD_BASE", nombre: "Unidad base", simbolo: "ub", activo: true, revision: 1 });
+      return { id, revision: 1 };
     });
     const politica = await t.mutation(api.catalogoRecursos.catalogo.asignarUnidadPermitida, {
       familiaRecursoId: familia.id, unidadId: unidad.id, principal: true,
@@ -417,11 +419,13 @@ describe("administración pública mínima del catálogo", () => {
     const familia = await t.mutation(api.catalogoRecursos.catalogo.crearFamiliaRecurso, {
       claseRecursoId: clase.id, clave: "FAMILIA", nombre: "Familia",
     });
-    const tipo = await t.mutation(api.catalogoRecursos.catalogo.crearTipoRecurso, {
-      familiaRecursoId: familia.id, clave: "TIPO", nombre: "Tipo",
+    const tipo = await t.run(async ctx => {
+      const id = await ctx.db.insert("tiposRecurso", { familiaRecursoId: familia.id, clave: "TIPO", nombre: "Tipo", activo: true, revision: 1 });
+      return { id, revision: 1 };
     });
-    const unidadTipoPrimero = await t.mutation(api.catalogoRecursos.catalogo.crearUnidad, {
-      clave: "UNIDAD_TIPO_PRIMERO", nombre: "Unidad tipo primero",
+    const unidadTipoPrimero = await t.run(async ctx => {
+      const id = await ctx.db.insert("unidades", { clave: "UNIDAD_TIPO_PRIMERO", nombre: "Unidad tipo primero", activo: true, revision: 1 });
+      return { id, revision: 1 };
     });
     await t.mutation(api.catalogoRecursos.catalogo.asignarUnidadPermitida, {
       familiaRecursoId: familia.id, tipoRecursoId: tipo.id, unidadId: unidadTipoPrimero.id, principal: true,
@@ -429,8 +433,9 @@ describe("administración pública mínima del catálogo", () => {
     await t.mutation(api.catalogoRecursos.catalogo.asignarUnidadPermitida, {
       familiaRecursoId: familia.id, unidadId: unidadTipoPrimero.id, principal: false,
     });
-    const unidadFamiliaPrimero = await t.mutation(api.catalogoRecursos.catalogo.crearUnidad, {
-      clave: "UNIDAD_FAMILIA_PRIMERO", nombre: "Unidad familia primero",
+    const unidadFamiliaPrimero = await t.run(async ctx => {
+      const id = await ctx.db.insert("unidades", { clave: "UNIDAD_FAMILIA_PRIMERO", nombre: "Unidad familia primero", activo: true, revision: 1 });
+      return { id, revision: 1 };
     });
     await t.mutation(api.catalogoRecursos.catalogo.asignarUnidadPermitida, {
       familiaRecursoId: familia.id, unidadId: unidadFamiliaPrimero.id, principal: true,

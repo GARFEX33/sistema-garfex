@@ -247,5 +247,63 @@ describe("ciclo administrativo de tipos", () => {
     await t.run(async ctx => { await ctx.db.patch(first.tipo, { activo: true }); await ctx.db.patch(second.tipo, { activo: true }); await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId: first.tipo, tokens: [], separador: "", activo: true, revision: 1 }); });
     await expect(t.mutation(api.catalogoAdmin.jerarquia.activarFamilia, { familiaRecursoId: first.familia, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
     expect(await t.query(api.catalogoAdmin.jerarquia.obtenerFamilia, { familiaRecursoId: first.familia })).toMatchObject({ activo: false, revision: 1 });
-  });
+
+    });
+
+      it("rekey normalizado conserva no-op, alcance de familia y precedencia de revisión", async () => {
+      const t = convexTest(schema, modules);
+      const first = await tree(t, true, true, "1");
+      const second = await tree(t, true, true, "2");
+      const changed = await t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 1, clave: "  NUEVA CLAVE  " });
+      expect(changed).toMatchObject({ disposition: "UPDATED", item: { clave: "NUEVA CLAVE", revision: 2 } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 2, clave: " NUEVA CLAVE " })).resolves.toMatchObject({ disposition: "UNCHANGED", item: { revision: 2 } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 2, clave: " " })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_ARGUMENT", context: { field: "clave" } } });
+      await t.run(async ctx => { await ctx.db.insert("tiposRecurso", { familiaRecursoId: first.familia, clave: "DUPLICADA", nombre: "Duplicada", activo: false, revision: 1 }); });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 2, clave: " DUPLICADA " })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: second.tipo, expectedRevision: 1, clave: "DUPLICADA" })).resolves.toMatchObject({ disposition: "UPDATED", item: { clave: "DUPLICADA", revision: 2 } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 2, familiaRecursoId: second.familia })).rejects.toMatchObject({ data: { code: "ADMIN_IMMUTABLE_FIELD", context: { field: "familiaRecursoId" } } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.actualizarTipo, { tipoRecursoId: first.tipo, expectedRevision: 1, clave: " " })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+    });
+
+    it("elimina tipos inactivos sin dependencias", async () => {
+      const t = convexTest(schema, modules);
+      const ids = await tree(t);
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.eliminarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 1 })).resolves.toEqual({ disposition: "DELETED", id: ids.tipo });
+      await expect(t.query(api.catalogoAdmin.jerarquia.obtenerTipo, { tipoRecursoId: ids.tipo })).resolves.toBeNull();
+    });
+
+    it("rechaza eliminar tipos activos después de comprobar la revisión", async () => {
+      const t = convexTest(schema, modules);
+      const ids = await tree(t);
+      await t.run(async ctx => { await ctx.db.patch(ids.tipo, { activo: true }); });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.eliminarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 2 })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION" } });
+      await expect(t.mutation(api.catalogoAdmin.jerarquia.eliminarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_STATE", context: { field: "activo" } } });
+    });
+
+    it("bloquea la eliminación por cada dependencia directa", async () => {
+      const blockers = [
+        ["recursos", "resource"],
+        ["politicasUnidadRecurso", "unit-policy"],
+        ["atributosRecurso", "resource-attribute"],
+        ["politicasPresentacionCanonica", "canonical-presentation-policy"],
+        ["politicasCompatibilidadOpciones", "option-compatibility-policy"],
+        ["reglasAtributoRecurso", "resource-attribute-rule"],
+      ] as const;
+      for (const [table, relationKind] of blockers) {
+        const t = convexTest(schema, modules);
+        const ids = await tree(t);
+        await t.run(async ctx => {
+          const unidad = await ctx.db.insert("unidades", { clave: `U-${table}`, nombre: "Unidad", activo: true, revision: 1 });
+          if (table === "recursos") return ctx.db.insert(table, { tipoRecursoId: ids.tipo, unidadId: unidad, identificadorTecnico: "R", nombre: "Recurso", activo: false, revision: 1 });
+          if (table === "politicasUnidadRecurso") return ctx.db.insert(table, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, unidadId: unidad, principal: false, activo: false, revision: 1 });
+          if (table === "politicasPresentacionCanonica") return ctx.db.insert(table, { tipoRecursoId: ids.tipo, tokens: [], separador: "", activo: false, revision: 1 });
+          const definicion = await ctx.db.insert("definicionesAtributo", { clave: `D-${table}`, nombre: "Definición", tipoDato: "TEXTO", activo: true, revision: 1 });
+          const atributo = await ctx.db.insert("atributosRecurso", { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definicion, aplicabilidad: "OPTIONAL", participaIdentidad: false, orden: 1, activo: true, revision: 1 });
+          if (table === "atributosRecurso") return;
+          if (table === "politicasCompatibilidadOpciones") return ctx.db.insert(table, { tipoRecursoId: ids.tipo, atributoOrigenId: atributo, atributoDestinoId: atributo, modo: "ALLOWLIST", direccion: "DIRECTIONAL", activo: false, revision: 1 });
+          return ctx.db.insert(table, { tipoRecursoId: ids.tipo, atributoCondicionId: atributo, atributoAfectadoId: atributo, aplicabilidad: "OPTIONAL", activo: false, revision: 1 });
+        });
+        await expect(t.mutation(api.catalogoAdmin.jerarquia.eliminarTipo, { tipoRecursoId: ids.tipo, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED", context: { relationKind } } });
+      }
+    });
 });
