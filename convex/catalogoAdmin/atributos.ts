@@ -181,8 +181,15 @@ async function allowedValueResourceBlocker(ctx: MutationCtx, id: Id<"valoresPerm
   }
   return null;
 }
+async function allowedValueRuleBlocker(ctx: MutationCtx, id: Id<"valoresPermitidosAtributo">) {
+  const rules = await ctx.db.query("reglasAtributoRecurso").withIndex("porValorPermitidoCondicion", q => q.eq("valorPermitidoCondicionId", id)).take(MAX_AGGREGATE_ROWS + 1);
+  for (const rule of rules) if (rule.activo && await effectiveType(ctx, rule.tipoRecursoId)) return { relationKind: "active-rule", blocker: { kind: "reglasAtributoRecurso" as const, id: rule._id } };
+  return null;
+}
 async function allowedValueLifecycle(ctx: MutationCtx, row: AllowedValue) {
   if (row.activo) return validateAllowedValue(ctx, row);
+  const ruleBlocker = await allowedValueRuleBlocker(ctx, row._id);
+  if (ruleBlocker) adminDependencyBlocked({ entity: allowedValueEntity(row._id), ...ruleBlocker });
   const resourceBlocker = await allowedValueResourceBlocker(ctx, row._id);
   if (resourceBlocker) adminDependencyBlocked({ entity: allowedValueEntity(row._id), ...resourceBlocker });
   const definition = await ctx.db.get(row.definicionAtributoId);

@@ -662,6 +662,125 @@ describe("catalogoAdmin.recursos.obtenerDetalleRecurso", () => {
         expect(await snapshot(t, global.resourceId)).toEqual(globalBefore);
       });
 
+describe("catalogoAdmin.recursos legacy contract / WU11", () => {
+  it("keeps the seven legacy admin functions and manual creator contract separate from selection creation", () => {
+    for (const endpoint of [
+      api.catalogoAdmin.recursos.crearRecurso,
+      api.catalogoAdmin.recursos.listarRecursosResumen,
+      api.catalogoAdmin.recursos.buscarRecursosResumen,
+      api.catalogoAdmin.recursos.obtenerDetalleRecurso,
+      api.catalogoAdmin.recursos.actualizarRecurso,
+      api.catalogoAdmin.recursos.activarRecurso,
+      api.catalogoAdmin.recursos.desactivarRecurso,
+    ]) expect(endpoint).toBeDefined();
+    const legacyCreator = source.slice(source.indexOf("export const crearRecurso ="), source.indexOf("export const listarRecursosResumen"));
+    expect(legacyCreator).toContain("nombre: v.string()");
+    expect(legacyCreator).toContain("descripcion: v.optional(v.string())");
+    expect(legacyCreator).toContain("valores: v.array(resourceValueInputValidator)");
+    expect(legacyCreator).not.toMatch(/expectedCatalogFingerprint|valorPermitidoId/);
+  });
+});
+
+describe("catalogoAdmin.recursos.crearRecursoDesdeSelecciones / WU9", () => {
+  async function seedSelectable(t: ReturnType<typeof convexTest>, required = false) {
+    const fixture = await seedFixture(t);
+    const value = await t.run(async ctx => {
+      await ctx.db.patch(fixture.definition, { modoCaptura: "SELECCION" });
+      await ctx.db.patch(fixture.attribute, { aplicabilidad: required ? "REQUIRED" : "OPTIONAL", participaIdentidad: true });
+      await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: fixture.unit, principal: true, activo: true, revision: 1 });
+      return ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: fixture.definition, clave: "PROOF_VALUE", valor: { kind: "TEXTO", value: "derived value" }, nombre: "Derived value", orden: 1, activo: true, revision: 1 });
+    });
+    const input = { claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA, unidadId: fixture.unit, selecciones: [{ asignacionAtributoId: fixture.attribute, valorPermitidoId: value }], ownership: { kind: "GLOBAL" as const } };
+    const evaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+    return { fixture, value, input, evaluation };
+  }
+
+  async function creationState(t: ReturnType<typeof convexTest>) {
+    return t.run(async (ctx: MutationCtx) => ({
+      resources: await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", q => q).collect(),
+      values: await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q).collect(),
+      aliases: await ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q).collect()
+    }));
+  }
+
+  it("requires a fingerprint, classifies stale input first, and does not write", async () => {
+    const t = convexTest(schema, modules);
+    const { input, evaluation } = await seedSelectable(t, true);
+    await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, input as never)).rejects.toThrow(/expectedCatalogFingerprint/);
+    const before = await creationState(t);
+    const stale = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, selecciones: [], expectedCatalogFingerprint: "stale" });
+    expect(Object.keys(stale).sort()).toEqual(["disposition", "evaluation"]);
+    expect(stale).toMatchObject({ disposition: "CATALOG_CHANGED", evaluation: { catalogFingerprint: evaluation.catalogFingerprint, status: "INCOMPLETE" } });
+    const foreign = await t.run(async ctx => ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: (await ctx.db.get(input.selecciones[0].valorPermitidoId))!.definicionAtributoId, clave: "STALE_INVALID", valor: { kind: "TEXTO", value: "stale" }, nombre: "Stale", orden: 2, activo: false, revision: 1 }));
+    await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, selecciones: [{ asignacionAtributoId: input.selecciones[0].asignacionAtributoId, valorPermitidoId: foreign }], expectedCatalogFingerprint: "stale" })).resolves.toMatchObject({ disposition: "CATALOG_CHANGED", evaluation: { status: "INVALID" } });
+    expect(await creationState(t)).toEqual(before);
+  });
+
+  it("returns matching incomplete and invalid evaluations without aggregate writes", async () => {
+    const t = convexTest(schema, modules);
+    const { fixture, input, evaluation } = await seedSelectable(t, true);
+    const before = await creationState(t);
+    await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, selecciones: [], expectedCatalogFingerprint: evaluation.catalogFingerprint })).resolves.toMatchObject({ disposition: "INCOMPLETE", evaluation: { status: "INCOMPLETE", valid: false } });
+    const foreign = await t.run(ctx => ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: fixture.definition, clave: "FOREIGN", valor: { kind: "TEXTO", value: "foreign" }, nombre: "Foreign", orden: 2, activo: false, revision: 1 }));
+    const invalidInput = { ...input, selecciones: [{ asignacionAtributoId: fixture.attribute, valorPermitidoId: foreign }] };
+    const invalidEvaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, invalidInput);
+    expect(invalidEvaluation.catalogFingerprint).toBe(evaluation.catalogFingerprint);
+    const invalid = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...invalidInput, expectedCatalogFingerprint: evaluation.catalogFingerprint });
+    expect(invalid).toMatchObject({ disposition: "INVALID", evaluation: { catalogFingerprint: evaluation.catalogFingerprint, status: "INVALID", valid: false, issues: [{ code: "ALLOWED_VALUE_INACTIVE" }] } });
+    expect(await creationState(t)).toEqual({ ...before, resources: before.resources, values: before.values, aliases: before.aliases });
+  });
+
+  it("persists the server-derived v2 global aggregate with private allowed-value references", async () => {
+    const t = convexTest(schema, modules);
+    const { input, value, evaluation } = await seedSelectable(t);
+    const created = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluation.catalogFingerprint });
+    expect(created.disposition).toBe("CREATED");
+    if (created.disposition !== "CREATED") throw new Error("Expected a created Resource");
+    expect(Object.keys(created).sort()).toEqual(["disposition", "item"]);
+    expect(created.item).toMatchObject({ nombre: evaluation.nombre, identificadorTecnico: evaluation.identificadorTecnico, activo: false, revision: 1 });
+    const stored = await t.run(async ctx => ({ resource: await ctx.db.get(created.item.id), values: await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", created.item.id)).collect(), aliases: await ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q.eq("recursoId", created.item.id)).collect() }));
+    expect(stored.resource).toMatchObject({ identificadorTecnico: evaluation.identificadorTecnico, nombre: evaluation.nombre, activo: false, revision: 1, identidadVersion: 2 });
+    expect(stored.resource).not.toHaveProperty("descripcion");
+    expect(stored.values).toEqual([expect.objectContaining({ valor: "derived value", valorPermitidoId: value })]);
+    expect(stored.aliases).toEqual([]);
+  });
+
+  it("reserves inactive scoped identities and creates only organization version-2 aliases", async () => {
+    const t = convexTest(schema, modules);
+    const { fixture, input, evaluation } = await seedSelectable(t);
+    await t.run(ctx => ctx.db.insert("recursos", { tipoRecursoId: fixture.typeA, claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family, unidadId: fixture.unit, identificadorTecnico: evaluation.identificadorTecnico!, nombre: "Inactive reservation", activo: false, revision: 1, identidadVersion: 2, adminScopeKey: "GLOBAL" }));
+    const before = await creationState(t);
+    const conflict = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluation.catalogFingerprint });
+    expect(conflict).toMatchObject({ disposition: "INVALID", evaluation: { status: "INVALID", valid: false, nombre: null, identificadorTecnico: null, issues: [{ code: "IDENTITY_CONFLICT" }] } });
+    expect(await creationState(t)).toEqual(before);
+
+    const organizationInput = { ...input, ownership: { kind: "ORGANIZATION" as const, organizacionId: fixture.organization } };
+    const organizationEvaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, organizationInput);
+    const aliasId = await t.run(async ctx => {
+      const owner = await ctx.db.insert("recursos", { tipoRecursoId: fixture.typeA, unidadId: fixture.unit, identificadorTecnico: "other", nombre: "Alias owner", activo: false, revision: 1, organizacionId: fixture.organization, identidadVersion: 2, adminScopeKey: `ORG:${fixture.organization}` });
+      return ctx.db.insert("identidadesRecurso", { organizacionId: fixture.organization, recursoId: owner, version: 2, clave: organizationEvaluation.identificadorTecnico!, activa: true, creadaEn: 1 });
+    });
+    const aliasBefore = await creationState(t);
+    await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...organizationInput, expectedCatalogFingerprint: organizationEvaluation.catalogFingerprint })).resolves.toMatchObject({ disposition: "INVALID", evaluation: { issues: [{ code: "IDENTITY_CONFLICT" }] } });
+    expect(await creationState(t)).toEqual(aliasBefore);
+    await t.run(ctx => ctx.db.delete(aliasId));
+    const created = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...organizationInput, expectedCatalogFingerprint: organizationEvaluation.catalogFingerprint });
+    expect(created.disposition).toBe("CREATED");
+    if (created.disposition !== "CREATED") throw new Error("Expected an organization Resource");
+    const aliases = await t.run(ctx => ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q.eq("recursoId", created.item.id)).collect());
+    expect(aliases).toEqual([expect.objectContaining({ organizacionId: fixture.organization, version: 2, clave: organizationEvaluation.identificadorTecnico })]);
+  });
+
+  it("uses Convex OCC so one of two matching selection creates reports a typed conflict", async () => {
+    const t = convexTest(schema, modules);
+    const { input, evaluation } = await seedSelectable(t);
+    const outcomes = await Promise.all([t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluation.catalogFingerprint }), t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluation.catalogFingerprint })]);
+    expect(outcomes.filter(outcome => outcome.disposition === "CREATED")).toHaveLength(1);
+    expect(outcomes.filter(outcome => outcome.disposition === "INVALID")).toEqual([expect.objectContaining({ evaluation: expect.objectContaining({ issues: expect.arrayContaining([expect.objectContaining({ code: "IDENTITY_CONFLICT" })]) }) })]);
+    expect((await creationState(t)).resources.filter(resource => resource.identificadorTecnico === evaluation.identificadorTecnico)).toHaveLength(1);
+  });
+});
+
 
       it("accepts 200 replacement values and rejects 201 without partial writes", async () => {
         const t = convexTest(schema, modules);
@@ -1015,3 +1134,31 @@ describe("catalogoAdmin.recursos.obtenerDetalleRecurso", () => {
         expect(lifecycleSource).toContain("patch: next => ctx.db.patch(next._id, { activo: false, revision: next.revision })");
       });
     });
+
+describe("catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones / WU8", () => {
+  it("evaluates the current live catalog with the exact public DTO", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const value = await t.run(async (ctx) => {
+      await ctx.db.patch(fixture.definition, { modoCaptura: "SELECCION" });
+      await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: fixture.unit, principal: true, activo: true, revision: 1 });
+      return ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: fixture.definition, clave: "PROOF", valor: { kind: "TEXTO", value: "proof" }, nombre: "Proof", orden: 1, activo: true, revision: 1 });
+    });
+    const args = { claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA, unidadId: fixture.unit, selecciones: [{ asignacionAtributoId: fixture.attribute, valorPermitidoId: value }], ownership: { kind: "GLOBAL" as const } };
+    const result = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, args);
+    expect(Object.keys(result).sort()).toEqual(["asignaciones", "catalogFingerprint", "faltantesRequeridos", "identificadorTecnico", "issues", "nombre", "seleccionesInvalidas", "status", "valid", "valoresNormalizados"].sort());
+    expect(result).toMatchObject({ status: "VALID", valid: true, valoresNormalizados: [{ atributoRecursoId: fixture.attribute, valor: "proof" }] });
+    const foreign = await t.run(async (ctx) => {
+      const definition = await ctx.db.insert("definicionesAtributo", { clave: "FOREIGN", nombre: "Foreign", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true, revision: 1 });
+      return ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: definition, clave: "FOREIGN", valor: { kind: "TEXTO", value: "foreign" }, nombre: "Foreign", orden: 1, activo: true, revision: 1 });
+    });
+    await expect(t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, { ...args, selecciones: [{ asignacionAtributoId: fixture.attribute, valorPermitidoId: foreign }] })).resolves.toMatchObject({ status: "INVALID", issues: [{ code: "ALLOWED_VALUE_FOREIGN" }] });
+    const inactiveUnit = await t.run(ctx => ctx.db.insert("unidades", { clave: "INACTIVE", nombre: "Inactive", activo: false, revision: 1 }));
+    await expect(t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, { ...args, unidadId: inactiveUnit })).resolves.toMatchObject({ status: "INVALID", issues: [{ code: "UNIT_INVALID" }] });
+    await t.run(ctx => ctx.db.patch(fixture.organization, { activo: false }));
+    const organizationArgs = { ...args, ownership: { kind: "ORGANIZATION" as const, organizacionId: fixture.organization } };
+    await expect(t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, organizationArgs)).resolves.toMatchObject({ status: "INVALID", issues: [{ code: "OWNERSHIP_INVALID" }] });
+    await t.run(ctx => ctx.db.delete(fixture.organization));
+    await expect(t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, organizationArgs)).resolves.toMatchObject({ status: "INVALID", issues: [{ code: "OWNERSHIP_INVALID" }] });
+  });
+});

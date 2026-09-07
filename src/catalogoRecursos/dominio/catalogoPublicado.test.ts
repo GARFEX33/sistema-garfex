@@ -71,7 +71,70 @@ describe("canonicalización del catálogo publicado", () => {
         expect(canonicalizeCatalog([first])).toBe(canonicalizeCatalog([historical]));
       });
 
-      it("produce el vector SHA-256 conocido", async () => {
+      it("canonicaliza el grafo de selección v2 sin IDs de almacenamiento", () => {
+    const published = entry("A", "A") as CanonicalCatalog[number] & { snapshot: Record<string, unknown> };
+    published.snapshot.snapshotVersion = 2;
+    published.snapshot.selectionGraph = {
+      politicasUnidad: [{ unidadClave: "M", principal: true }],
+      atributos: [{
+        atributoClave: "COLOR", modoCaptura: "SELECCION", tipoDato: "OPCION",
+        valoresPermitidos: [
+          { clave: "AZUL", nombre: "Azul", orden: 1, valor: { kind: "OPCION", opcionAtributoId: "storage-a" }, opcionClave: "AZUL" },
+          { clave: "ROJO", nombre: "Rojo", orden: 1, valor: { kind: "OPCION", opcionAtributoId: "storage-b" }, opcionClave: "ROJO" },
+        ],
+      }],
+      reglas: [{ atributoCondicionClave: "COLOR", valorPermitidoCondicionClave: "AZUL", atributoAfectadoClave: "COLOR", aplicabilidad: "OPTIONAL" }],
+    };
+    const reordered = structuredClone(published);
+    const values = (reordered.snapshot.selectionGraph as { atributos: Array<{ valoresPermitidos: Array<{ valor: { opcionAtributoId: string } }> }> }).atributos[0].valoresPermitidos;
+    values.reverse(); values[0].valor.opcionAtributoId = "other-storage-id";
+    expect(canonicalizeCatalog([published as CanonicalCatalog[number]])).toBe(canonicalizeCatalog([reordered as CanonicalCatalog[number]]));
+    (values[0].valor as { opcionAtributoId: string }).opcionAtributoId = "semantic-change";
+    (reordered.snapshot.selectionGraph as { atributos: Array<{ valoresPermitidos: Array<{ opcionClave: string }> }> }).atributos[0].valoresPermitidos[0].opcionClave = "VERDE";
+    const canonical = canonicalizeCatalog([published as CanonicalCatalog[number]]);
+    expect(canonical).not.toBe(canonicalizeCatalog([reordered as CanonicalCatalog[number]]));
+    const changes: Array<(graph: any) => void> = [
+      graph => { graph.atributos[0].modoCaptura = "LIBRE"; },
+      graph => { graph.atributos[0].valoresPermitidos[0].valor = { kind: "TEXTO", value: "azul" }; },
+      graph => { graph.reglas[0].aplicabilidad = "REQUIRED"; },
+      graph => { graph.politicasUnidad[0].unidadClave = "CM"; },
+    ];
+    for (const change of changes) {
+      const semantic = structuredClone(published);
+      change(semantic.snapshot.selectionGraph);
+      expect(canonicalizeCatalog([semantic as CanonicalCatalog[number]])).not.toBe(canonical);
+    }
+  });
+
+  it("canonicaliza todas las políticas de Unidad efectivas sin IDs de almacenamiento", () => {
+    const published = entry("A", "A") as CanonicalCatalog[number] & { snapshot: Record<string, unknown> };
+    published.snapshot.snapshotVersion = 2;
+    published.snapshot.selectionGraph = {
+      politicasUnidad: [
+        { unidadClave: "M", principal: true },
+        { unidadClave: "CM", principal: false },
+      ],
+      atributos: [],
+      reglas: [],
+    };
+    const reordered = structuredClone(published);
+    (reordered.snapshot.selectionGraph as { politicasUnidad: unknown[] }).politicasUnidad.reverse();
+    expect(canonicalizeCatalog([published as CanonicalCatalog[number]])).toBe(canonicalizeCatalog([reordered as CanonicalCatalog[number]]));
+
+    const withoutNonPrincipal = structuredClone(published);
+    (withoutNonPrincipal.snapshot.selectionGraph as { politicasUnidad: unknown[] }).politicasUnidad.pop();
+    expect(canonicalizeCatalog([published as CanonicalCatalog[number]])).not.toBe(canonicalizeCatalog([withoutNonPrincipal as CanonicalCatalog[number]]));
+
+    const withAdditionalNonPrincipal = structuredClone(published);
+    (withAdditionalNonPrincipal.snapshot.selectionGraph as { politicasUnidad: Array<{ unidadClave: string; principal: boolean }> }).politicasUnidad.push({ unidadClave: "KM", principal: false });
+    expect(canonicalizeCatalog([published as CanonicalCatalog[number]])).not.toBe(canonicalizeCatalog([withAdditionalNonPrincipal as CanonicalCatalog[number]]));
+
+    const changedNonPrincipal = structuredClone(published);
+    (changedNonPrincipal.snapshot.selectionGraph as { politicasUnidad: Array<{ unidadClave: string; principal: boolean }> }).politicasUnidad[1] = { unidadClave: "KM", principal: false };
+    expect(canonicalizeCatalog([published as CanonicalCatalog[number]])).not.toBe(canonicalizeCatalog([changedNonPrincipal as CanonicalCatalog[number]]));
+  });
+
+  it("produce el vector SHA-256 conocido", async () => {
     expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
 });

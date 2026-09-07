@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "../_generated/api";
 import schema from "../schema";
+import { cargarAgregado } from "./lib/cargarAgregado";
 
 const modules = {
   ...import.meta.glob("../_generated/**/*.{ts,js}"),
@@ -120,7 +121,7 @@ describe("administración de definiciones y opciones", () => {
     await expect(t.mutation(api.catalogoAdmin.atributos.activarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: true, revision: 2 } });
     await expect(t.mutation(api.catalogoAdmin.atributos.actualizarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 2, valor: { kind: "TEXTO", value: "changed" } })).resolves.toMatchObject({ disposition: "UPDATED", item: { valor: { kind: "TEXTO", value: "changed" }, revision: 3 } });
     await expect(t.mutation(api.catalogoAdmin.atributos.actualizarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 1, nombre: "Stale" })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION", context: { entity: { kind: "valoresPermitidosAtributo", id: textValue.item.id }, expectedRevision: 1, currentRevision: 3 } } });
-    expect(await t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, { valorPermitidoId: textValue.item.id })).toMatchObject({ valor: { kind: "TEXTO", value: "changed" }, activo: true, revision: 3 });
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, { valorPermitidoId: textValue.item.id })).toMatchObject({ nombre: "Text value", valor: { kind: "TEXTO", value: "changed" }, activo: true, revision: 3 });
     await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 3 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 4 } });
     expect(boolean.item.tipoDato).toBe("BOOLEANO");
   });
@@ -160,6 +161,72 @@ describe("administración de definiciones y opciones", () => {
     expect(await t.query(api.catalogoAdmin.atributos.obtenerDefinicionAtributo, { definicionAtributoId: definition.item.id })).toMatchObject({ modoCaptura: "LIBRE", revision: 1 });
     await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "AUTHORITY", nombre: "Authority", orden: 1, activo: true, valor: { kind: "TEXTO", value: "value" } });
     await expect(t.mutation(api.catalogoAdmin.atributos.actualizarDefinicionAtributo, { definicionAtributoId: definition.item.id, expectedRevision: 1, modoCaptura: "SELECCION" })).resolves.toMatchObject({ disposition: "UPDATED", item: { modoCaptura: "SELECCION", revision: 2 } });
+  });
+
+  it("uses cargarAgregado to reject an effective selection without an active valid typed value", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "LOADER_SELECTION", nombre: "Loader selection", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true,
+    });
+    const assignment = await t.run(ctx => ctx.db.insert("atributosRecurso", {
+      familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id,
+      aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, revision: 1,
+    }));
+
+    await t.run(async ctx => {
+      const invalidValue = await ctx.db.insert("valoresPermitidosAtributo", {
+        definicionAtributoId: definition.item.id, clave: "INVALID", nombre: "Invalid", orden: 1,
+        valor: { kind: "NUMERO", value: 1 }, activo: true, revision: 1,
+      });
+      await ctx.db.patch(invalidValue, { adminSortId: invalidValue });
+    });
+    const aggregate = await t.run(ctx => cargarAgregado(ctx, ids.tipo));
+    expect(aggregate).toMatchObject({ effective: true, status: "INVALID" });
+    expect(aggregate.violations).toEqual(expect.arrayContaining([
+      { code: "ASSIGNMENT_SELECTION_INVALID", detail: String(assignment) },
+      { code: "OPTION_SET_EMPTY", detail: String(assignment) },
+    ]));
+  });
+
+  it("blocks deactivation when an active effective rule references the allowed value", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await tree(t);
+    const conditionDefinition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "RULE_CONDITION", nombre: "Rule condition", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true,
+    });
+    const affectedDefinition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "RULE_AFFECTED", nombre: "Rule affected", tipoDato: "TEXTO", modoCaptura: "LIBRE", activo: true,
+    });
+    const value = await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, {
+      definicionAtributoId: conditionDefinition.item.id, clave: "RULE_VALUE", nombre: "Rule value", orden: 1, activo: true,
+      valor: { kind: "TEXTO", value: "rule-value" },
+    });
+    await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, {
+      definicionAtributoId: conditionDefinition.item.id, clave: "RULE_FALLBACK", nombre: "Rule fallback", orden: 2, activo: true,
+      valor: { kind: "TEXTO", value: "fallback" },
+    });
+    await t.run(async ctx => {
+      const condition = await ctx.db.insert("atributosRecurso", {
+        familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: conditionDefinition.item.id,
+        aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true, revision: 1,
+      });
+      const affected = await ctx.db.insert("atributosRecurso", {
+        familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: affectedDefinition.item.id,
+        aplicabilidad: "CONDITIONAL", participaIdentidad: false, orden: 2, activo: true, revision: 1,
+      });
+      await ctx.db.insert("reglasAtributoRecurso", {
+        tipoRecursoId: ids.tipo, atributoCondicionId: condition, atributoAfectadoId: affected,
+        valorPermitidoCondicionId: value.item.id, aplicabilidad: "REQUIRED", activo: true, revision: 1,
+      });
+    });
+
+    await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, {
+      valorPermitidoId: value.item.id, expectedRevision: 1,
+    })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED" } });
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, {
+      valorPermitidoId: value.item.id,
+    })).toMatchObject({ activo: true, revision: 1 });
   });
 
   it("stores and projects an explicit capture mode", async () => {

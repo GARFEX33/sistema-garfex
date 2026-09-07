@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { snapshotValidator } from "./catalogoRecursos/catalogoPublicadoValidators";
 
 const estadoCatalogo = {
   activo: v.boolean(),
@@ -39,16 +40,7 @@ export default defineSchema({
   catalogoRevisiones: defineTable({ organizacionId: v.id("organizaciones"), numero: v.number(), estado: estadoRevisionCatalogo, hashContenido: v.string(), creadoEn: v.number(), publicadoEn: v.number(), ...adminSort }).index("porOrganizacionYNumero", ["organizacionId", "numero"]).index("porOrganizacionYEstado", ["organizacionId", "estado"]).index("porOrganizacionYEstadoYNumeroYAdminSort", ["organizacionId", "estado", "numero", "adminSortId"]),
   catalogoTipoSnapshots: defineTable({
     organizacionId: v.id("organizaciones"), revisionId: v.id("catalogoRevisiones"), tipoClave: v.string(),
-    snapshot: v.object({
-      clase: v.object({ id: v.id("clasesRecurso"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()) }),
-      familia: v.object({ id: v.id("familiasRecurso"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()) }),
-      tipo: v.object({ id: v.id("tiposRecurso"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()) }),
-      unidadNatural: v.object({ id: v.id("unidades"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()), simbolo: v.optional(v.string()) }),
-      atributos: v.array(v.object({ id: v.id("atributosRecurso"), definicionAtributoId: v.id("definicionesAtributo"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()), tipoDato: v.union(v.literal("TEXTO"), v.literal("NUMERO"), v.literal("BOOLEANO"), v.literal("OPCION")), unidad: v.union(v.object({ id: v.id("unidades"), clave: v.string(), nombre: v.string(), simbolo: v.union(v.string(), v.null()) }), v.null()), participaIdentidad: v.boolean(), aplicabilidad, orden: v.number(), opciones: v.array(v.object({ id: v.id("opcionesAtributo"), clave: v.string(), nombre: v.string(), descripcion: v.optional(v.string()) })) })),
-      reglas: v.array(v.object({ id: v.id("reglasAtributoRecurso"), atributoCondicionClave: v.string(), opcionCondicionClave: v.optional(v.string()), atributoAfectadoClave: v.string(), aplicabilidad })),
-      presentacionCanonica: v.object({ tipoNombre: v.string(), tokens: v.array(v.union(v.object({ tipo: v.literal("TYPE_NAME") }), v.object({ tipo: v.literal("ATTRIBUTE_VALUE"), atributoClave: v.string() }), v.object({ tipo: v.literal("LITERAL"), texto: v.string() }))), separador: v.string() }),
-          politicasCompatibilidad: v.array(v.object({ atributoOrigenClave: v.string(), atributoDestinoClave: v.string(), modo: v.union(v.literal("ALLOWLIST"), v.literal("DENYLIST")), direccion: v.union(v.literal("DIRECTIONAL"), v.literal("SYMMETRIC")), pares: v.array(v.object({ origenOpcionClave: v.string(), destinoOpcionClave: v.string() })) })),
-    }),
+    snapshot: snapshotValidator,
   }).index("porRevisionYTipo", ["revisionId", "tipoClave"]).index("porOrganizacionYTipo", ["organizacionId", "tipoClave"]),
   clasesRecurso: defineTable({ ...identificacionCatalogo, ...adminSort }).index("porClave", ["clave"]).index("porClaveYAdminSort", ["clave", "adminSortId"]).index("porActivoYClaveYAdminSort", ["activo", "clave", "adminSortId"]),
 
@@ -222,9 +214,11 @@ export default defineSchema({
   })
     .index("porTipo", ["tipoRecursoId"])
     .index("porAtributoCondicion", ["atributoCondicionId"])
+    .index("porValorPermitidoCondicion", ["valorPermitidoCondicionId"])
     .index("porAtributoAfectado", ["atributoAfectadoId"])
     .index("porTipoYCondicionYOpcionYAfectadoYAdminSort", ["tipoRecursoId", "atributoCondicionId", "opcionCondicionId", "atributoAfectadoId", "adminSortId"])
-    .index("porTipoYActivoYCondicionYOpcionYAfectadoYAdminSort", ["tipoRecursoId", "activo", "atributoCondicionId", "opcionCondicionId", "atributoAfectadoId", "adminSortId"]),
+    .index("porTipoYActivoYCondicionYOpcionYAfectadoYAdminSort", ["tipoRecursoId", "activo", "atributoCondicionId", "opcionCondicionId", "atributoAfectadoId", "adminSortId"])
+    .index("porTipoYCondicionYOpcionYValorYAfectadoYAdminSort", ["tipoRecursoId", "atributoCondicionId", "opcionCondicionId", "valorPermitidoCondicionId", "atributoAfectadoId", "adminSortId"]),
 
 
   recursos: defineTable({

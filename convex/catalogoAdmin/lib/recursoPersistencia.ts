@@ -5,6 +5,12 @@ import { deriveResourceMetadata } from "./backfillMetadatos";
 import type { ResourceValue, ResourceValueInput } from "../resourceValidators";
 
 type Ownership = { organizacionId?: Id<"organizaciones"> };
+type Classification = {
+  tipoRecursoId: Id<"tiposRecurso">;
+  claseRecursoId: Id<"clasesRecurso">;
+  familiaRecursoId: Id<"familiasRecurso">;
+  unidadId: Id<"unidades">;
+};
 
 /** Internal persistence may carry the additive stored reference without widening legacy inputs. */
 export type StoredResourceValueInput = ResourceValueInput & { valorPermitidoId?: Id<"valoresPermitidosAtributo"> };
@@ -39,50 +45,59 @@ export async function buscarAliasExacto(
   return resolverAlias(ctx, input);
 }
 
-/** Writes one complete Resource aggregate; Convex owns atomic rollback and OCC. */
-export async function insertarRecursoAdministrativo(
+/** Server-only aggregate seam: callers provide resolved classification and derived lifecycle/identity. */
+export async function insertarAgregadoRecurso(
   ctx: MutationCtx,
   input: {
-    tipoRecursoId: Id<"tiposRecurso">;
-    claseRecursoId: Id<"clasesRecurso">;
-    familiaRecursoId: Id<"familiasRecurso">;
-    unidadId: Id<"unidades">;
-    identificadorTecnico: string;
-    nombre: string;
-    descripcion?: string;
+    classification: Classification;
     ownership: Ownership;
-    valores: ResourceValueInput[];
+    nombre: string;
+    identificadorTecnico: string;
+    identidadVersion?: number;
+    activo: boolean;
+    descripcion?: string;
+    valores: StoredResourceValueInput[];
   },
 ): Promise<Id<"recursos">> {
   const { adminScopeKey } = deriveResourceMetadata(input.ownership);
   const recursoId = await ctx.db.insert("recursos", {
-    tipoRecursoId: input.tipoRecursoId,
-    claseRecursoId: input.claseRecursoId,
-    familiaRecursoId: input.familiaRecursoId,
-    unidadId: input.unidadId,
+    ...input.classification,
     identificadorTecnico: input.identificadorTecnico,
     nombre: input.nombre,
     ...(input.descripcion === undefined ? {} : { descripcion: input.descripcion }),
-    activo: false,
+    activo: input.activo,
     revision: 1,
-    ...(input.ownership.organizacionId === undefined ? {} : {
-      organizacionId: input.ownership.organizacionId,
-      identidadVersion: 1,
-    }),
+    ...(input.ownership.organizacionId === undefined ? {} : { organizacionId: input.ownership.organizacionId }),
+    ...(input.identidadVersion === undefined ? {} : { identidadVersion: input.identidadVersion }),
     adminScopeKey,
   });
-  for (const value of input.valores) {
-    await ctx.db.insert("valoresAtributoRecurso", storedValueDocument(recursoId, value));
-  }
-  if (input.ownership.organizacionId !== undefined) {
-    await registrarAlias(ctx, {
-      organizacionId: input.ownership.organizacionId,
-      recursoId,
-      version: 1,
-      clave: input.identificadorTecnico,
-    });
+  for (const value of input.valores) await ctx.db.insert("valoresAtributoRecurso", storedValueDocument(recursoId, value));
+  if (input.ownership.organizacionId !== undefined && input.identidadVersion !== undefined) {
+    await registrarAlias(ctx, { organizacionId: input.ownership.organizacionId, recursoId, version: input.identidadVersion, clave: input.identificadorTecnico });
   }
   return recursoId;
+}
+
+/** Legacy wrapper preserves v1 organization identity and all caller-observable behavior. */
+export async function insertarRecursoAdministrativo(
+  ctx: MutationCtx,
+  input: Classification & { identificadorTecnico: string; nombre: string; descripcion?: string; ownership: Ownership; valores: ResourceValueInput[] },
+): Promise<Id<"recursos">> {
+  return insertarAgregadoRecurso(ctx, {
+    classification: {
+      claseRecursoId: input.claseRecursoId,
+      familiaRecursoId: input.familiaRecursoId,
+      tipoRecursoId: input.tipoRecursoId,
+      unidadId: input.unidadId,
+    },
+    ownership: input.ownership,
+    nombre: input.nombre,
+    identificadorTecnico: input.identificadorTecnico,
+    ...(input.ownership.organizacionId === undefined ? {} : { identidadVersion: 1 }),
+    activo: false,
+    ...(input.descripcion === undefined ? {} : { descripcion: input.descripcion }),
+    valores: input.valores,
+  });
 }
 
 /** Replace the bounded Resource value set inside the caller's Convex transaction. */

@@ -1,3 +1,4 @@
+import { compararPuntosCodigo } from "./huellaCatalogoSeleccion";
 import type { Atributo, Clase, Definicion, Familia, IdDominio, Opcion, Tipo, Valor, ValorEntrada } from "./tipos";
 
 export function normalizarValor(valor: Valor): string {
@@ -32,7 +33,7 @@ export function serializarIdentidadV2(
   tipo: Pick<Tipo, "clave">, familia: Pick<Familia, "clave">, clase: Pick<Clase, "clave">,
   partes: readonly (readonly [string, string])[],
 ): string {
-  const ordenadas = [...partes].sort(([a], [b]) => a.localeCompare(b));
+  const ordenadas = [...partes].sort(([a], [b]) => compararPuntosCodigo(a, b));
   return ["v2", clase.clave, familia.clave, tipo.clave, ...ordenadas.flatMap(([clave, valor]) => [clave, valor])]
     .map(componente).join("|");
 }

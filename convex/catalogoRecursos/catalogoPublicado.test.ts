@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
+import type { Snapshot } from "./catalogoPublicadoValidators";
 
 /** Test-only Vite typing; ImportMeta.glob is not included in the root TypeScript config. */
 declare global {
@@ -42,6 +43,8 @@ const crearFixture = (t: ReturnType<typeof convexTest>) => t.run(async ctx => {
   await ctx.db.insert("opcionesAtributo", { definicionAtributoId: calibreDefinicionId, clave: "TEST_14", nombre: "14", activo: true, revision: 1 });
   const cobreOpcionId = await ctx.db.insert("opcionesAtributo", { definicionAtributoId: materialDefinicionId, clave: "TEST_COBRE", nombre: "Cobre", activo: true, revision: 1 });
   await ctx.db.insert("opcionesAtributo", { definicionAtributoId: materialDefinicionId, clave: "TEST_ALUMINIO", nombre: "Aluminio", activo: true, revision: 1 });
+  await ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: calibreDefinicionId, clave: "CAL_12", nombre: "12", orden: 1, activo: true, revision: 1, valor: { kind: "OPCION", opcionAtributoId: doceOpcionId }, opcionAtributoIdIndex: doceOpcionId });
+  await ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: materialDefinicionId, clave: "MAT_CU", nombre: "Cobre", orden: 1, activo: true, revision: 1, valor: { kind: "OPCION", opcionAtributoId: cobreOpcionId }, opcionAtributoIdIndex: cobreOpcionId });
   return { claseRecursoId, familiaRecursoId, tipoRecursoId, unidadId, calibreDefinicionId, materialDefinicionId, calibreAtributoId, materialAtributoId, doceOpcionId, cobreOpcionId };
 });
 
@@ -53,6 +56,64 @@ describe("catálogo publicado", () => {
     const first = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
     expect(await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org })).toEqual(first);
     expect((await t.query(api.catalogoRecursos.catalogoPublicado.obtenerUltimaRevisionPublicada, { organizacionClave: "ORG_A" }))?.hashContenido).toBe(first.hashContenido);
+  });
+
+  it("publica la representación v2 con valores tipados y conserva el snapshot histórico", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await crearFixture(t);
+    const org = await t.mutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "ORG_A", nombre: "A" });
+    const revision = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    const snapshot = (await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: revision.revisionId, tipoClave: "TEST_CABLE" }))!.snapshot;
+    expect(snapshot).toMatchObject({ snapshotVersion: 2 });
+    expect((snapshot as Extract<typeof snapshot, { snapshotVersion: 2 }>).selectionGraph.atributos.find(attribute => attribute.atributoClave === "TEST_CALIBRE")).toMatchObject({ modoCaptura: "SELECCION", valoresPermitidos: [{ clave: "CAL_12", valor: { kind: "OPCION" }, opcionClave: "TEST_12" }] });
+  });
+
+  it("publica cada política de Unidad efectiva y el cambio no principal crea una revisión", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await crearFixture(t);
+    const org = await t.mutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "ORG_A", nombre: "A" });
+    const centimetro = await t.run(ctx => ctx.db.insert("unidades", { clave: "TEST_CM", nombre: "Centímetro", activo: true, revision: 1 }));
+    await t.run(ctx => ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: seeded.familiaRecursoId, tipoRecursoId: seeded.tipoRecursoId, unidadId: centimetro, principal: false, activo: true, revision: 1 }));
+    const first = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    const snapshot = (await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: first.revisionId, tipoClave: "TEST_CABLE" }))!.snapshot as Extract<Snapshot, { snapshotVersion: 2 }>;
+    expect(snapshot.selectionGraph.politicasUnidad).toEqual([
+      { unidadClave: "TEST_CM", principal: false },
+      { unidadClave: "TEST_M", principal: true },
+    ]);
+
+    await t.run(ctx => ctx.db.patch(centimetro, { clave: "TEST_MM" }));
+    const second = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    expect(second.hashContenido).not.toBe(first.hashContenido);
+
+    await t.run(ctx => ctx.db.patch(centimetro, { activo: false }));
+    await expect(t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org })).rejects.toThrow("Unidad natural inválida");
+  });
+
+  it("lee snapshots v1 sin reescribirlos y filtra reglas exclusivas de selección", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await crearFixture(t);
+    const org = await t.mutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "ORG_A", nombre: "A" });
+    const revision = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    const current = (await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: revision.revisionId, tipoClave: "TEST_CABLE" }))!.snapshot;
+    const { snapshotVersion: _version, selectionGraph: _graph, ...legacy } = current as Extract<typeof current, { snapshotVersion: 2 }>;
+    await t.run(ctx => ctx.db.insert("catalogoTipoSnapshots", { organizacionId: org, revisionId: revision.revisionId, tipoClave: "TEST_LEGACY", snapshot: legacy }));
+    const legacyRead = (await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: revision.revisionId, tipoClave: "TEST_LEGACY" }))!.snapshot;
+    expect("snapshotVersion" in legacyRead).toBe(false);
+
+    const allowed = await t.run(ctx => ctx.db.query("valoresPermitidosAtributo").withIndex("porDefinicionYClave", query => query.eq("definicionAtributoId", seeded.calibreDefinicionId).eq("clave", "CAL_12")).first());
+    await t.run(ctx => ctx.db.insert("reglasAtributoRecurso", { tipoRecursoId: seeded.tipoRecursoId, atributoCondicionId: seeded.calibreAtributoId, valorPermitidoCondicionId: allowed!._id, atributoAfectadoId: seeded.materialAtributoId, aplicabilidad: "OPTIONAL", activo: true, revision: 1 }));
+    const changed = await t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org });
+    const selection = (await t.query(api.catalogoRecursos.catalogoPublicado.obtenerSnapshotTipo, { organizacionClave: "ORG_A", revisionId: changed.revisionId, tipoClave: "TEST_CABLE" }))!.snapshot as Extract<typeof current, { snapshotVersion: 2 }>;
+    expect(selection.reglas).toEqual([]);
+    expect(selection.selectionGraph.reglas).toEqual([{ atributoCondicionClave: "TEST_CALIBRE", valorPermitidoCondicionClave: "CAL_12", atributoAfectadoClave: "TEST_MATERIAL", aplicabilidad: "OPTIONAL" }]);
+  });
+
+  it("rechaza un payload OPCION cuyo origen ya no está activo", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await crearFixture(t);
+    const org = await t.mutation(internal.catalogoRecursos.catalogoPublicado.asegurarOrganizacion, { clave: "ORG_A", nombre: "A" });
+    await t.run(ctx => ctx.db.patch(seeded.doceOpcionId, { activo: false }));
+    await expect(t.mutation(internal.catalogoRecursos.catalogoPublicado.publicarCatalogo, { organizacionId: org })).rejects.toThrow("ASSIGNMENT_SELECTION_INVALID");
   });
 
   it("aísla organizaciones y conserva snapshots anteriores al cambiar etiquetas", async () => {

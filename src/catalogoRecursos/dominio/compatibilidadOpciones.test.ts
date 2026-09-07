@@ -59,3 +59,15 @@ describe("evaluador de compatibilidad de opciones", () => {
     expect(evaluarCompatibilidadOpciones([inactive], "A", "A1", "B", "B1")).toBe(true);
   });
 });
+
+import { evaluarReglasCondicionales } from "./reglasCondicionales";
+
+describe("legacy conditional compatibility / WU11", () => {
+  it("keeps false, zero, and empty legacy values present while filtering selection-only predicates", () => {
+    const base = new Map([["target", "CONDITIONAL" as const]]);
+    for (const value of [false, 0, ""]) {
+      expect(evaluarReglasCondicionales([{ id: "legacy", atributoCondicionId: "source", atributoAfectadoId: "target", aplicabilidad: "REQUIRED", activo: true }], new Map([["source", value]]), base).get("target")).toBe("REQUIRED");
+    }
+    expect(evaluarReglasCondicionales([{ id: "selection", atributoCondicionId: "source", valorPermitidoCondicionId: "allowed", atributoAfectadoId: "target", aplicabilidad: "REQUIRED", activo: true }], new Map([["source", false]]), base).get("target")).toBe("OPTIONAL");
+  });
+});

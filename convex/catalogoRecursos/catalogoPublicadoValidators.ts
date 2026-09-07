@@ -38,6 +38,16 @@ const opcion = v.object({
   nombre: v.string(),
   descripcion,
 });
+const modoCapturaValidator = v.union(v.literal("SELECCION"), v.literal("LIBRE"));
+const valorPermitidoTipadoValidator = v.union(
+  v.object({ kind: v.literal("TEXTO"), value: v.string() }),
+  v.object({ kind: v.literal("NUMERO"), value: v.number() }),
+  v.object({ kind: v.literal("BOOLEANO"), value: v.boolean() }),
+  v.object({ kind: v.literal("OPCION"), opcionAtributoId: v.id("opcionesAtributo") }),
+);
+const valorPermitidoPublicado = v.object({
+  clave: v.string(), nombre: v.string(), descripcion, orden: v.number(), valor: valorPermitidoTipadoValidator, opcionClave: v.optional(v.string()),
+});
 const atributo = v.object({
   id: v.id("atributosRecurso"),
   definicionAtributoId: v.id("definicionesAtributo"),
@@ -81,16 +91,28 @@ export const tokenPresentacionValidator = v.union(
       separador: v.string(),
     });
 
-    export const snapshotValidator = v.object({
-  clase,
-  familia,
-  tipo,
-  unidadNatural: unidad,
-  atributos: v.array(atributo),
-  reglas: v.array(regla),
-  politicasCompatibilidad: v.array(politicaCompatibilidad),
-      presentacionCanonica: politicaPresentacionValidator,
-    });
+export const snapshotV1Validator = v.object({
+  clase, familia, tipo, unidadNatural: unidad, atributos: v.array(atributo), reglas: v.array(regla),
+  politicasCompatibilidad: v.array(politicaCompatibilidad), presentacionCanonica: politicaPresentacionValidator,
+});
+
+const selectionGraph = v.object({
+  politicasUnidad: v.array(v.object({ unidadClave: v.string(), principal: v.boolean() })),
+  atributos: v.array(v.object({
+    atributoClave: v.string(), modoCaptura: modoCapturaValidator, tipoDato: tipoDatoValidator,
+    valoresPermitidos: v.array(valorPermitidoPublicado),
+  })),
+  reglas: v.array(v.object({
+    atributoCondicionClave: v.string(), valorPermitidoCondicionClave: v.optional(v.string()),
+    atributoAfectadoClave: v.string(), aplicabilidad: aplicabilidadValidator,
+  })),
+});
+
+export const snapshotV2Validator = v.object({
+  snapshotVersion: v.literal(2), clase, familia, tipo, unidadNatural: unidad, atributos: v.array(atributo), reglas: v.array(regla),
+  politicasCompatibilidad: v.array(politicaCompatibilidad), presentacionCanonica: politicaPresentacionValidator, selectionGraph,
+});
+export const snapshotValidator = v.union(snapshotV1Validator, snapshotV2Validator);
 
 export const snapshotResultadoValidator = v.object({
   revisionId: v.id("catalogoRevisiones"),

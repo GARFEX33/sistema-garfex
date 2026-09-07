@@ -126,3 +126,12 @@ describe("administración de políticas de compatibilidad", () => {
     expect(deny.item.effective).toBe(true);
   });
 });
+
+describe("Resource administration compatibility / WU11", () => {
+  it("retains the seven legacy Resource administration references beside only two selection additions", () => {
+    const legacy = ["crearRecurso", "listarRecursosResumen", "buscarRecursosResumen", "obtenerDetalleRecurso", "actualizarRecurso", "activarRecurso", "desactivarRecurso"] as const;
+    for (const name of legacy) expect(api.catalogoAdmin.recursos[name]).toBeDefined();
+    expect(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones).toBeDefined();
+    expect(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones).toBeDefined();
+  });
+});

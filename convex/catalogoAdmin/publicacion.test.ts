@@ -37,6 +37,18 @@ describe("publicación administrativa explícita", () => {
     expect(unchanged).toMatchObject({ disposition: "CREATED", numero: 2 });
   });
 
+  it("rechaza atómicamente una asignación SELECCION efectiva sin valor permitido", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await fixture(t);
+    await t.run(async ctx => {
+      const definition = await ctx.db.insert("definicionesAtributo", { clave: "COLOR", nombre: "Color", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true, revision: 1 });
+      await ctx.db.insert("atributosRecurso", { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition, aplicabilidad: "REQUIRED", participaIdentidad: false, orden: 1, activo: true, revision: 1 });
+    });
+    await expect(t.mutation(api.catalogoAdmin.publicacion.publicarCatalogo, publish(ids.organizacion))).rejects.toMatchObject({ data: { code: "ADMIN_PUBLICATION_INVALID" } });
+    expect((await t.query(api.catalogoAdmin.publicacion.listarRevisiones, { organizacionId: ids.organizacion, cursor: null, pageSize: 10 })).items).toEqual([]);
+    expect(await t.run(ctx => ctx.db.query("catalogoTipoSnapshots").collect())).toEqual([]);
+  });
+
   it("devuelve UNCHANGED y no agrega una revisión cuando el contenido no cambia", async () => {
     const t = convexTest(schema, modules);
     const ids = await fixture(t);

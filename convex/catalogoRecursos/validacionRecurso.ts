@@ -133,7 +133,7 @@ async function cargarSnapshot(ctx: MutationCtx, entrada: CrearRecursoEntrada): P
     unidad: unidadDoc ? { id: id(unidadDoc._id), activo: unidadDoc.activo } : null,
     politicas: politicas.map(p => ({ id: id(p._id), activo: p.activo, familiaRecursoId: id(p.familiaRecursoId), tipoRecursoId: p.tipoRecursoId === undefined ? undefined : id(p.tipoRecursoId), unidadId: id(p.unidadId) })),
     atributos: registros.map(r => { const d = definicion(r); return { id: id(r._id), activo: r.activo, definicionAtributoId: id(r.definicionAtributoId), tipoRecursoId: r.tipoRecursoId === undefined ? undefined : id(r.tipoRecursoId), aplicabilidad: r.aplicabilidad, participaIdentidad: r.participaIdentidad, definicion: d ? { id: id(d._id), clave: d.clave, tipoDato: d.tipoDato, activo: d.activo } : null }; }),
-    reglas: reglas.map(r => ({ id: id(r._id), activo: r.activo, atributoCondicionId: id(r.atributoCondicionId), opcionCondicionId: r.opcionCondicionId === undefined ? undefined : id(r.opcionCondicionId), atributoAfectadoId: id(r.atributoAfectadoId), aplicabilidad: r.aplicabilidad })),
+    reglas: reglas.map(r => ({ id: id(r._id), activo: r.activo, atributoCondicionId: id(r.atributoCondicionId), opcionCondicionId: r.opcionCondicionId === undefined ? undefined : id(r.opcionCondicionId), valorPermitidoCondicionId: r.valorPermitidoCondicionId === undefined ? undefined : id(r.valorPermitidoCondicionId), atributoAfectadoId: id(r.atributoAfectadoId), aplicabilidad: r.aplicabilidad })),
     opciones: opciones.map(o => ({ id: id(o._id), activo: o.activo, definicionAtributoId: id(o.definicionAtributoId), clave: o.clave })),
   };
 }

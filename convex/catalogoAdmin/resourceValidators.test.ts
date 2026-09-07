@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_RESOURCE_VALUES, resourceDetailValidator, resourceSummaryValidator, resourceValueValidator, valorPermitidoTipadoValidator } from "./resourceValidators";
+import { MAX_RESOURCE_VALUES, resourceDetailValidator, resourceSummaryValidator, resourceValueValidator, selectionCreateResultValidator, valorPermitidoTipadoValidator } from "./resourceValidators";
 
 describe("Resource administrative validators", () => {
   it("defines bounded inferred contracts", () => { expect(MAX_RESOURCE_VALUES).toBe(200); expect(resourceValueValidator).toMatchObject({ kind: "object" }); expect(resourceSummaryValidator).toMatchObject({ kind: "object" }); expect(resourceDetailValidator).toMatchObject({ kind: "object" }); });
@@ -7,5 +7,10 @@ describe("Resource administrative validators", () => {
   it("defines each authoritative typed allowed-value payload", () => {
     expect(valorPermitidoTipadoValidator).toMatchObject({ kind: "union" });
     expect((valorPermitidoTipadoValidator as { members?: unknown[] }).members).toHaveLength(4);
+  });
+  it("keeps selection creation to four exact result members", () => {
+    const members = (selectionCreateResultValidator as { members?: Array<{ fields?: Record<string, unknown> }> }).members ?? [];
+    expect(members).toHaveLength(4);
+    expect(members.map(member => Object.keys(member.fields ?? {}).sort())).toEqual([["disposition", "item"], ["disposition", "evaluation"], ["disposition", "evaluation"], ["disposition", "evaluation"]]);
   });
 });

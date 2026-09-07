@@ -2355,92 +2355,217 @@ export declare const api: {
         },
         {
           revisionId: Id<"catalogoRevisiones">;
-          snapshot: {
-            atributos: Array<{
-              aplicabilidad:
-                | "REQUIRED"
-                | "OPTIONAL"
-                | "CONDITIONAL"
-                | "FORBIDDEN"
-                | "NOT_APPLICABLE";
-              clave: string;
-              definicionAtributoId: Id<"definicionesAtributo">;
-              descripcion?: string;
-              id: Id<"atributosRecurso">;
-              nombre: string;
-              opciones: Array<{
-                clave: string;
-                descripcion?: string;
-                id: Id<"opcionesAtributo">;
-                nombre: string;
-              }>;
-              orden: number;
-              participaIdentidad: boolean;
-              tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
-              unidad: {
-                clave: string;
-                id: Id<"unidades">;
-                nombre: string;
-                simbolo: string | null;
-              } | null;
-            }>;
-            clase: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"clasesRecurso">;
-              nombre: string;
-            };
-            familia: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"familiasRecurso">;
-              nombre: string;
-            };
-            politicasCompatibilidad: Array<{
-              atributoDestinoClave: string;
-              atributoOrigenClave: string;
-              direccion: "DIRECTIONAL" | "SYMMETRIC";
-              modo: "ALLOWLIST" | "DENYLIST";
-              pares: Array<{
-                destinoOpcionClave: string;
-                origenOpcionClave: string;
-              }>;
-            }>;
-            presentacionCanonica: {
-              separador: string;
-              tipoNombre: string;
-              tokens: Array<
-                | { tipo: "TYPE_NAME" }
-                | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
-                | { texto: string; tipo: "LITERAL" }
-              >;
-            };
-            reglas: Array<{
-              aplicabilidad:
-                | "REQUIRED"
-                | "OPTIONAL"
-                | "CONDITIONAL"
-                | "FORBIDDEN"
-                | "NOT_APPLICABLE";
-              atributoAfectadoClave: string;
-              atributoCondicionClave: string;
-              id: Id<"reglasAtributoRecurso">;
-              opcionCondicionClave?: string;
-            }>;
-            tipo: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"tiposRecurso">;
-              nombre: string;
-            };
-            unidadNatural: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"unidades">;
-              nombre: string;
-              simbolo?: string;
-            };
-          };
+          snapshot:
+            | {
+                atributos: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  clave: string;
+                  definicionAtributoId: Id<"definicionesAtributo">;
+                  descripcion?: string;
+                  id: Id<"atributosRecurso">;
+                  nombre: string;
+                  opciones: Array<{
+                    clave: string;
+                    descripcion?: string;
+                    id: Id<"opcionesAtributo">;
+                    nombre: string;
+                  }>;
+                  orden: number;
+                  participaIdentidad: boolean;
+                  tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                  unidad: {
+                    clave: string;
+                    id: Id<"unidades">;
+                    nombre: string;
+                    simbolo: string | null;
+                  } | null;
+                }>;
+                clase: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"clasesRecurso">;
+                  nombre: string;
+                };
+                familia: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"familiasRecurso">;
+                  nombre: string;
+                };
+                politicasCompatibilidad: Array<{
+                  atributoDestinoClave: string;
+                  atributoOrigenClave: string;
+                  direccion: "DIRECTIONAL" | "SYMMETRIC";
+                  modo: "ALLOWLIST" | "DENYLIST";
+                  pares: Array<{
+                    destinoOpcionClave: string;
+                    origenOpcionClave: string;
+                  }>;
+                }>;
+                presentacionCanonica: {
+                  separador: string;
+                  tipoNombre: string;
+                  tokens: Array<
+                    | { tipo: "TYPE_NAME" }
+                    | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
+                    | { texto: string; tipo: "LITERAL" }
+                  >;
+                };
+                reglas: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  atributoAfectadoClave: string;
+                  atributoCondicionClave: string;
+                  id: Id<"reglasAtributoRecurso">;
+                  opcionCondicionClave?: string;
+                }>;
+                tipo: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"tiposRecurso">;
+                  nombre: string;
+                };
+                unidadNatural: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"unidades">;
+                  nombre: string;
+                  simbolo?: string;
+                };
+              }
+            | {
+                atributos: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  clave: string;
+                  definicionAtributoId: Id<"definicionesAtributo">;
+                  descripcion?: string;
+                  id: Id<"atributosRecurso">;
+                  nombre: string;
+                  opciones: Array<{
+                    clave: string;
+                    descripcion?: string;
+                    id: Id<"opcionesAtributo">;
+                    nombre: string;
+                  }>;
+                  orden: number;
+                  participaIdentidad: boolean;
+                  tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                  unidad: {
+                    clave: string;
+                    id: Id<"unidades">;
+                    nombre: string;
+                    simbolo: string | null;
+                  } | null;
+                }>;
+                clase: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"clasesRecurso">;
+                  nombre: string;
+                };
+                familia: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"familiasRecurso">;
+                  nombre: string;
+                };
+                politicasCompatibilidad: Array<{
+                  atributoDestinoClave: string;
+                  atributoOrigenClave: string;
+                  direccion: "DIRECTIONAL" | "SYMMETRIC";
+                  modo: "ALLOWLIST" | "DENYLIST";
+                  pares: Array<{
+                    destinoOpcionClave: string;
+                    origenOpcionClave: string;
+                  }>;
+                }>;
+                presentacionCanonica: {
+                  separador: string;
+                  tipoNombre: string;
+                  tokens: Array<
+                    | { tipo: "TYPE_NAME" }
+                    | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
+                    | { texto: string; tipo: "LITERAL" }
+                  >;
+                };
+                reglas: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  atributoAfectadoClave: string;
+                  atributoCondicionClave: string;
+                  id: Id<"reglasAtributoRecurso">;
+                  opcionCondicionClave?: string;
+                }>;
+                selectionGraph: {
+                  atributos: Array<{
+                    atributoClave: string;
+                    modoCaptura: "SELECCION" | "LIBRE";
+                    tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                    valoresPermitidos: Array<{
+                      clave: string;
+                      descripcion?: string;
+                      nombre: string;
+                      opcionClave?: string;
+                      orden: number;
+                      valor:
+                        | { kind: "TEXTO"; value: string }
+                        | { kind: "NUMERO"; value: number }
+                        | { kind: "BOOLEANO"; value: boolean }
+                        | {
+                            kind: "OPCION";
+                            opcionAtributoId: Id<"opcionesAtributo">;
+                          };
+                    }>;
+                  }>;
+                  politicasUnidad: Array<{
+                    principal: boolean;
+                    unidadClave: string;
+                  }>;
+                  reglas: Array<{
+                    aplicabilidad:
+                      | "REQUIRED"
+                      | "OPTIONAL"
+                      | "CONDITIONAL"
+                      | "FORBIDDEN"
+                      | "NOT_APPLICABLE";
+                    atributoAfectadoClave: string;
+                    atributoCondicionClave: string;
+                    valorPermitidoCondicionClave?: string;
+                  }>;
+                };
+                snapshotVersion: 2;
+                tipo: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"tiposRecurso">;
+                  nombre: string;
+                };
+                unidadNatural: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"unidades">;
+                  nombre: string;
+                  simbolo?: string;
+                };
+              };
           tipoClave: string;
         } | null
       >;
@@ -2600,6 +2725,176 @@ export declare const api: {
           };
         }
       >;
+      crearRecursoDesdeSelecciones: FunctionReference<
+        "mutation",
+        "public",
+        {
+          claseRecursoId: Id<"clasesRecurso">;
+          expectedCatalogFingerprint: string;
+          familiaRecursoId: Id<"familiasRecurso">;
+          ownership:
+            | { kind: "GLOBAL" }
+            | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+          selecciones: Array<{
+            asignacionAtributoId: Id<"atributosRecurso">;
+            valorPermitidoId: Id<"valoresPermitidosAtributo">;
+          }>;
+          tipoRecursoId: Id<"tiposRecurso">;
+          unidadId: Id<"unidades">;
+        },
+        | {
+            disposition: "CREATED";
+            item: {
+              activo: boolean;
+              classificationStatus: {
+                reasons: Array<string>;
+                state: "EFFECTIVE" | "INERT" | "BROKEN_REFERENCE";
+              };
+              id: Id<"recursos">;
+              identificadorTecnico: string;
+              nombre: string;
+              organizacionId?: Id<"organizaciones">;
+              revision: number;
+              tipoRecursoId: Id<"tiposRecurso">;
+              unidadId: Id<"unidades">;
+            };
+          }
+        | {
+            disposition: "CATALOG_CHANGED";
+            evaluation: {
+              asignaciones: Array<{
+                aplicabilidadResuelta:
+                  "REQUIRED" | "OPTIONAL" | "FORBIDDEN" | "NOT_APPLICABLE";
+                asignacionAtributoId: Id<"atributosRecurso">;
+                definicionAtributoId: Id<"definicionesAtributo">;
+                effectiveReasons: Array<string>;
+                orden: number;
+                participaIdentidad: boolean;
+                selectedValueId?: Id<"valoresPermitidosAtributo">;
+              }>;
+              catalogFingerprint: string;
+              faltantesRequeridos: Array<Id<"atributosRecurso">>;
+              identificadorTecnico: string | null;
+              issues: Array<{
+                asignacionAtributoId?: Id<"atributosRecurso">;
+                code:
+                  | "HIERARCHY_INVALID"
+                  | "UNIT_INVALID"
+                  | "OWNERSHIP_INVALID"
+                  | "ASSIGNMENT_UNKNOWN"
+                  | "ASSIGNMENT_DUPLICATE"
+                  | "ALLOWED_VALUE_UNKNOWN"
+                  | "ALLOWED_VALUE_FOREIGN"
+                  | "ALLOWED_VALUE_INACTIVE"
+                  | "SELECTION_NON_EFFECTIVE"
+                  | "SELECTION_FORBIDDEN"
+                  | "SELECTION_NOT_APPLICABLE"
+                  | "UNSUPPORTED_FREE_CAPTURE"
+                  | "IDENTITY_CONFLICT";
+                message: string;
+              }>;
+              nombre: string | null;
+              seleccionesInvalidas: Array<Id<"atributosRecurso">>;
+              status: "INCOMPLETE" | "VALID" | "INVALID";
+              valid: boolean;
+              valoresNormalizados: Array<{
+                atributoRecursoId: Id<"atributosRecurso">;
+                opcionAtributoId?: Id<"opcionesAtributo">;
+                valor: string | number | boolean;
+              }>;
+            };
+          }
+        | {
+            disposition: "INCOMPLETE";
+            evaluation: {
+              asignaciones: Array<{
+                aplicabilidadResuelta:
+                  "REQUIRED" | "OPTIONAL" | "FORBIDDEN" | "NOT_APPLICABLE";
+                asignacionAtributoId: Id<"atributosRecurso">;
+                definicionAtributoId: Id<"definicionesAtributo">;
+                effectiveReasons: Array<string>;
+                orden: number;
+                participaIdentidad: boolean;
+                selectedValueId?: Id<"valoresPermitidosAtributo">;
+              }>;
+              catalogFingerprint: string;
+              faltantesRequeridos: Array<Id<"atributosRecurso">>;
+              identificadorTecnico: string | null;
+              issues: Array<{
+                asignacionAtributoId?: Id<"atributosRecurso">;
+                code:
+                  | "HIERARCHY_INVALID"
+                  | "UNIT_INVALID"
+                  | "OWNERSHIP_INVALID"
+                  | "ASSIGNMENT_UNKNOWN"
+                  | "ASSIGNMENT_DUPLICATE"
+                  | "ALLOWED_VALUE_UNKNOWN"
+                  | "ALLOWED_VALUE_FOREIGN"
+                  | "ALLOWED_VALUE_INACTIVE"
+                  | "SELECTION_NON_EFFECTIVE"
+                  | "SELECTION_FORBIDDEN"
+                  | "SELECTION_NOT_APPLICABLE"
+                  | "UNSUPPORTED_FREE_CAPTURE"
+                  | "IDENTITY_CONFLICT";
+                message: string;
+              }>;
+              nombre: string | null;
+              seleccionesInvalidas: Array<Id<"atributosRecurso">>;
+              status: "INCOMPLETE" | "VALID" | "INVALID";
+              valid: boolean;
+              valoresNormalizados: Array<{
+                atributoRecursoId: Id<"atributosRecurso">;
+                opcionAtributoId?: Id<"opcionesAtributo">;
+                valor: string | number | boolean;
+              }>;
+            };
+          }
+        | {
+            disposition: "INVALID";
+            evaluation: {
+              asignaciones: Array<{
+                aplicabilidadResuelta:
+                  "REQUIRED" | "OPTIONAL" | "FORBIDDEN" | "NOT_APPLICABLE";
+                asignacionAtributoId: Id<"atributosRecurso">;
+                definicionAtributoId: Id<"definicionesAtributo">;
+                effectiveReasons: Array<string>;
+                orden: number;
+                participaIdentidad: boolean;
+                selectedValueId?: Id<"valoresPermitidosAtributo">;
+              }>;
+              catalogFingerprint: string;
+              faltantesRequeridos: Array<Id<"atributosRecurso">>;
+              identificadorTecnico: string | null;
+              issues: Array<{
+                asignacionAtributoId?: Id<"atributosRecurso">;
+                code:
+                  | "HIERARCHY_INVALID"
+                  | "UNIT_INVALID"
+                  | "OWNERSHIP_INVALID"
+                  | "ASSIGNMENT_UNKNOWN"
+                  | "ASSIGNMENT_DUPLICATE"
+                  | "ALLOWED_VALUE_UNKNOWN"
+                  | "ALLOWED_VALUE_FOREIGN"
+                  | "ALLOWED_VALUE_INACTIVE"
+                  | "SELECTION_NON_EFFECTIVE"
+                  | "SELECTION_FORBIDDEN"
+                  | "SELECTION_NOT_APPLICABLE"
+                  | "UNSUPPORTED_FREE_CAPTURE"
+                  | "IDENTITY_CONFLICT";
+                message: string;
+              }>;
+              nombre: string | null;
+              seleccionesInvalidas: Array<Id<"atributosRecurso">>;
+              status: "INCOMPLETE" | "VALID" | "INVALID";
+              valid: boolean;
+              valoresNormalizados: Array<{
+                atributoRecursoId: Id<"atributosRecurso">;
+                opcionAtributoId?: Id<"opcionesAtributo">;
+                valor: string | number | boolean;
+              }>;
+            };
+          }
+      >;
       desactivarRecurso: FunctionReference<
         "mutation",
         "public",
@@ -2620,6 +2915,65 @@ export declare const api: {
             tipoRecursoId: Id<"tiposRecurso">;
             unidadId: Id<"unidades">;
           };
+        }
+      >;
+      evaluarCreacionDesdeSelecciones: FunctionReference<
+        "query",
+        "public",
+        {
+          claseRecursoId: Id<"clasesRecurso">;
+          familiaRecursoId: Id<"familiasRecurso">;
+          ownership:
+            | { kind: "GLOBAL" }
+            | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+          selecciones: Array<{
+            asignacionAtributoId: Id<"atributosRecurso">;
+            valorPermitidoId: Id<"valoresPermitidosAtributo">;
+          }>;
+          tipoRecursoId: Id<"tiposRecurso">;
+          unidadId: Id<"unidades">;
+        },
+        {
+          asignaciones: Array<{
+            aplicabilidadResuelta:
+              "REQUIRED" | "OPTIONAL" | "FORBIDDEN" | "NOT_APPLICABLE";
+            asignacionAtributoId: Id<"atributosRecurso">;
+            definicionAtributoId: Id<"definicionesAtributo">;
+            effectiveReasons: Array<string>;
+            orden: number;
+            participaIdentidad: boolean;
+            selectedValueId?: Id<"valoresPermitidosAtributo">;
+          }>;
+          catalogFingerprint: string;
+          faltantesRequeridos: Array<Id<"atributosRecurso">>;
+          identificadorTecnico: string | null;
+          issues: Array<{
+            asignacionAtributoId?: Id<"atributosRecurso">;
+            code:
+              | "HIERARCHY_INVALID"
+              | "UNIT_INVALID"
+              | "OWNERSHIP_INVALID"
+              | "ASSIGNMENT_UNKNOWN"
+              | "ASSIGNMENT_DUPLICATE"
+              | "ALLOWED_VALUE_UNKNOWN"
+              | "ALLOWED_VALUE_FOREIGN"
+              | "ALLOWED_VALUE_INACTIVE"
+              | "SELECTION_NON_EFFECTIVE"
+              | "SELECTION_FORBIDDEN"
+              | "SELECTION_NOT_APPLICABLE"
+              | "UNSUPPORTED_FREE_CAPTURE"
+              | "IDENTITY_CONFLICT";
+            message: string;
+          }>;
+          nombre: string | null;
+          seleccionesInvalidas: Array<Id<"atributosRecurso">>;
+          status: "INCOMPLETE" | "VALID" | "INVALID";
+          valid: boolean;
+          valoresNormalizados: Array<{
+            atributoRecursoId: Id<"atributosRecurso">;
+            opcionAtributoId?: Id<"opcionesAtributo">;
+            valor: string | number | boolean;
+          }>;
         }
       >;
       listarRecursosResumen: FunctionReference<
@@ -2907,6 +3261,7 @@ export declare const api: {
             opcionCondicionId?: Id<"opcionesAtributo">;
             revision: number;
             tipoRecursoId: Id<"tiposRecurso">;
+            valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
           };
         }
       >;
@@ -2926,6 +3281,7 @@ export declare const api: {
           opcionCondicionId?: Id<"opcionesAtributo"> | null;
           reglaAtributoRecursoId: Id<"reglasAtributoRecurso">;
           tipoRecursoId?: Id<"tiposRecurso">;
+          valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo"> | null;
         },
         {
           disposition: "UPDATED" | "UNCHANGED";
@@ -2945,6 +3301,7 @@ export declare const api: {
             opcionCondicionId?: Id<"opcionesAtributo">;
             revision: number;
             tipoRecursoId: Id<"tiposRecurso">;
+            valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
           };
         }
       >;
@@ -2963,6 +3320,7 @@ export declare const api: {
           atributoCondicionId: Id<"atributosRecurso">;
           opcionCondicionId?: Id<"opcionesAtributo">;
           tipoRecursoId: Id<"tiposRecurso">;
+          valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
         },
         {
           disposition: "CREATED";
@@ -2982,6 +3340,7 @@ export declare const api: {
             opcionCondicionId?: Id<"opcionesAtributo">;
             revision: number;
             tipoRecursoId: Id<"tiposRecurso">;
+            valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
           };
         }
       >;
@@ -3010,6 +3369,7 @@ export declare const api: {
             opcionCondicionId?: Id<"opcionesAtributo">;
             revision: number;
             tipoRecursoId: Id<"tiposRecurso">;
+            valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
           };
         }
       >;
@@ -3050,6 +3410,7 @@ export declare const api: {
             opcionCondicionId?: Id<"opcionesAtributo">;
             revision: number;
             tipoRecursoId: Id<"tiposRecurso">;
+            valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
           }>;
         }
       >;
@@ -3073,6 +3434,7 @@ export declare const api: {
           opcionCondicionId?: Id<"opcionesAtributo">;
           revision: number;
           tipoRecursoId: Id<"tiposRecurso">;
+          valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
         } | null
       >;
     };
@@ -3616,92 +3978,217 @@ export declare const api: {
         },
         {
           revisionId: Id<"catalogoRevisiones">;
-          snapshot: {
-            atributos: Array<{
-              aplicabilidad:
-                | "REQUIRED"
-                | "OPTIONAL"
-                | "CONDITIONAL"
-                | "FORBIDDEN"
-                | "NOT_APPLICABLE";
-              clave: string;
-              definicionAtributoId: Id<"definicionesAtributo">;
-              descripcion?: string;
-              id: Id<"atributosRecurso">;
-              nombre: string;
-              opciones: Array<{
-                clave: string;
-                descripcion?: string;
-                id: Id<"opcionesAtributo">;
-                nombre: string;
-              }>;
-              orden: number;
-              participaIdentidad: boolean;
-              tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
-              unidad: {
-                clave: string;
-                id: Id<"unidades">;
-                nombre: string;
-                simbolo: string | null;
-              } | null;
-            }>;
-            clase: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"clasesRecurso">;
-              nombre: string;
-            };
-            familia: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"familiasRecurso">;
-              nombre: string;
-            };
-            politicasCompatibilidad: Array<{
-              atributoDestinoClave: string;
-              atributoOrigenClave: string;
-              direccion: "DIRECTIONAL" | "SYMMETRIC";
-              modo: "ALLOWLIST" | "DENYLIST";
-              pares: Array<{
-                destinoOpcionClave: string;
-                origenOpcionClave: string;
-              }>;
-            }>;
-            presentacionCanonica: {
-              separador: string;
-              tipoNombre: string;
-              tokens: Array<
-                | { tipo: "TYPE_NAME" }
-                | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
-                | { texto: string; tipo: "LITERAL" }
-              >;
-            };
-            reglas: Array<{
-              aplicabilidad:
-                | "REQUIRED"
-                | "OPTIONAL"
-                | "CONDITIONAL"
-                | "FORBIDDEN"
-                | "NOT_APPLICABLE";
-              atributoAfectadoClave: string;
-              atributoCondicionClave: string;
-              id: Id<"reglasAtributoRecurso">;
-              opcionCondicionClave?: string;
-            }>;
-            tipo: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"tiposRecurso">;
-              nombre: string;
-            };
-            unidadNatural: {
-              clave: string;
-              descripcion?: string;
-              id: Id<"unidades">;
-              nombre: string;
-              simbolo?: string;
-            };
-          };
+          snapshot:
+            | {
+                atributos: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  clave: string;
+                  definicionAtributoId: Id<"definicionesAtributo">;
+                  descripcion?: string;
+                  id: Id<"atributosRecurso">;
+                  nombre: string;
+                  opciones: Array<{
+                    clave: string;
+                    descripcion?: string;
+                    id: Id<"opcionesAtributo">;
+                    nombre: string;
+                  }>;
+                  orden: number;
+                  participaIdentidad: boolean;
+                  tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                  unidad: {
+                    clave: string;
+                    id: Id<"unidades">;
+                    nombre: string;
+                    simbolo: string | null;
+                  } | null;
+                }>;
+                clase: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"clasesRecurso">;
+                  nombre: string;
+                };
+                familia: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"familiasRecurso">;
+                  nombre: string;
+                };
+                politicasCompatibilidad: Array<{
+                  atributoDestinoClave: string;
+                  atributoOrigenClave: string;
+                  direccion: "DIRECTIONAL" | "SYMMETRIC";
+                  modo: "ALLOWLIST" | "DENYLIST";
+                  pares: Array<{
+                    destinoOpcionClave: string;
+                    origenOpcionClave: string;
+                  }>;
+                }>;
+                presentacionCanonica: {
+                  separador: string;
+                  tipoNombre: string;
+                  tokens: Array<
+                    | { tipo: "TYPE_NAME" }
+                    | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
+                    | { texto: string; tipo: "LITERAL" }
+                  >;
+                };
+                reglas: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  atributoAfectadoClave: string;
+                  atributoCondicionClave: string;
+                  id: Id<"reglasAtributoRecurso">;
+                  opcionCondicionClave?: string;
+                }>;
+                tipo: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"tiposRecurso">;
+                  nombre: string;
+                };
+                unidadNatural: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"unidades">;
+                  nombre: string;
+                  simbolo?: string;
+                };
+              }
+            | {
+                atributos: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  clave: string;
+                  definicionAtributoId: Id<"definicionesAtributo">;
+                  descripcion?: string;
+                  id: Id<"atributosRecurso">;
+                  nombre: string;
+                  opciones: Array<{
+                    clave: string;
+                    descripcion?: string;
+                    id: Id<"opcionesAtributo">;
+                    nombre: string;
+                  }>;
+                  orden: number;
+                  participaIdentidad: boolean;
+                  tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                  unidad: {
+                    clave: string;
+                    id: Id<"unidades">;
+                    nombre: string;
+                    simbolo: string | null;
+                  } | null;
+                }>;
+                clase: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"clasesRecurso">;
+                  nombre: string;
+                };
+                familia: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"familiasRecurso">;
+                  nombre: string;
+                };
+                politicasCompatibilidad: Array<{
+                  atributoDestinoClave: string;
+                  atributoOrigenClave: string;
+                  direccion: "DIRECTIONAL" | "SYMMETRIC";
+                  modo: "ALLOWLIST" | "DENYLIST";
+                  pares: Array<{
+                    destinoOpcionClave: string;
+                    origenOpcionClave: string;
+                  }>;
+                }>;
+                presentacionCanonica: {
+                  separador: string;
+                  tipoNombre: string;
+                  tokens: Array<
+                    | { tipo: "TYPE_NAME" }
+                    | { atributoClave: string; tipo: "ATTRIBUTE_VALUE" }
+                    | { texto: string; tipo: "LITERAL" }
+                  >;
+                };
+                reglas: Array<{
+                  aplicabilidad:
+                    | "REQUIRED"
+                    | "OPTIONAL"
+                    | "CONDITIONAL"
+                    | "FORBIDDEN"
+                    | "NOT_APPLICABLE";
+                  atributoAfectadoClave: string;
+                  atributoCondicionClave: string;
+                  id: Id<"reglasAtributoRecurso">;
+                  opcionCondicionClave?: string;
+                }>;
+                selectionGraph: {
+                  atributos: Array<{
+                    atributoClave: string;
+                    modoCaptura: "SELECCION" | "LIBRE";
+                    tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+                    valoresPermitidos: Array<{
+                      clave: string;
+                      descripcion?: string;
+                      nombre: string;
+                      opcionClave?: string;
+                      orden: number;
+                      valor:
+                        | { kind: "TEXTO"; value: string }
+                        | { kind: "NUMERO"; value: number }
+                        | { kind: "BOOLEANO"; value: boolean }
+                        | {
+                            kind: "OPCION";
+                            opcionAtributoId: Id<"opcionesAtributo">;
+                          };
+                    }>;
+                  }>;
+                  politicasUnidad: Array<{
+                    principal: boolean;
+                    unidadClave: string;
+                  }>;
+                  reglas: Array<{
+                    aplicabilidad:
+                      | "REQUIRED"
+                      | "OPTIONAL"
+                      | "CONDITIONAL"
+                      | "FORBIDDEN"
+                      | "NOT_APPLICABLE";
+                    atributoAfectadoClave: string;
+                    atributoCondicionClave: string;
+                    valorPermitidoCondicionClave?: string;
+                  }>;
+                };
+                snapshotVersion: 2;
+                tipo: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"tiposRecurso">;
+                  nombre: string;
+                };
+                unidadNatural: {
+                  clave: string;
+                  descripcion?: string;
+                  id: Id<"unidades">;
+                  nombre: string;
+                  simbolo?: string;
+                };
+              };
           tipoClave: string;
         } | null
       >;

@@ -373,3 +373,19 @@ describe("recursos", () => {
     expect(counts).toEqual({ recursos: 0, valores: 0 });
   });
 });
+
+describe("legacy Resource creation compatibility / WU11", () => {
+  it("accepts manual primitive and option values without a fingerprint or allowed-value ID, leaving rows unlinked", async () => {
+    const t = convexTest(schema, modules); const f = await seedFixture(t);
+    await t.run(async ctx => {
+      const color = await ctx.db.get(f.color);
+      const allowed = await ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: color!.definicionAtributoId, clave: "rojo", valor: { kind: "OPCION", opcionAtributoId: f.rojo }, nombre: "Selection only", orden: 1, activo: true, revision: 1 });
+      await ctx.db.insert("reglasAtributoRecurso", { tipoRecursoId: f.tipo, atributoCondicionId: f.color, valorPermitidoCondicionId: allowed, atributoAfectadoId: f.condicionalBase, aplicabilidad: "REQUIRED", activo: true, revision: 1 });
+    });
+    const created = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { descripcion: "manual", valores: [...input(f).valores, { atributoRecursoId: f.texto, valor: "manual text" }, { atributoRecursoId: f.booleano, valor: false }, { atributoRecursoId: f.numero, valor: 0 }] }));
+    expect(created).toMatchObject({ nombre: "Bomba visible", descripcion: "manual", activo: true });
+    const rows = await t.run(ctx => ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q.eq("recursoId", created._id)).collect());
+    expect(rows).toHaveLength(5);
+    expect(rows.every(row => row.valorPermitidoId === undefined)).toBe(true);
+  });
+});

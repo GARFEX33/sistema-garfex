@@ -7,6 +7,7 @@ import { validarReglasCondicionales, type ReglaCondicional } from "../../../src/
 import { validarEstructuraPresentacion } from "../../../src/catalogoRecursos/dominio/presentacionCanonica";
 import { politicasCompatibilidadEnConflicto } from "../../../src/catalogoRecursos/dominio/compatibilidadOpciones";
 import { resolverJerarquiaEfectiva } from "../../../src/catalogoRecursos/dominio/catalogoEfectivo";
+import { resolverModoCaptura } from "../../../src/catalogoRecursos/dominio/modoCaptura";
 
 export const MAX_AGGREGATE_ROWS = 200;
 export type BoundedRows<T> = { exceeded: boolean; rows: T[] };
@@ -60,6 +61,23 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
   const options = (await Promise.all([...new Set(selectedAssignments.filter(row => row.tipoDato === "OPCION").map(row => row.definicionId))].map(async id => ctx.db.query("opcionesAtributo").withIndex("porDefinicion", q => q.eq("definicionAtributoId", id as Id<"definicionesAtributo">)).take(MAX_AGGREGATE_ROWS + 1)))).flat().map(row => ({ id: String(row._id), definicionId: String(row.definicionAtributoId), activo: row.activo }));
   const incompleteAssignments = validarCompletitudAsignaciones(selectedAssignments.filter(row => row.tipoDato === "OPCION"), options);
   if (incompleteAssignments.length) return { effective, status: "INVALID", violations: incompleteAssignments.map(id => ({ code: "OPTION_SET_EMPTY" as const, detail: id })) };
+  const selectionViolations: AggregateViolation[] = [];
+  for (const assignment of selectedAssignments) {
+    const definition = definitions.get(assignment.definicionId);
+    if (!definition || assignment.aplicabilidad === "FORBIDDEN" || assignment.aplicabilidad === "NOT_APPLICABLE" || resolverModoCaptura(definition) !== "SELECCION") continue;
+    const values = await ctx.db.query("valoresPermitidosAtributo")
+      .withIndex("porDefinicionYActivoYOrdenYClaveYAdminSort", query => query.eq("definicionAtributoId", definition._id).eq("activo", true))
+      .take(MAX_AGGREGATE_ROWS + 1);
+    if (values.length > MAX_AGGREGATE_ROWS) return { effective, status: "INVALID", violations: [limitViolation("allowed-value fan-out exceeds the bounded limit")] };
+    const valid = values.filter(value => {
+      const payload = value.valor;
+      if (payload.kind === "OPCION") return definition.tipoDato === "OPCION" && options.some(option => option.id === String(payload.opcionAtributoId) && option.definicionId === assignment.definicionId && option.activo);
+      return payload.kind === definition.tipoDato && (payload.kind !== "NUMERO" || Number.isFinite(payload.value));
+    });
+    if (valid.length !== values.length) selectionViolations.push({ code: "ASSIGNMENT_SELECTION_INVALID", detail: assignment.id });
+    if (valid.length === 0) selectionViolations.push({ code: "OPTION_SET_EMPTY", detail: assignment.id });
+  }
+  if (selectionViolations.length) return { effective, status: "INVALID", violations: selectionViolations};
   const selectedIds = new Set(selectedAssignments.map(row => row.id));
   const activeOptionIds = new Set(options.filter(option => option.activo).map(option => option.id));
   const compatibilityRows = await ctx.db.query("politicasCompatibilidadOpciones").withIndex("porTipo", q => q.eq("tipoRecursoId", typeId)).take(MAX_AGGREGATE_ROWS + 1);
@@ -78,7 +96,7 @@ export async function cargarAgregado(ctx: DbContext, typeId: Id<"tiposRecurso">,
     if (compatibilityRows.some(other => other.activo && other._id !== policy._id && politicasCompatibilidadEnConflicto(policy, other))) valid = false;
     compatibilityPolicies.push({ active: true, allowlist: policy.modo === "ALLOWLIST", hasRelation, valid });
   }
-  const ruleViolations = validarReglasCondicionales(rules.map(row => ({ id: String(row._id), atributoCondicionId: String(row.atributoCondicionId), opcionCondicionId: row.opcionCondicionId === undefined ? undefined : String(row.opcionCondicionId), atributoAfectadoId: String(row.atributoAfectadoId), aplicabilidad: row.aplicabilidad, activo: row.activo } satisfies ReglaCondicional)), selectedIds, activeOptionIds);
+  const ruleViolations = validarReglasCondicionales(rules.map(row => ({ id: String(row._id), atributoCondicionId: String(row.atributoCondicionId), opcionCondicionId: row.opcionCondicionId === undefined ? undefined : String(row.opcionCondicionId), valorPermitidoCondicionId: row.valorPermitidoCondicionId === undefined ? undefined : String(row.valorPermitidoCondicionId), atributoAfectadoId: String(row.atributoAfectadoId), aplicabilidad: row.aplicabilidad, activo: row.activo } satisfies ReglaCondicional)), selectedIds, activeOptionIds);
   if (ruleViolations.length) return { effective, status: "INVALID", violations: ruleViolations.map(violation => ({ code: violation.code, detail: violation.detail })) };
   const familyRows = familyPolicies.filter(policy => policy.tipoRecursoId === undefined);
   const typeRows = typePolicies;

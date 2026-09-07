@@ -3,16 +3,18 @@ import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { MAX_RESOURCE_VALUES, resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
+import { MAX_RESOURCE_VALUES, creationEvaluationValidator, resourceDetailValidator, resourceSummaryValidator, resourceOwnershipInputValidator, resourceValueInputValidator, selectionCreateResultValidator, selectionCreationInputFields, type CreationEvaluation, type ResourceDetail, type ResourceSummary } from "./resourceValidators";
 import { adminAggregateIncomplete, adminConflict, adminDuplicateKey, adminInvalidArgument, adminInvalidReference, adminImmutableField, adminInvalidState, adminNotFound, adminStaleRevision } from "./lib/errors";
 import { cargarAgregado } from "./lib/cargarAgregado";
 import { loadResourceValuesBounded, projectResourceDetail } from "./lib/recursoDetalle";
 import { classificationStatusFromReferences, normalizeResourceSearchText, projectResourceSummary } from "./lib/recursoResumen";
 import { lifecycleFilterValidator, createResultValidator, changeResultValidator } from "./validators";
 import { applyLifecycleChange } from "./lib/revisions";
-import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarRecursoAdministrativo, reemplazarValoresRecurso } from "./lib/recursoPersistencia";
+import { buscarAliasExacto, buscarRecursoPorIdentidad, insertarAgregadoRecurso, insertarRecursoAdministrativo, reemplazarValoresRecurso, type SelectionResourceValueInput } from "./lib/recursoPersistencia";
 import { derivarIdentidadRecurso, validarRecursoAdministrativo, type CrearRecursoEntrada } from "../catalogoRecursos/validacionRecurso";
 import { mapResourceValidationFailure } from "./lib/recursoValidacion";
+import { cargarCreacionSeleccion } from "./lib/cargarCreacionSeleccion";
+import { evaluarCreacionSeleccion, type SelectionCreationInput } from "../../src/catalogoRecursos/dominio/evaluarCreacionSeleccion";
 
 const resourceScopeValidator = v.union(
   v.object({ kind: v.literal("ALL") }),
@@ -86,6 +88,58 @@ function projectResourcePage(ctx: QueryCtx, page: Doc<"recursos">[]): Promise<Re
 function normalizeAdminText(value: string): string {
   return value.normalize("NFC").trim().replace(/\s+/gu, " ");
 }
+
+export const evaluarCreacionDesdeSelecciones = query({
+  args: selectionCreationInputFields,
+  returns: creationEvaluationValidator,
+  handler: async (ctx, args): Promise<CreationEvaluation> => {
+    const graph = await cargarCreacionSeleccion(ctx, args as SelectionCreationInput);
+    return (await evaluarCreacionSeleccion(args as SelectionCreationInput, graph)).evaluation as CreationEvaluation;
+  },
+});
+
+export const crearRecursoDesdeSelecciones = mutation({
+  args: { ...selectionCreationInputFields, expectedCatalogFingerprint: v.string() },
+  returns: selectionCreateResultValidator,
+  handler: async (ctx, args) => {
+    const graph = await cargarCreacionSeleccion(ctx, args as SelectionCreationInput);
+    const { evaluation, valoresParaPersistir } = await evaluarCreacionSeleccion(args as SelectionCreationInput, graph);
+    if (args.expectedCatalogFingerprint !== evaluation.catalogFingerprint) return { disposition: "CATALOG_CHANGED" as const, evaluation: evaluation as unknown as CreationEvaluation };
+    if (evaluation.status === "INCOMPLETE") return { disposition: "INCOMPLETE" as const, evaluation: evaluation as unknown as CreationEvaluation };
+    if (evaluation.status === "INVALID") return { disposition: "INVALID" as const, evaluation: evaluation as unknown as CreationEvaluation };
+    if (evaluation.nombre === null || evaluation.identificadorTecnico === null) throw new Error("Valid selection evaluation is missing derived identity");
+
+    const organizacionId = args.ownership.kind === "ORGANIZATION" ? args.ownership.organizacionId : undefined;
+    const duplicate = await buscarRecursoPorIdentidad(ctx, { organizacionId, identificadorTecnico: evaluation.identificadorTecnico });
+    const alias = organizacionId === undefined ? null : await buscarAliasExacto(ctx, { organizacionId, version: 2, clave: evaluation.identificadorTecnico });
+    if (duplicate || alias) {
+      return {
+        disposition: "INVALID" as const,
+        evaluation: {
+          ...evaluation,
+          status: "INVALID" as const,
+          valid: false,
+          nombre: null,
+          identificadorTecnico: null,
+          issues: [...evaluation.issues, { code: "IDENTITY_CONFLICT" as const, message: "La identidad del recurso ya existe." }],
+        } as unknown as CreationEvaluation,
+      };
+    }
+
+    const recursoId = await insertarAgregadoRecurso(ctx, {
+      classification: { claseRecursoId: args.claseRecursoId, familiaRecursoId: args.familiaRecursoId, tipoRecursoId: args.tipoRecursoId, unidadId: args.unidadId },
+      ownership: { ...(organizacionId === undefined ? {} : { organizacionId }) },
+      nombre: evaluation.nombre,
+      identificadorTecnico: evaluation.identificadorTecnico,
+      identidadVersion: 2,
+      activo: false,
+      valores: valoresParaPersistir as unknown as SelectionResourceValueInput[],
+    });
+    const recurso = await ctx.db.get(recursoId);
+    if (!recurso) throw new Error("Resource disappeared after insertion");
+    return { disposition: "CREATED" as const, item: await summaryForResource(ctx, recurso) };
+  },
+});
 
 export const crearRecurso = mutation({
   args: {

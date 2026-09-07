@@ -4,6 +4,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { canonicalizeCatalog, sha256Hex, type CanonicalCatalog, type CanonicalSnapshot } from "../../src/catalogoRecursos/dominio/catalogoPublicado";
 import { snapshotResultadoValidator, type Snapshot } from "./catalogoPublicadoValidators";
+import { resolverModoCaptura } from "../../src/catalogoRecursos/dominio/modoCaptura";
 import { resolverCatalogoEfectivo, resolverJerarquiaEfectiva } from "../../src/catalogoRecursos/dominio/catalogoEfectivo";
 import { cargarAgregado } from "../catalogoAdmin/lib/cargarAgregado";
 
@@ -20,6 +21,8 @@ type SnapshotEntry = { tipoClave: string; snapshot: Snapshot };
 type OptionDoc = Doc<"opcionesAtributo">;
 type AttributeDoc = Doc<"atributosRecurso">;
 type DefinitionDoc = Doc<"definicionesAtributo">;
+type SnapshotV2 = Extract<Snapshot, { snapshotVersion: 2 }>;
+type SelectionAttribute = SnapshotV2["selectionGraph"]["atributos"][number];
 
 export const MAX_PUBLICATION_TYPES = 200;
 export const MAX_PUBLICATION_ROWS = 8_000;
@@ -98,14 +101,14 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
       tipo: { id: String(type._id), clave: type.clave, activo: type.activo, familiaRecursoId: String(type.familiaRecursoId) },
       unidad: null, politicas: policies.map(policy => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? undefined : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal })), atributos: [], reglas: [], opciones: [],
     } as never);
-    const effectiveByUnit = new Map(policies.filter(policy => effectivePolicies.policies.some(selected => String(selected.id) === String(policy._id))).map(policy => [policy.unidadId, policy]));
-    const principals = [...effectiveByUnit.values()].filter(policy => policy.activo && policy.principal);
+    const selectedPolicies = policies.filter(policy => effectivePolicies.policies.some(selected => String(selected.id) === String(policy._id)));
+    const policyUnits = await Promise.all(selectedPolicies.map(async policy => ({ policy, unit: await ctx.db.get(policy.unidadId) })));
+    const principals = policyUnits.filter(({ policy }) => policy.principal);
     if (principals.length !== 1) {
       throw new Error(`Tipo ${type.clave}: se requiere exactamente una unidad natural efectiva`);
     }
-
-    const naturalUnit = await ctx.db.get(principals[0].unidadId);
-    if (!naturalUnit?.activo) throw new Error(`Unidad natural inválida para ${type.clave}`);
+    if (policyUnits.some(({ unit }) => !unit?.activo)) throw new Error(`Unidad natural inválida para ${type.clave}`);
+    const naturalUnit = principals[0].unit!;
 
     const attributes = boundedRows(await ctx.db.query("atributosRecurso")
       .withIndex("porFamilia", query => query.eq("familiaRecursoId", family._id))
@@ -119,6 +122,8 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const selected = new Map<Id<"definicionesAtributo">, AttributeDoc>(attributes.filter(attribute => effectiveAssignments.assignments.some(row => String(row.id) === String(attribute._id))).map(attribute => [attribute.definicionAtributoId, attribute]));
 
     const snapshotAttributes: Snapshot["atributos"] = [];
+    const selectionAttributes: SelectionAttribute[] = [];
+    const allowedValuesById = new Map<Id<"valoresPermitidosAtributo">, Doc<"valoresPermitidosAtributo">>();
     const optionDefinitions = new Map<Id<"opcionesAtributo">, { attribute: AttributeDoc; definition: DefinitionDoc; option: OptionDoc }>();
     for (const attribute of selected.values()) {
       if (!attribute.activo || attribute.aplicabilidad === "FORBIDDEN" || attribute.aplicabilidad === "NOT_APPLICABLE") continue;
@@ -131,6 +136,25 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
         .filter(option => option.activo)
         .sort((left, right) => compareCodePoints(left.clave, right.clave) || compareStable(left, right));
       for (const option of options) optionDefinitions.set(option._id, { attribute, definition, option });
+      const allowedValues = boundedRows(await ctx.db.query("valoresPermitidosAtributo")
+        .withIndex("porDefinicionYActivoYOrdenYClaveYAdminSort", query => query.eq("definicionAtributoId", definition._id).eq("activo", true))
+        .take(MAX_PUBLICATION_ROWS + 1));
+      const validValues = allowedValues.filter(value => {
+        const payload = value.valor;
+        if (payload.kind === "OPCION") return definition.tipoDato === "OPCION" && options.some(option => option._id === payload.opcionAtributoId);
+        return payload.kind === definition.tipoDato && (payload.kind !== "NUMERO" || Number.isFinite(payload.value));
+      });
+      if (allowedValues.length !== validValues.length) throw new Error(`ASSIGNMENT_SELECTION_INVALID:${definition.clave}: invalid typed allowed value`);
+      const modoCaptura = resolverModoCaptura(definition);
+      if (modoCaptura === "SELECCION" && validValues.length === 0) throw new Error(`OPTION_SET_EMPTY:${String(attribute._id)}`);
+      for (const value of validValues) allowedValuesById.set(value._id, value);
+      selectionAttributes.push({
+        atributoClave: definition.clave, modoCaptura, tipoDato: definition.tipoDato,
+        valoresPermitidos: validValues.map(value => ({
+          clave: value.clave, nombre: value.nombre, descripcion: value.descripcion, orden: value.orden, valor: value.valor,
+          ...(value.valor.kind === "OPCION" ? (() => { const optionId = value.valor.opcionAtributoId; return { opcionClave: options.find(option => option._id === optionId)?.clave }; })() : {}),
+        })),
+      });
       snapshotAttributes.push({
         id: attribute._id,
         definicionAtributoId: definition._id,
@@ -149,6 +173,7 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
     const effectiveAttributeIds = new Set(snapshotAttributes.map(attribute => attribute.id));
     const effectiveDefinitionIds = new Set(snapshotAttributes.map(attribute => attribute.definicionAtributoId));
     const rules: Snapshot["reglas"] = [];
+    const selectionRules: SnapshotV2["selectionGraph"]["reglas"] = [];
     const ruleRows = boundedRows(await ctx.db.query("reglasAtributoRecurso")
       .withIndex("porTipo", query => query.eq("tipoRecursoId", type._id))
       .take(MAX_PUBLICATION_ROWS + 1));
@@ -160,12 +185,19 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
       const conditionDefinition = await ctx.db.get(conditionAttribute.definicionAtributoId);
       const affectedDefinition = await ctx.db.get(affectedAttribute.definicionAtributoId);
       if (!conditionDefinition || !affectedDefinition || !effectiveDefinitionIds.has(conditionDefinition._id) || !effectiveDefinitionIds.has(affectedDefinition._id)) continue;
+      let conditionValueKey: string | undefined;
+      if (rule.valorPermitidoCondicionId !== undefined) {
+        const value = allowedValuesById.get(rule.valorPermitidoCondicionId);
+        if (!value || value.definicionAtributoId !== conditionDefinition._id) throw new Error(`RULE_REFERENCE_INVALID:${String(rule._id)}`);
+        conditionValueKey = value.clave;
+        selectionRules.push({ atributoCondicionClave: conditionDefinition.clave, valorPermitidoCondicionClave: conditionValueKey, atributoAfectadoClave: affectedDefinition.clave, aplicabilidad: rule.aplicabilidad });
+      }
       let conditionOptionKey: string | undefined;
       if (rule.opcionCondicionId !== undefined) {
         const option = optionDefinitions.get(rule.opcionCondicionId);
         if (!option || option.definition._id !== conditionDefinition._id) continue;
         conditionOptionKey = option.option.clave;
-      }
+      } else if (rule.valorPermitidoCondicionId !== undefined) continue;
       rules.push({ id: rule._id, atributoCondicionClave: conditionDefinition.clave, opcionCondicionClave: conditionOptionKey, atributoAfectadoClave: affectedDefinition.clave, aplicabilidad: rule.aplicabilidad });
     }
 
@@ -212,7 +244,8 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
         }
         if (!structural) throw new Error(`Política de presentación inválida para ${type.clave}: nombre estructuralmente vacío`);
 
-        const snapshot: Snapshot = {
+        const snapshot: SnapshotV2 = {
+      snapshotVersion: 2,
       clase: { id: classDocument._id, clave: classDocument.clave, nombre: classDocument.nombre, descripcion: classDocument.descripcion },
       familia: { id: family._id, clave: family.clave, nombre: family.nombre, descripcion: family.descripcion },
       tipo: { id: type._id, clave: type.clave, nombre: type.nombre, descripcion: type.descripcion },
@@ -221,6 +254,12 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
       reglas: rules,
       politicasCompatibilidad: compatibilityPolicies,
        presentacionCanonica: { tipoNombre: type.nombre, tokens: presentationTokens, separador: presentationPolicy.separador },
+      selectionGraph: {
+        politicasUnidad: policyUnits.map(({ policy, unit }) => ({ unidadClave: unit!.clave, principal: policy.principal }))
+          .sort((left, right) => compareCodePoints(left.unidadClave, right.unidadClave) || Number(left.principal) - Number(right.principal)),
+        atributos: selectionAttributes,
+        reglas: selectionRules,
+      },
     };
     snapshots.push({ tipoClave: type.clave, snapshot });
     canonical.push({ tipoClave: type.clave, snapshot: toCanonical(snapshot) });
@@ -232,15 +271,23 @@ export async function compile(ctx: MutationCtx): Promise<BuiltCatalog> {
 }
 
 function toCanonical(snapshot: Snapshot): CanonicalSnapshot {
-  return {
+  const legacy = {
     clase: { clave: snapshot.clase.clave, nombre: snapshot.clase.nombre, descripcion: snapshot.clase.descripcion },
     familia: { clave: snapshot.familia.clave, nombre: snapshot.familia.nombre, descripcion: snapshot.familia.descripcion },
     tipo: { clave: snapshot.tipo.clave, nombre: snapshot.tipo.nombre, descripcion: snapshot.tipo.descripcion },
     unidadNatural: { clave: snapshot.unidadNatural.clave, nombre: snapshot.unidadNatural.nombre, descripcion: snapshot.unidadNatural.descripcion, simbolo: snapshot.unidadNatural.simbolo },
     atributos: snapshot.atributos.map(attribute => ({ clave: attribute.clave, nombre: attribute.nombre, descripcion: attribute.descripcion, tipoDato: attribute.tipoDato, unidad: attribute.unidad ? { clave: attribute.unidad.clave, nombre: attribute.unidad.nombre, simbolo: attribute.unidad.simbolo } : null, participaIdentidad: attribute.participaIdentidad, aplicabilidad: attribute.aplicabilidad, orden: attribute.orden, opciones: attribute.opciones.map(option => ({ clave: option.clave, nombre: option.nombre, descripcion: option.descripcion })) })),
     reglas: snapshot.reglas.map(rule => ({ atributoCondicionClave: rule.atributoCondicionClave, opcionCondicionClave: rule.opcionCondicionClave, atributoAfectadoClave: rule.atributoAfectadoClave, aplicabilidad: rule.aplicabilidad })),
-    politicasCompatibilidad: snapshot.politicasCompatibilidad,
-     presentacionCanonica: snapshot.presentacionCanonica,
+    politicasCompatibilidad: snapshot.politicasCompatibilidad, presentacionCanonica: snapshot.presentacionCanonica,
+  };
+  if (!("snapshotVersion" in snapshot)) return legacy;
+  return {
+    ...legacy, snapshotVersion: 2,
+    selectionGraph: {
+      politicasUnidad: snapshot.selectionGraph.politicasUnidad,
+      atributos: snapshot.selectionGraph.atributos.map(attribute => ({ ...attribute, valoresPermitidos: attribute.valoresPermitidos.map(value => ({ ...value, valor: value.valor.kind === "OPCION" ? { kind: "OPCION", opcionAtributoId: String(value.valor.opcionAtributoId) } : value.valor })) })),
+      reglas: snapshot.selectionGraph.reglas,
+    },
   };
 }
 

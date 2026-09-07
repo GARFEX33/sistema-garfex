@@ -216,4 +216,97 @@ type LegacyDetailReturn = FunctionReturnType<typeof api.catalogoRecursos.recurso
 const legacyFields: keyof LegacyCreateReturn = "identificadorTecnico";
 const legacyDetailFields: keyof NonNullable<LegacyDetailReturn> = "atributos";
 const modelResource: DataModel["recursos"] = {} as DataModel["recursos"];
-void [detail, searchSummary, listHasOnlyNativeControls, searchHasOnlyNativeControls, inspectPaginatedState, inspectDetail, inspectMutations, describeAdminError, generatedSummaryContract, legacyCreateArgs, legacyFields, legacyDetailFields, modelResource];
+
+type Exact<Actual, Expected> = (<T>() => T extends Actual ? 1 : 2) extends
+  (<T>() => T extends Expected ? 1 : 2)
+  ? (<T>() => T extends Expected ? 1 : 2) extends (<T>() => T extends Actual ? 1 : 2)
+    ? true
+    : false
+  : false;
+type Assert<T extends true> = T;
+type EvaluationReference = typeof api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones;
+type SelectionCreateReference = typeof api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones;
+type SelectionEvaluationArgs = FunctionArgs<EvaluationReference>;
+type SelectionCreateArgs = FunctionArgs<SelectionCreateReference>;
+type SelectionEvaluation = FunctionReturnType<EvaluationReference>;
+type SelectionCreateResult = FunctionReturnType<SelectionCreateReference>;
+type ExpectedSelectionInput = {
+  asignacionAtributoId: Id<"atributosRecurso">;
+  valorPermitidoId: Id<"valoresPermitidosAtributo">;
+};
+type ExpectedSharedSelectionArgs = {
+  claseRecursoId: Id<"clasesRecurso">;
+  familiaRecursoId: Id<"familiasRecurso">;
+  tipoRecursoId: Id<"tiposRecurso">;
+  unidadId: Id<"unidades">;
+  selecciones: ExpectedSelectionInput[];
+  ownership: { kind: "GLOBAL" } | { kind: "ORGANIZATION"; organizacionId: Id<"organizaciones"> };
+};
+
+type _SelectionArgKeysAreExact = Assert<Exact<keyof SelectionEvaluationArgs, keyof ExpectedSharedSelectionArgs>>;
+type _SelectionItemKeysAreExact = Assert<Exact<keyof SelectionEvaluationArgs["selecciones"][number], keyof ExpectedSelectionInput>>;
+type _SelectionIdsAreExact = Assert<Exact<SelectionEvaluationArgs["selecciones"][number], ExpectedSelectionInput>>;
+type _HierarchyIdsAreExact = Assert<Exact<
+  [SelectionEvaluationArgs["claseRecursoId"], SelectionEvaluationArgs["familiaRecursoId"], SelectionEvaluationArgs["tipoRecursoId"], SelectionEvaluationArgs["unidadId"]],
+  [Id<"clasesRecurso">, Id<"familiasRecurso">, Id<"tiposRecurso">, Id<"unidades">]
+>>;
+type _OwnershipIsExact = Assert<Exact<SelectionEvaluationArgs["ownership"], ExpectedSharedSelectionArgs["ownership"]>>;
+type _CreateInputKeysAreExact = Assert<Exact<keyof SelectionCreateArgs, keyof ExpectedSharedSelectionArgs | "expectedCatalogFingerprint">>;
+type _CreateFingerprintIsRequiredString = Assert<Exact<SelectionCreateArgs["expectedCatalogFingerprint"], string>>;
+type _EvaluationHasExactTopLevelFields = Assert<Exact<keyof SelectionEvaluation, "status" | "valid" | "catalogFingerprint" | "nombre" | "identificadorTecnico" | "asignaciones" | "faltantesRequeridos" | "seleccionesInvalidas" | "valoresNormalizados" | "issues">>;
+type NormalizedValue = SelectionEvaluation["valoresNormalizados"][number];
+type _NormalizedValueHasNoAllowedValueId = Assert<Exact<keyof NormalizedValue, "atributoRecursoId" | "valor" | "opcionAtributoId">>;
+type CreatedSelectionResult = Extract<SelectionCreateResult, { disposition: "CREATED" }>;
+type _CreatedResultHasExactlyTwoKeys = Assert<Exact<keyof CreatedSelectionResult, "disposition" | "item">>;
+type _HasOnlyFourDispositions = Assert<Exact<SelectionCreateResult["disposition"], "CREATED" | "CATALOG_CHANGED" | "INCOMPLETE" | "INVALID">>;
+
+const selectionArgs = {
+  claseRecursoId: classId,
+  familiaRecursoId: familyId,
+  tipoRecursoId: typeId,
+  unidadId: unitId,
+  selecciones: [{ asignacionAtributoId: attributeId, valorPermitidoId: {} as Id<"valoresPermitidosAtributo"> }],
+  ownership: { kind: "ORGANIZATION", organizacionId: organizationId },
+} satisfies SelectionEvaluationArgs;
+const selectionCreateArgs = {
+  ...selectionArgs,
+  expectedCatalogFingerprint: "catalog-fingerprint",
+} satisfies SelectionCreateArgs;
+
+// @ts-expect-error The selection-only query does not accept suspended UI state.
+const suspendedSelectionArgs: SelectionEvaluationArgs = { ...selectionArgs, suspendedSelections: [] };
+// @ts-expect-error The selection-only query does not accept manual Resource fields.
+const manualSelectionArgs: SelectionEvaluationArgs = { ...selectionArgs, nombre: "Manual", descripcion: "Manual", identificadorTecnico: "manual", activo: true };
+// @ts-expect-error Selection answers are allowed-value IDs, never primitive or legacy option input.
+const primitiveSelectionArgs: SelectionEvaluationArgs = { ...selectionArgs, selecciones: [{ asignacionAtributoId: attributeId, valor: "rojo", opcionAtributoId: {} as Id<"opcionesAtributo"> }] };
+// @ts-expect-error Approved Spanish field names do not have English aliases.
+const englishAliasSelectionArgs: SelectionEvaluationArgs = { ...selectionArgs, classResourceId: classId };
+// @ts-expect-error Create requires the current catalog fingerprint.
+const missingFingerprint: SelectionCreateArgs = selectionArgs;
+// @ts-expect-error Public normalized values do not expose the private allowed-value reference.
+const normalizedValueWithAllowedId: NormalizedValue = { atributoRecursoId: attributeId, valor: "rojo", valorPermitidoId: {} as Id<"valoresPermitidosAtributo"> };
+// @ts-expect-error CREATED has no evaluation, fingerprint, or other metadata.
+const createdWithExtraMetadata: CreatedSelectionResult = { disposition: "CREATED", item: {} as CreatedSelectionResult["item"], catalogFingerprint: "unexpected" };
+// @ts-expect-error The selection creator has no fifth disposition.
+const fifthDisposition: SelectionCreateResult["disposition"] = "PENDING";
+
+function inspectSelectionCreateDisposition(result: SelectionCreateResult): void {
+  switch (result.disposition) {
+    case "CREATED": {
+      const exactCreated: Assert<Exact<keyof typeof result, "disposition" | "item">> = true;
+      void [result.item, exactCreated];
+      return;
+    }
+    case "CATALOG_CHANGED":
+    case "INCOMPLETE":
+    case "INVALID":
+      void result.evaluation.catalogFingerprint;
+      return;
+    default: {
+      const exhaustive: never = result;
+      void exhaustive;
+    }
+  }
+}
+
+void [detail, searchSummary, listHasOnlyNativeControls, searchHasOnlyNativeControls, inspectPaginatedState, inspectDetail, inspectMutations, describeAdminError, generatedSummaryContract, legacyCreateArgs, legacyFields, legacyDetailFields, modelResource, selectionCreateArgs, suspendedSelectionArgs, manualSelectionArgs, primitiveSelectionArgs, englishAliasSelectionArgs, missingFingerprint, normalizedValueWithAllowedId, createdWithExtraMetadata, fifthDisposition, inspectSelectionCreateDisposition];

@@ -42,6 +42,31 @@ export const resourceOwnershipInputValidator = v.union(
 );
 export type ResourceOwnershipInput = Infer<typeof resourceOwnershipInputValidator>;
 
+export const selectionInputValidator = v.object({
+  asignacionAtributoId: v.id("atributosRecurso"),
+  valorPermitidoId: v.id("valoresPermitidosAtributo"),
+});
+export const selectionCreationInputFields = {
+  claseRecursoId: v.id("clasesRecurso"),
+  familiaRecursoId: v.id("familiasRecurso"),
+  tipoRecursoId: v.id("tiposRecurso"),
+  unidadId: v.id("unidades"),
+  selecciones: v.array(selectionInputValidator),
+  ownership: resourceOwnershipInputValidator,
+};
+export const selectionCreationInputValidator = v.object(selectionCreationInputFields);
+export const creationIssueValidator = v.object({
+  code: v.union(v.literal("HIERARCHY_INVALID"), v.literal("UNIT_INVALID"), v.literal("OWNERSHIP_INVALID"), v.literal("ASSIGNMENT_UNKNOWN"), v.literal("ASSIGNMENT_DUPLICATE"), v.literal("ALLOWED_VALUE_UNKNOWN"), v.literal("ALLOWED_VALUE_FOREIGN"), v.literal("ALLOWED_VALUE_INACTIVE"), v.literal("SELECTION_NON_EFFECTIVE"), v.literal("SELECTION_FORBIDDEN"), v.literal("SELECTION_NOT_APPLICABLE"), v.literal("UNSUPPORTED_FREE_CAPTURE"), v.literal("IDENTITY_CONFLICT")),
+  message: v.string(), asignacionAtributoId: v.optional(v.id("atributosRecurso")),
+});
+export const creationEvaluationValidator = v.object({
+  status: v.union(v.literal("INCOMPLETE"), v.literal("VALID"), v.literal("INVALID")), valid: v.boolean(), catalogFingerprint: v.string(), nombre: v.union(v.string(), v.null()), identificadorTecnico: v.union(v.string(), v.null()),
+  asignaciones: v.array(v.object({ asignacionAtributoId: v.id("atributosRecurso"), definicionAtributoId: v.id("definicionesAtributo"), aplicabilidadResuelta: v.union(v.literal("REQUIRED"), v.literal("OPTIONAL"), v.literal("FORBIDDEN"), v.literal("NOT_APPLICABLE")), participaIdentidad: v.boolean(), orden: v.number(), effectiveReasons: v.array(v.string()), selectedValueId: v.optional(v.id("valoresPermitidosAtributo")) })),
+  faltantesRequeridos: v.array(v.id("atributosRecurso")), seleccionesInvalidas: v.array(v.id("atributosRecurso")),
+  valoresNormalizados: v.array(resourceValueInputValidator), issues: v.array(creationIssueValidator),
+});
+export type CreationEvaluation = Infer<typeof creationEvaluationValidator>;
+
 export const resourceClassificationStatusValidator = v.object({
   state: v.union(v.literal("EFFECTIVE"), v.literal("INERT"), v.literal("BROKEN_REFERENCE")),
   reasons: v.array(v.string()),
@@ -60,6 +85,14 @@ export const resourceSummaryValidator = v.object({
   classificationStatus: resourceClassificationStatusValidator,
 });
 export type ResourceSummary = Infer<typeof resourceSummaryValidator>;
+
+export const selectionCreateResultValidator = v.union(
+  v.object({ disposition: v.literal("CREATED"), item: resourceSummaryValidator }),
+  v.object({ disposition: v.literal("CATALOG_CHANGED"), evaluation: creationEvaluationValidator }),
+  v.object({ disposition: v.literal("INCOMPLETE"), evaluation: creationEvaluationValidator }),
+  v.object({ disposition: v.literal("INVALID"), evaluation: creationEvaluationValidator }),
+);
+export type SelectionCreateResult = Infer<typeof selectionCreateResultValidator>;
 
 export const resourceReferenceValidator = v.object({
   id: v.union(
