@@ -16,6 +16,7 @@ describe("cursor administrativo", () => {
     expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
     await expect(consumeCursor(token, context)).resolves.toBe("native-cursor");
     await expect(consumeCursor(token, { ...context, mode: "ACTIVE" })).rejects.toThrow(ConvexError);
+    await expect(consumeCursor(token, { ...context, mode: "INACTIVE" })).rejects.toThrow(ConvexError);
     await expect(consumeCursor(token, { ...context, order: "other-order" })).rejects.toThrow(ConvexError);
     await expect(consumeCursor(token, { ...context, filters: { parent: "other" } })).rejects.toThrow(ConvexError);
     await expect(consumeCursor("not-a-cursor", context)).rejects.toThrow(ConvexError);

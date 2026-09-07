@@ -6,6 +6,20 @@ import type { ResourceValue, ResourceValueInput } from "../resourceValidators";
 
 type Ownership = { organizacionId?: Id<"organizaciones"> };
 
+/** Internal persistence may carry the additive stored reference without widening legacy inputs. */
+export type StoredResourceValueInput = ResourceValueInput & { valorPermitidoId?: Id<"valoresPermitidosAtributo"> };
+export type SelectionResourceValueInput = StoredResourceValueInput & { valorPermitidoId: Id<"valoresPermitidosAtributo"> };
+
+function storedValueDocument(recursoId: Id<"recursos">, value: StoredResourceValueInput) {
+  return {
+    recursoId,
+    atributoRecursoId: value.atributoRecursoId,
+    valor: value.valor,
+    ...(value.opcionAtributoId === undefined ? {} : { opcionAtributoId: value.opcionAtributoId }),
+    ...(value.valorPermitidoId === undefined ? {} : { valorPermitidoId: value.valorPermitidoId }),
+  };
+}
+
 /** One indexed, bounded identity lookup; inactive Resources intentionally reserve identities. */
 export async function buscarRecursoPorIdentidad(
   ctx: MutationCtx,
@@ -58,12 +72,7 @@ export async function insertarRecursoAdministrativo(
     adminScopeKey,
   });
   for (const value of input.valores) {
-    await ctx.db.insert("valoresAtributoRecurso", {
-      recursoId,
-      atributoRecursoId: value.atributoRecursoId,
-      valor: value.valor,
-      ...(value.opcionAtributoId === undefined ? {} : { opcionAtributoId: value.opcionAtributoId }),
-    });
+    await ctx.db.insert("valoresAtributoRecurso", storedValueDocument(recursoId, value));
   }
   if (input.ownership.organizacionId !== undefined) {
     await registrarAlias(ctx, {
@@ -85,11 +94,6 @@ export async function reemplazarValoresRecurso(
 ): Promise<void> {
   for (const anterior of anteriores) await ctx.db.delete(anterior._id);
   for (const valor of valores) {
-    await ctx.db.insert("valoresAtributoRecurso", {
-      recursoId,
-      atributoRecursoId: valor.atributoRecursoId,
-      valor: valor.valor,
-      ...(valor.opcionAtributoId === undefined ? {} : { opcionAtributoId: valor.opcionAtributoId }),
-    });
+    await ctx.db.insert("valoresAtributoRecurso", storedValueDocument(recursoId, valor));
   }
 }

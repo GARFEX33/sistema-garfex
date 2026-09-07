@@ -2,6 +2,7 @@ import { adminInvalidArgument } from "./errors";
 import type { LifecycleFilter } from "../validators";
 
 export const ORDERING_VERSION = "key-id-v1";
+export const ALLOWED_VALUE_ORDERING_VERSION = "orden-clave-id-v1";
 export type CursorContext = { filters: unknown; mode: LifecycleFilter; plan: string; order: string };
 
 type CursorEnvelope = { v: 1; plan: string; filtersHash: string; order: string; cursor: string };

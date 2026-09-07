@@ -241,3 +241,58 @@ describe("recursoPersistencia / crearRecurso", () => {
         await expect(t.run(async ctx => ctx.db.get(old))).resolves.toMatchObject({ recursoId, valor: "old" });
       });
     });
+
+describe("recursoPersistencia / allowed-value reference seam", () => {
+  it("blocks an allowed value by its stored ID without inferring from its scalar value", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const allowed = await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, {
+      definicionAtributoId: fixture.definition,
+      clave: "TECHNICAL_KEY",
+      nombre: "Allowed",
+      orden: 1,
+      activo: true,
+      valor: { kind: "TEXTO", value: "authoritative payload" },
+    });
+    const resource = await t.run(ctx => ctx.db.insert("recursos", {
+      tipoRecursoId: fixture.tipo,
+      unidadId: fixture.unidad,
+      identificadorTecnico: "referenced",
+      nombre: "Referenced",
+      activo: true,
+      revision: 1,
+    }));
+    await t.run(ctx => ctx.db.insert("valoresAtributoRecurso", {
+      recursoId: resource,
+      atributoRecursoId: fixture.attribute,
+      valor: "different persisted scalar",
+      valorPermitidoId: allowed.item.id,
+    } as never));
+
+    await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, {
+      valorPermitidoId: allowed.item.id,
+      expectedRevision: 1,
+    })).rejects.toMatchObject({ data: { code: "ADMIN_DEPENDENCY_BLOCKED" } });
+  });
+
+  it("keeps legacy Resource-value rows valid without an allowed-value reference", async () => {
+    const t = convexTest(schema, modules);
+    const fixture = await seedFixture(t);
+    const recursoId = await t.run(ctx => ctx.db.insert("recursos", {
+      tipoRecursoId: fixture.tipo,
+      unidadId: fixture.unidad,
+      identificadorTecnico: "legacy",
+      nombre: "Legacy",
+      activo: false,
+      revision: 1,
+    }));
+    const legacy = await t.run(ctx => ctx.db.insert("valoresAtributoRecurso", {
+      recursoId,
+      atributoRecursoId: fixture.attribute,
+      valor: false,
+    }));
+    const stored = await t.run(ctx => ctx.db.get(legacy));
+    expect(stored).toMatchObject({ recursoId, valor: false });
+    expect(stored).not.toHaveProperty("valorPermitidoId");
+  });
+});
