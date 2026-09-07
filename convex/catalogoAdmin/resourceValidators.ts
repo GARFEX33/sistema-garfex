@@ -3,6 +3,14 @@ import { violationValidator } from "./validators";
 
 export const MAX_RESOURCE_VALUES = 200;
 
+export const valorPermitidoTipadoValidator = v.union(
+  v.object({ kind: v.literal("TEXTO"), value: v.string() }),
+  v.object({ kind: v.literal("NUMERO"), value: v.number() }),
+  v.object({ kind: v.literal("BOOLEANO"), value: v.boolean() }),
+  v.object({ kind: v.literal("OPCION"), opcionAtributoId: v.id("opcionesAtributo") }),
+);
+export type ValorPermitidoTipado = Infer<typeof valorPermitidoTipadoValidator>;
+
 export const resourceValueValidator = v.object({
   _id: v.id("valoresAtributoRecurso"),
   _creationTime: v.number(),
@@ -10,6 +18,7 @@ export const resourceValueValidator = v.object({
   atributoRecursoId: v.id("atributosRecurso"),
   valor: v.union(v.string(), v.number(), v.boolean()),
   opcionAtributoId: v.optional(v.id("opcionesAtributo")),
+  valorPermitidoId: v.optional(v.id("valoresPermitidosAtributo")),
 });
 export type ResourceValue = Infer<typeof resourceValueValidator>;
 

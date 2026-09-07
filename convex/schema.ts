@@ -26,6 +26,14 @@ const aplicabilidad = v.union(
 
 const estadoRevisionCatalogo = v.literal("PUBLISHED");
 
+const modoCaptura = v.union(v.literal("SELECCION"), v.literal("LIBRE"));
+const valorPermitidoTipado = v.union(
+  v.object({ kind: v.literal("TEXTO"), value: v.string() }),
+  v.object({ kind: v.literal("NUMERO"), value: v.number() }),
+  v.object({ kind: v.literal("BOOLEANO"), value: v.boolean() }),
+  v.object({ kind: v.literal("OPCION"), opcionAtributoId: v.id("opcionesAtributo") }),
+);
+
 export default defineSchema({
   organizaciones: defineTable({ clave: v.string(), nombre: v.string(), activo: v.boolean(), revision: v.number() }).index("porClave", ["clave"]),
   catalogoRevisiones: defineTable({ organizacionId: v.id("organizaciones"), numero: v.number(), estado: estadoRevisionCatalogo, hashContenido: v.string(), creadoEn: v.number(), publicadoEn: v.number(), ...adminSort }).index("porOrganizacionYNumero", ["organizacionId", "numero"]).index("porOrganizacionYEstado", ["organizacionId", "estado"]).index("porOrganizacionYEstadoYNumeroYAdminSort", ["organizacionId", "estado", "numero", "adminSortId"]),
@@ -99,6 +107,7 @@ export default defineSchema({
       v.literal("BOOLEANO"),
       v.literal("OPCION"),
     ),
+    modoCaptura: v.optional(modoCaptura),
     unidadId: v.optional(v.id("unidades")),
   }).index("porClave", ["clave"]).index("porUnidad", ["unidadId"])
     .index("porClaveYAdminSort", ["clave", "adminSortId"])
@@ -136,6 +145,22 @@ export default defineSchema({
     .index("porDefinicionYClave", ["definicionAtributoId", "clave"])
     .index("porDefinicionYClaveYAdminSort", ["definicionAtributoId", "clave", "adminSortId"])
     .index("porActivoYDefinicionYClaveYAdminSort", ["activo", "definicionAtributoId", "clave", "adminSortId"]),
+
+  valoresPermitidosAtributo: defineTable({
+    definicionAtributoId: v.id("definicionesAtributo"),
+    clave: v.string(),
+    valor: valorPermitidoTipado,
+    opcionAtributoIdIndex: v.optional(v.id("opcionesAtributo")),
+    nombre: v.string(),
+    descripcion: v.optional(v.string()),
+    orden: v.number(),
+    ...estadoCatalogo,
+    ...adminSort,
+  })
+    .index("porDefinicionYClave", ["definicionAtributoId", "clave"])
+    .index("porOpcionDeValor", ["opcionAtributoIdIndex"])
+    .index("porDefinicionYOrdenYClaveYAdminSort", ["definicionAtributoId", "orden", "clave", "adminSortId"])
+    .index("porDefinicionYActivoYOrdenYClaveYAdminSort", ["definicionAtributoId", "activo", "orden", "clave", "adminSortId"]),
 
   politicasPresentacionCanonica: defineTable({
         tipoRecursoId: v.id("tiposRecurso"),
@@ -188,6 +213,8 @@ export default defineSchema({
     tipoRecursoId: v.id("tiposRecurso"),
     atributoCondicionId: v.id("atributosRecurso"),
     opcionCondicionId: v.optional(v.id("opcionesAtributo")),
+    // Optional migration seam; WU5 owns rule-write and evaluation behavior.
+    valorPermitidoCondicionId: v.optional(v.id("valoresPermitidosAtributo")),
     atributoAfectadoId: v.id("atributosRecurso"),
     aplicabilidad,
     ...estadoCatalogo,
@@ -252,8 +279,10 @@ export default defineSchema({
     atributoRecursoId: v.id("atributosRecurso"),
     valor: v.union(v.string(), v.number(), v.boolean()),
     opcionAtributoId: v.optional(v.id("opcionesAtributo")),
+    valorPermitidoId: v.optional(v.id("valoresPermitidosAtributo")),
   })
     .index("porRecurso", ["recursoId"])
     .index("porAtributo", ["atributoRecursoId"])
-    .index("porRecursoYAtributo", ["recursoId", "atributoRecursoId"]),
+    .index("porRecursoYAtributo", ["recursoId", "atributoRecursoId"])
+    .index("porValorPermitido", ["valorPermitidoId"]),
 });

@@ -95,4 +95,171 @@ describe("administración de definiciones y opciones", () => {
     const assignment = await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1 });
     await expect(t.mutation(api.catalogoAdmin.atributos.activarAsignacionAtributo, { atributoRecursoId: assignment.item.id, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
   });
+
+  it("stores typed allowed values with scoped immutable identities and revisions", async () => {
+    const t = convexTest(schema, modules);
+    const text = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "TEXT", nombre: "Text", tipoDato: "TEXTO", activo: true });
+    const number = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "NUMBER", nombre: "Number", tipoDato: "NUMERO", activo: true });
+    const boolean = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "BOOLEAN", nombre: "Boolean", tipoDato: "BOOLEANO", activo: true });
+    const optionDefinition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "OPTION", nombre: "Option", tipoDato: "OPCION", activo: true });
+    const source = await t.mutation(api.catalogoAdmin.atributos.crearOpcionAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "SOURCE", nombre: "Source", activo: true });
+    const inactiveSource = await t.mutation(api.catalogoAdmin.atributos.crearOpcionAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "INACTIVE", nombre: "Inactive", activo: false });
+    const foreignDefinition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "FOREIGN_OPTION", nombre: "Foreign option", tipoDato: "OPCION", activo: true });
+    const foreignSource = await t.mutation(api.catalogoAdmin.atributos.crearOpcionAtributo, { definicionAtributoId: foreignDefinition.item.id, clave: "FOREIGN", nombre: "Foreign", activo: true });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: text.item.id, clave: "WRONG", nombre: "Wrong", orden: 1, valor: { kind: "NUMERO", value: 3 } })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE", context: { entityKind: "valoresPermitidosAtributo", field: "valor.kind", reference: { kind: "definicionesAtributo", id: text.item.id } } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: number.item.id, clave: "INFINITE", nombre: "Infinite", orden: 1, valor: { kind: "NUMERO", value: Infinity } } as never)).rejects.toThrow();
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: number.item.id, clave: "FINITE", nombre: "Finite", orden: 1, valor: { kind: "NUMERO", value: 3.5 } })).resolves.toMatchObject({ item: { valor: { kind: "NUMERO", value: 3.5 } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: boolean.item.id, clave: "FALSE", nombre: "False", orden: 1, valor: { kind: "BOOLEANO", value: false } })).resolves.toMatchObject({ item: { valor: { kind: "BOOLEANO", value: false } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "FOREIGN", nombre: "Foreign", orden: 1, valor: { kind: "OPCION", opcionAtributoId: foreignSource.item.id } })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE", context: { entityKind: "valoresPermitidosAtributo", field: "valor.opcionAtributoId", reference: { kind: "opcionesAtributo", id: foreignSource.item.id } } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "INACTIVE", nombre: "Inactive", orden: 1, valor: { kind: "OPCION", opcionAtributoId: inactiveSource.item.id } })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_REFERENCE", context: { entityKind: "valoresPermitidosAtributo", field: "valor.opcionAtributoId", reference: { kind: "opcionesAtributo", id: inactiveSource.item.id } } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "SOURCE", nombre: "Source", orden: 1, valor: { kind: "OPCION", opcionAtributoId: source.item.id } })).resolves.toMatchObject({ item: { valor: { kind: "OPCION", opcionAtributoId: source.item.id } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: optionDefinition.item.id, clave: "SOURCE_DUPLICATE", nombre: "Duplicate source", orden: 2, valor: { kind: "OPCION", opcionAtributoId: source.item.id } })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY" } });
+    const textValue = await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: text.item.id, clave: "TEXT_VALUE", nombre: "Text value", orden: 1, activo: false, valor: { kind: "TEXTO", value: "typed" } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: text.item.id, clave: "TEXT_VALUE", nombre: "Duplicate", orden: 2, valor: { kind: "TEXTO", value: "duplicate" } })).rejects.toMatchObject({ data: { code: "ADMIN_DUPLICATE_KEY", context: { entityKind: "valoresPermitidosAtributo", key: "TEXT_VALUE", scope: text.item.id } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.actualizarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 1, clave: "OTHER" })).rejects.toMatchObject({ data: { code: "ADMIN_IMMUTABLE_FIELD", context: { entity: { kind: "valoresPermitidosAtributo", id: textValue.item.id }, field: "clave" } } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.activarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: true, revision: 2 } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.actualizarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 2, valor: { kind: "TEXTO", value: "changed" } })).resolves.toMatchObject({ disposition: "UPDATED", item: { valor: { kind: "TEXTO", value: "changed" }, revision: 3 } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.actualizarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 1, nombre: "Stale" })).rejects.toMatchObject({ data: { code: "ADMIN_STALE_REVISION", context: { entity: { kind: "valoresPermitidosAtributo", id: textValue.item.id }, expectedRevision: 1, currentRevision: 3 } } });
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, { valorPermitidoId: textValue.item.id })).toMatchObject({ valor: { kind: "TEXTO", value: "changed" }, activo: true, revision: 3 });
+    await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, { valorPermitidoId: textValue.item.id, expectedRevision: 3 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 4 } });
+    expect(boolean.item.tipoDato).toBe("BOOLEANO");
+  });
+
+  it("accepts only valorPermitidoId for allowed-value commands", async () => {
+    const t = convexTest(schema, modules);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "PUBLIC_ID", nombre: "Public ID", tipoDato: "TEXTO", activo: true });
+    const value = await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "VALUE", nombre: "Value", orden: 1, valor: { kind: "TEXTO", value: "value" } });
+    await expect(t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, { valorPermitidoAtributoId: value.item.id } as never)).rejects.toThrow(/valorPermitidoId/);
+    await expect(t.query(api.catalogoAdmin.atributos.obtenerValorPermitidoAtributo, { valorPermitidoId: value.item.id })).resolves.toMatchObject({ id: value.item.id });
+  });
+
+  it("blocks deactivation of the last typed value for an effective selection assignment", async () => {
+    const t = convexTest(schema, modules); const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "LAST", nombre: "Last", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true });
+    const first = await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "FIRST", nombre: "First", orden: 1, activo: true, valor: { kind: "TEXTO", value: "first" } });
+    await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true });
+    await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, { valorPermitidoId: first.item.id, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE", context: { entity: { kind: "valoresPermitidosAtributo", id: first.item.id } } } });
+    await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "SECOND", nombre: "Second", orden: 2, activo: true, valor: { kind: "TEXTO", value: "second" } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.desactivarValorPermitidoAtributo, { valorPermitidoId: first.item.id, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: false, revision: 2 } });
+  });
+
+  it("requires an active typed allowed value before an effective selection assignment can activate", async () => {
+    const t = convexTest(schema, modules); const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "SELECT", nombre: "Select", tipoDato: "TEXTO", modoCaptura: "SELECCION", activo: true });
+    const assignment = await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1 });
+    await expect(t.mutation(api.catalogoAdmin.atributos.activarAsignacionAtributo, { atributoRecursoId: assignment.item.id, expectedRevision: 1 })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+    await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "VALUE", nombre: "Value", orden: 1, activo: true, valor: { kind: "TEXTO", value: "authority" } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.activarAsignacionAtributo, { atributoRecursoId: assignment.item.id, expectedRevision: 1 })).resolves.toMatchObject({ disposition: "UPDATED", item: { activo: true } });
+  });
+
+  it("rejects a revisioned transition to selection until typed allowed values exist", async () => {
+    const t = convexTest(schema, modules); const ids = await tree(t);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "TRANSITION", nombre: "Transition", tipoDato: "TEXTO", modoCaptura: "LIBRE", activo: true });
+    await t.mutation(api.catalogoAdmin.atributos.crearAsignacionAtributo, { familiaRecursoId: ids.familia, tipoRecursoId: ids.tipo, definicionAtributoId: definition.item.id, aplicabilidad: "REQUIRED", participaIdentidad: true, orden: 1, activo: true });
+    await expect(t.mutation(api.catalogoAdmin.atributos.actualizarDefinicionAtributo, { definicionAtributoId: definition.item.id, expectedRevision: 1, modoCaptura: "SELECCION" })).rejects.toMatchObject({ data: { code: "ADMIN_AGGREGATE_INCOMPLETE" } });
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerDefinicionAtributo, { definicionAtributoId: definition.item.id })).toMatchObject({ modoCaptura: "LIBRE", revision: 1 });
+    await t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, { definicionAtributoId: definition.item.id, clave: "AUTHORITY", nombre: "Authority", orden: 1, activo: true, valor: { kind: "TEXTO", value: "value" } });
+    await expect(t.mutation(api.catalogoAdmin.atributos.actualizarDefinicionAtributo, { definicionAtributoId: definition.item.id, expectedRevision: 1, modoCaptura: "SELECCION" })).resolves.toMatchObject({ disposition: "UPDATED", item: { modoCaptura: "SELECCION", revision: 2 } });
+  });
+
+  it("stores and projects an explicit capture mode", async () => {
+    const t = convexTest(schema, modules);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "S",
+      nombre: "Selectable",
+      tipoDato: "OPCION",
+      modoCaptura: "SELECCION",
+    });
+
+    expect(definition.item).toMatchObject({ modoCaptura: "SELECCION" });
+  });
+
+  it("preserves absent legacy modes and changes explicit modes through the revision seam", async () => {
+    const t = convexTest(schema, modules);
+    const legacy = await t.run(ctx => ctx.db.insert("definicionesAtributo", {
+      clave: "LEGACY_OPTION",
+      nombre: "Legacy option",
+      tipoDato: "OPCION",
+      activo: false,
+      revision: 1,
+    }));
+    const legacyText = await t.run(ctx => ctx.db.insert("definicionesAtributo", {
+      clave: "LEGACY_TEXT",
+      nombre: "Legacy text",
+      tipoDato: "TEXTO",
+      activo: false,
+      revision: 1,
+    }));
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerDefinicionAtributo, { definicionAtributoId: legacy })).toMatchObject({ modoCaptura: "SELECCION" });
+    expect(await t.query(api.catalogoAdmin.atributos.obtenerDefinicionAtributo, { definicionAtributoId: legacyText })).toMatchObject({ modoCaptura: "LIBRE" });
+
+    const updated = await t.mutation(api.catalogoAdmin.atributos.actualizarDefinicionAtributo, {
+      definicionAtributoId: legacyText,
+      expectedRevision: 1,
+      tipoDato: "OPCION",
+      modoCaptura: "SELECCION",
+    });
+    expect(updated).toMatchObject({ disposition: "UPDATED", item: { tipoDato: "OPCION", modoCaptura: "SELECCION", revision: 2 } });
+  });
+
+  it("rejects DERIVADO without creating a definition", async () => {
+    const t = convexTest(schema, modules);
+    await expect(t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "DERIVED",
+      nombre: "Derived",
+      tipoDato: "TEXTO",
+      modoCaptura: "DERIVADO",
+    } as never)).rejects.toThrow();
+    const page = await t.query(api.catalogoAdmin.atributos.listarDefinicionesAtributo, { cursor: null, pageSize: 10 });
+    expect(page.items).toEqual([]);
+  });
+
+  it("paginates allowed values by order and key without mixing lifecycle cursors", async () => {
+    const t = convexTest(schema, modules);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, {
+      clave: "PAGED", nombre: "Paged", tipoDato: "TEXTO", activo: true,
+    });
+    await Promise.all([
+      ["B", 1, true], ["A", 1, true], ["INACTIVE", 0, false], ["FIRST", 0, true],
+    ].map(async ([clave, orden, activo]) => t.mutation(api.catalogoAdmin.atributos.crearValorPermitidoAtributo, {
+      definicionAtributoId: definition.item.id,
+      clave: clave as string,
+      nombre: clave as string,
+      orden: orden as number,
+      activo: activo as boolean,
+      valor: { kind: "TEXTO", value: clave as string },
+    })));
+
+    const first = await t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, {
+      definicionAtributoId: definition.item.id, modo: "ALL", pageSize: 2,
+    });
+    const second = await t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, {
+      definicionAtributoId: definition.item.id, modo: "ALL", pageSize: 2, cursor: first.continuationCursor,
+    });
+    expect([...first.items, ...second.items].map(item => item.clave)).toEqual(["FIRST", "INACTIVE", "A", "B"]);
+    expect([...first.items, ...second.items]).toHaveLength(4);
+    await expect(t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, {
+      definicionAtributoId: definition.item.id, modo: "ACTIVE", pageSize: 2, cursor: first.continuationCursor,
+    })).rejects.toThrow(/cursor/i);
+    expect((await t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, {
+      definicionAtributoId: definition.item.id, modo: "INACTIVE", pageSize: 2,
+    })).items).toMatchObject([{ clave: "INACTIVE", activo: false, effective: false, effectiveReasons: ["INACTIVE"] }]);
+  });
+
+
+  it("does not skip or repeat equal-order and equal-key allowed-value ties", async () => {
+    const t = convexTest(schema, modules);
+    const definition = await t.mutation(api.catalogoAdmin.atributos.crearDefinicionAtributo, { clave: "TIES", nombre: "Ties", tipoDato: "TEXTO", activo: true });
+    const ids = await t.run(async ctx => {
+      const first = await ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: definition.item.id, clave: "SAME", nombre: "First", orden: 1, valor: { kind: "TEXTO", value: "first" }, activo: true, revision: 1 });
+      const second = await ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: definition.item.id, clave: "SAME", nombre: "Second", orden: 1, valor: { kind: "TEXTO", value: "second" }, activo: true, revision: 1 });
+      await ctx.db.patch(first, { adminSortId: first });
+      await ctx.db.patch(second, { adminSortId: second });
+      return [first, second];
+    });
+    const first = await t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, { definicionAtributoId: definition.item.id, pageSize: 1 });
+    const second = await t.query(api.catalogoAdmin.atributos.listarValoresPermitidosAtributo, { definicionAtributoId: definition.item.id, pageSize: 1, cursor: first.continuationCursor });
+    expect([...first.items, ...second.items].map(item => item.id)).toEqual([...ids].sort());
+  });
+
 });

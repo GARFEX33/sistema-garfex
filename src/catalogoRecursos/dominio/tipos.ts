@@ -18,6 +18,12 @@ export type EntradaRecurso = {
 
 export type Aplicabilidad = "REQUIRED" | "OPTIONAL" | "CONDITIONAL" | "FORBIDDEN" | "NOT_APPLICABLE";
 export type TipoDato = "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
+export type ModoCaptura = "SELECCION" | "LIBRE";
+export type ValorPermitidoTipado =
+  | { kind: "TEXTO"; value: string }
+  | { kind: "NUMERO"; value: number }
+  | { kind: "BOOLEANO"; value: boolean }
+  | { kind: "OPCION"; opcionAtributoId: IdDominio };
 
 export type ElementoCatalogo = { id: IdDominio; activo: boolean };
 export type Clase = ElementoCatalogo & { clave: string };
@@ -31,7 +37,7 @@ export type PoliticaUnidad = ElementoCatalogo & {
   unidadId: IdDominio;
 };
 
-export type Definicion = ElementoCatalogo & { clave: string; tipoDato: TipoDato };
+export type Definicion = ElementoCatalogo & { clave: string; tipoDato: TipoDato; modoCaptura?: ModoCaptura };
 export type Atributo = ElementoCatalogo & {
   definicionAtributoId: IdDominio;
   tipoRecursoId?: IdDominio;

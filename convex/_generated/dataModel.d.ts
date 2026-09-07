@@ -340,6 +340,7 @@ export type DataModel = {
       adminSortId?: string;
       clave: string;
       descripcion?: string;
+      modoCaptura?: "SELECCION" | "LIBRE";
       nombre: string;
       revision: number;
       tipoDato: "TEXTO" | "NUMERO" | "BOOLEANO" | "OPCION";
@@ -354,6 +355,7 @@ export type DataModel = {
       | "adminSortId"
       | "clave"
       | "descripcion"
+      | "modoCaptura"
       | "nombre"
       | "revision"
       | "tipoDato"
@@ -783,6 +785,7 @@ export type DataModel = {
       opcionCondicionId?: Id<"opcionesAtributo">;
       revision: number;
       tipoRecursoId: Id<"tiposRecurso">;
+      valorPermitidoCondicionId?: Id<"valoresPermitidosAtributo">;
       _id: Id<"reglasAtributoRecurso">;
       _creationTime: number;
     };
@@ -796,7 +799,8 @@ export type DataModel = {
       | "atributoCondicionId"
       | "opcionCondicionId"
       | "revision"
-      | "tipoRecursoId";
+      | "tipoRecursoId"
+      | "valorPermitidoCondicionId";
     indexes: {
       by_id: ["_id"];
       by_creation_time: ["_creationTime"];
@@ -965,6 +969,7 @@ export type DataModel = {
       opcionAtributoId?: Id<"opcionesAtributo">;
       recursoId: Id<"recursos">;
       valor: string | number | boolean;
+      valorPermitidoId?: Id<"valoresPermitidosAtributo">;
       _id: Id<"valoresAtributoRecurso">;
       _creationTime: number;
     };
@@ -974,13 +979,74 @@ export type DataModel = {
       | "atributoRecursoId"
       | "opcionAtributoId"
       | "recursoId"
-      | "valor";
+      | "valor"
+      | "valorPermitidoId";
     indexes: {
       by_id: ["_id"];
       by_creation_time: ["_creationTime"];
       porAtributo: ["atributoRecursoId", "_creationTime"];
       porRecurso: ["recursoId", "_creationTime"];
       porRecursoYAtributo: ["recursoId", "atributoRecursoId", "_creationTime"];
+      porValorPermitido: ["valorPermitidoId", "_creationTime"];
+    };
+    searchIndexes: {};
+    vectorIndexes: {};
+  };
+  valoresPermitidosAtributo: {
+    document: {
+      activo: boolean;
+      adminSortId?: string;
+      clave: string;
+      definicionAtributoId: Id<"definicionesAtributo">;
+      descripcion?: string;
+      nombre: string;
+      opcionAtributoIdIndex?: Id<"opcionesAtributo">;
+      orden: number;
+      revision: number;
+      valor:
+        | { kind: "TEXTO"; value: string }
+        | { kind: "NUMERO"; value: number }
+        | { kind: "BOOLEANO"; value: boolean }
+        | { kind: "OPCION"; opcionAtributoId: Id<"opcionesAtributo"> };
+      _id: Id<"valoresPermitidosAtributo">;
+      _creationTime: number;
+    };
+    fieldPaths:
+      | "_creationTime"
+      | "_id"
+      | "activo"
+      | "adminSortId"
+      | "clave"
+      | "definicionAtributoId"
+      | "descripcion"
+      | "nombre"
+      | "opcionAtributoIdIndex"
+      | "orden"
+      | "revision"
+      | "valor"
+      | "valor.kind"
+      | "valor.opcionAtributoId"
+      | "valor.value";
+    indexes: {
+      by_id: ["_id"];
+      by_creation_time: ["_creationTime"];
+      porDefinicionYActivoYOrdenYClaveYAdminSort: [
+        "definicionAtributoId",
+        "activo",
+        "orden",
+        "clave",
+        "adminSortId",
+        "_creationTime",
+      ];
+      porDefinicionYClave: ["definicionAtributoId", "clave", "_creationTime"];
+      porDefinicionYOrdenYClaveYAdminSort: [
+        "definicionAtributoId",
+        "orden",
+        "clave",
+        "adminSortId",
+        "_creationTime",
+      ];
+      porOpcionDeValor: ["opcionAtributoIdIndex", "_creationTime"];
     };
     searchIndexes: {};
     vectorIndexes: {};
