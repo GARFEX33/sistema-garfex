@@ -23,6 +23,12 @@ const classCursor: string | null = classes.continuationCursor;
 const classEffective: boolean = classes.items[0]?.effective ?? false;
 
 const units = useQuery(api.catalogoAdmin.unidades.listarUnidades, { cursor: null, pageSize: 10 });
+const activeUnits = useQuery(api.catalogoAdmin.unidades.listarUnidades, {
+  cursor: null,
+  pageSize: 10,
+  modo: "ACTIVE",
+} satisfies FunctionArgs<typeof api.catalogoAdmin.unidades.listarUnidades>);
+const activeUnitProjection: { id: Id<"unidades">; clave: string; nombre: string; activo: boolean; effective: boolean; revision: number } | undefined = activeUnits.items[0];
 const definitions = useQuery(api.catalogoAdmin.atributos.listarDefinicionesAtributo, { cursor: null, pageSize: 10 });
 const rules = useQuery(api.catalogoAdmin.reglas.listarReglasAtributo, { cursor: null, pageSize: 10 });
 const presentations = useQuery(api.catalogoAdmin.presentacion.listarPoliticasPresentacion, { cursor: null, pageSize: 10 });
@@ -65,6 +71,8 @@ const checkPagination = [
   classCursor,
   classes.isExhausted,
   units.continuationCursor,
+  activeUnits.isExhausted,
+  activeUnitProjection,
   definitions.items,
   rules.isExhausted,
   presentations.continuationCursor,

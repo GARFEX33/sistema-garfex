@@ -1189,3 +1189,161 @@ describe("catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones / WU8", () => {
     await expect(t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, organizationArgs)).resolves.toMatchObject({ status: "INVALID", issues: [{ code: "OWNERSHIP_INVALID" }] });
   });
 });
+
+describe("catalogoAdmin.recursos selection creation / B4", () => {
+  async function seedMetroLineal(t: ReturnType<typeof convexTest>) {
+    const fixture = await seedFixture(t);
+    const value = await t.run(async ctx => {
+      await ctx.db.patch(fixture.definition, { modoCaptura: "SELECCION" });
+      await ctx.db.patch(fixture.attribute, { participaIdentidad: true });
+      return ctx.db.insert("valoresPermitidosAtributo", { definicionAtributoId: fixture.definition, clave: "METRO_LINEAL", valor: { kind: "TEXTO", value: "metro-lineal" }, nombre: "Metro Lineal", orden: 1, activo: true, revision: 1 });
+    });
+    return { fixture, input: { claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA, unidadId: fixture.unit, selecciones: [{ asignacionAtributoId: fixture.attribute, valorPermitidoId: value }], ownership: { kind: "GLOBAL" as const } } };
+  }
+
+  async function policySnapshot(t: ReturnType<typeof convexTest>) {
+    return t.run((ctx: MutationCtx) => ctx.db.query("politicasUnidadRecurso").withIndex("porFamiliaYTipoYUnidadYAdminSort", q => q).collect());
+  }
+
+  const compareCodePoints = (left: string, right: string): number => {
+    const a = [...left], b = [...right];
+    for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+      const order = a[index].codePointAt(0)! - b[index].codePointAt(0)!;
+      if (order !== 0) return order;
+    }
+    return a.length - b.length;
+  };
+  const legacyJson = (value: unknown): string => {
+    if (value === undefined || value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value ?? null);
+    if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : JSON.stringify({ $number: String(value) });
+    if (Array.isArray(value)) return `[${value.map(legacyJson).join(",")}]`;
+    return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => compareCodePoints(left, right)).map(([key, item]) => `${JSON.stringify(key)}:${legacyJson(item)}`).join(",")}}`;
+  };
+  const legacyReference = (kind: string, suppliedId: string | undefined, row: { id: string; clave?: string; nombre?: string; activo: boolean } | undefined) => !row
+    ? suppliedId === undefined ? { state: "MISSING_REFERENCE", kind } : { state: "INVALID_REFERENCE", kind, suppliedId }
+    : row.id !== suppliedId ? { state: "INVALID_REFERENCE", kind, suppliedId } : { state: "RESOLVED", kind, suppliedId, value: { id: row.id, clave: row.clave, nombre: row.nombre, activo: row.activo } };
+
+  async function v1FingerprintForInFlightSelection(t: ReturnType<typeof convexTest>, input: Awaited<ReturnType<typeof seedMetroLineal>>["input"]) {
+    return t.run(async (ctx: MutationCtx) => {
+      const [clase, familia, tipo, unidad] = await Promise.all([ctx.db.get(input.claseRecursoId), ctx.db.get(input.familiaRecursoId), ctx.db.get(input.tipoRecursoId), ctx.db.get(input.unidadId)]);
+      const attributes = await ctx.db.query("atributosRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", input.familiaRecursoId)).collect();
+      const definitions = new Map(await Promise.all(attributes.map(async attribute => [String(attribute.definicionAtributoId), await ctx.db.get(attribute.definicionAtributoId)] as const)));
+      const assignment = (attribute: typeof attributes[number]) => ({ id: String(attribute._id), familiaId: String(attribute.familiaRecursoId), ...(attribute.tipoRecursoId === undefined ? {} : { tipoId: String(attribute.tipoRecursoId) }), definicionId: String(attribute.definicionAtributoId), definicionClave: definitions.get(String(attribute.definicionAtributoId))!.clave, tipoDato: definitions.get(String(attribute.definicionAtributoId))!.tipoDato, modoCaptura: definitions.get(String(attribute.definicionAtributoId))!.modoCaptura ?? "LIBRE", activo: attribute.activo, aplicabilidad: attribute.aplicabilidad, participaIdentidad: attribute.participaIdentidad, orden: attribute.orden, effectiveReasons: [] });
+      const familyAssignments = attributes.filter(attribute => attribute.tipoRecursoId === undefined).map(assignment);
+      const typeAssignments = attributes.filter(attribute => attribute.tipoRecursoId !== undefined).map(assignment);
+      const selectedValue = await ctx.db.get(input.selecciones[0].valorPermitidoId);
+      const policies = await ctx.db.query("politicasUnidadRecurso").withIndex("porFamiliaYTipoYUnidadYAdminSort", q => q).collect();
+      const hierarchyValid = Boolean(clase?.activo && familia?.activo && tipo?.activo && String(familia.claseRecursoId) === String(input.claseRecursoId) && String(tipo.familiaRecursoId) === String(input.familiaRecursoId));
+      const familyPolicies = policies.filter(policy => policy.tipoRecursoId === undefined && String(policy.familiaRecursoId) === String(input.familiaRecursoId));
+      const typePolicies = policies.filter(policy => String(policy.tipoRecursoId) === String(input.tipoRecursoId));
+      const typePoliciesByUnit = new Map(typePolicies.map(policy => [String(policy.unidadId), policy]));
+      const effectivePolicies = hierarchyValid ? [
+        ...familyPolicies.filter(policy => policy.activo && !typePoliciesByUnit.has(String(policy.unidadId))),
+        ...typePolicies.filter(policy => policy.activo),
+      ] : [];
+      const policyUnits = new Map(await Promise.all(effectivePolicies.map(async policy => [String(policy.unidadId), await ctx.db.get(policy.unidadId)] as const)));
+      const text = (value: unknown) => typeof value === "string" ? value : "";
+      const number = (value: unknown) => typeof value === "number" ? value : 0;
+      const orderedAssignments = [...familyAssignments, ...typeAssignments].sort((left, right) => number(left.orden) - number(right.orden) || compareCodePoints(text(left.definicionClave), text(right.definicionClave)) || compareCodePoints(text(left.id), text(right.id)));
+      const orderedValues = [selectedValue!].sort((left, right) => left.orden - right.orden || compareCodePoints(left.clave, right.clave) || compareCodePoints(String(left._id), String(right._id))).map(value => ({ id: String(value._id), definicionAtributoId: String(value.definicionAtributoId), clave: value.clave, nombre: value.nombre, orden: value.orden, activo: value.activo, valor: value.valor }));
+      const canonical = {
+        ownership: { kind: input.ownership.kind },
+        hierarchy: {
+          clase: legacyReference("CLASS", String(input.claseRecursoId), clase === null ? undefined : { id: String(clase._id), clave: clase.clave, nombre: clase.nombre, activo: clase.activo }),
+          familia: legacyReference("FAMILY", String(input.familiaRecursoId), familia === null ? undefined : { id: String(familia._id), clave: familia.clave, nombre: familia.nombre, activo: familia.activo }),
+          tipo: legacyReference("TYPE", String(input.tipoRecursoId), tipo === null ? undefined : { id: String(tipo._id), clave: tipo.clave, nombre: tipo.nombre, activo: tipo.activo }),
+          unidad: legacyReference("UNIT", String(input.unidadId), unidad === null ? undefined : { id: String(unidad._id), clave: unidad.clave, nombre: unidad.nombre, activo: unidad.activo }),
+          relationships: { familyToClass: { familiaId: familia === null ? null : String(familia._id), claseRecursoId: familia === null ? null : String(familia.claseRecursoId) }, typeToFamily: { tipoId: tipo === null ? null : String(tipo._id), familiaRecursoId: tipo === null ? null : String(tipo.familiaRecursoId) } },
+          hierarchyValid,
+          unitValid: Boolean(unidad?.activo && effectivePolicies.some(policy => String(policy.unidadId) === String(input.unidadId))),
+        },
+        policies: effectivePolicies.sort((left, right) => compareCodePoints(String(left.familiaRecursoId), String(right.familiaRecursoId)) || compareCodePoints(String(left.tipoRecursoId ?? ""), String(right.tipoRecursoId ?? "")) || compareCodePoints(String(left.unidadId), String(right.unidadId)) || compareCodePoints(String(left._id), String(right._id))).map(policy => ({ id: String(policy._id), familiaRecursoId: String(policy.familiaRecursoId), tipoRecursoId: policy.tipoRecursoId === undefined ? null : String(policy.tipoRecursoId), unidadId: String(policy.unidadId), activo: policy.activo, principal: policy.principal, state: "SELECTED", unidad: legacyReference("POLICY_UNIT", String(policy.unidadId), policyUnits.get(String(policy.unidadId)) === null ? undefined : (() => { const row = policyUnits.get(String(policy.unidadId))!; return { id: String(row._id), clave: row.clave, nombre: row.nombre, activo: row.activo }; })()) })),
+        assignments: orderedAssignments,
+        values: orderedValues,
+        options: [],
+        rules: [],
+      };
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`selection-catalog-fingerprint:v1\n${legacyJson(canonical)}`));
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+    });
+  }
+
+  it("creates from an active no-policy Metro Lineal selection without mutating Unit policies", async () => {
+    const t = convexTest(schema, modules);
+    const { fixture, input } = await seedMetroLineal(t);
+    const policiesBefore = await policySnapshot(t);
+    expect(policiesBefore).toEqual([]);
+    const evaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+    expect(evaluation).toMatchObject({ status: "VALID", valid: true, nombre: "Type A · Metro Lineal" });
+    expect(await policySnapshot(t)).toEqual(policiesBefore);
+    const created = await t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluation.catalogFingerprint });
+    expect(created).toMatchObject({ disposition: "CREATED", item: { unidadId: fixture.unit } });
+    if (created.disposition !== "CREATED") throw new Error("Expected Metro Lineal creation");
+    expect((await t.run(ctx => ctx.db.get(created.item.id)))?.unidadId).toBe(fixture.unit);
+    expect(await policySnapshot(t)).toEqual(policiesBefore);
+  });
+
+  async function creationSnapshot(t: ReturnType<typeof convexTest>) {
+    return t.run(async (ctx: MutationCtx) => ({
+      resources: await ctx.db.query("recursos").withIndex("porIdentificadorTecnico", q => q).collect(),
+      values: await ctx.db.query("valoresAtributoRecurso").withIndex("porRecurso", q => q).collect(),
+      aliases: await ctx.db.query("identidadesRecurso").withIndex("porRecurso", q => q).collect(),
+    }));
+  }
+
+  it("keeps the v2 fingerprint stable across a policy-only mutation and still creates", async () => {
+    const t = convexTest(schema, modules);
+    const { fixture, input } = await seedMetroLineal(t);
+    const evaluated = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+    const otherUnit = await t.mutation(api.catalogoAdmin.unidades.crearUnidad, { clave: "POLICY_ONLY", nombre: "Policy only", activo: true });
+    await t.mutation(api.catalogoAdmin.unidades.crearPoliticaUnidad, { familiaRecursoId: fixture.family, unidadId: otherUnit.item.id, principal: true, activo: true });
+    const afterPolicy = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+    expect(afterPolicy.catalogFingerprint).toBe(evaluated.catalogFingerprint);
+    await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluated.catalogFingerprint })).resolves.toMatchObject({ disposition: "CREATED", item: { unidadId: fixture.unit } });
+  });
+
+  it("keeps v2 eligibility stable across policy principal changes and deletion", async () => {
+        const t = convexTest(schema, modules);
+        const { fixture, input } = await seedMetroLineal(t);
+        const evaluated = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+        const policyId = await t.run(ctx => ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: fixture.unit, principal: true, activo: true, revision: 1 }));
+        const inFlightV1 = await v1FingerprintForInFlightSelection(t, input);
+        expect(inFlightV1).toMatch(/^[a-f0-9]{64}$/);
+        expect(inFlightV1).not.toBe(evaluated.catalogFingerprint);
+        expect(await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input)).toMatchObject({ status: "VALID", valid: true, catalogFingerprint: evaluated.catalogFingerprint });
+        await t.run(ctx => ctx.db.patch(policyId, { principal: false }));
+        expect(await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input)).toMatchObject({ status: "VALID", valid: true, catalogFingerprint: evaluated.catalogFingerprint });
+        await t.run(ctx => ctx.db.delete(policyId));
+        expect(await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input)).toMatchObject({ status: "VALID", valid: true, catalogFingerprint: evaluated.catalogFingerprint });
+        const beforeStaleV1 = await creationSnapshot(t);
+        await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: inFlightV1 })).resolves.toMatchObject({ disposition: "CATALOG_CHANGED", evaluation: { catalogFingerprint: evaluated.catalogFingerprint } });
+        expect(await creationSnapshot(t)).toEqual(beforeStaleV1);
+        await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluated.catalogFingerprint })).resolves.toMatchObject({ disposition: "CREATED", item: { unidadId: fixture.unit } });
+      });
+
+      it("keeps v2 creation eligible and fingerprint-stable when a type policy shadows the family policy", async () => {
+        const t = convexTest(schema, modules);
+        const { fixture, input } = await seedMetroLineal(t);
+        await t.run(ctx => ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: fixture.unit, principal: true, activo: true, revision: 1 }));
+        const familyPolicyEvaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+        expect(familyPolicyEvaluation).toMatchObject({ status: "VALID", valid: true });
+        await t.run(ctx => ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA, unidadId: fixture.unit, principal: true, activo: false, revision: 1 }));
+        const typeShadowedEvaluation = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+        expect(typeShadowedEvaluation).toMatchObject({ status: "VALID", valid: true, catalogFingerprint: familyPolicyEvaluation.catalogFingerprint });
+        await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: familyPolicyEvaluation.catalogFingerprint })).resolves.toMatchObject({ disposition: "CREATED", item: { unidadId: fixture.unit } });
+      });
+
+      it("does not insert after selected-Unit deactivation", async () => {
+        const t = convexTest(schema, modules);
+        const { fixture, input } = await seedMetroLineal(t);
+        const evaluated = await t.query(api.catalogoAdmin.recursos.evaluarCreacionDesdeSelecciones, input);
+        await t.run(async ctx => {
+          const resources = await ctx.db.query("recursos").withIndex("porUnidad", q => q.eq("unidadId", fixture.unit)).collect();
+          await Promise.all(resources.map(resource => ctx.db.patch(resource._id, { activo: false })));
+        });
+        await t.mutation(api.catalogoAdmin.unidades.desactivarUnidad, { unidadId: fixture.unit, expectedRevision: 1 });
+        const beforeInactive = await creationSnapshot(t);
+        await expect(t.mutation(api.catalogoAdmin.recursos.crearRecursoDesdeSelecciones, { ...input, expectedCatalogFingerprint: evaluated.catalogFingerprint })).resolves.toMatchObject({ disposition: "CATALOG_CHANGED", evaluation: { status: "INVALID", issues: [{ code: "UNIT_INVALID" }] } });
+        expect(await creationSnapshot(t)).toEqual(beforeInactive);
+      });
+});

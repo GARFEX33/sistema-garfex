@@ -198,4 +198,21 @@ describe("administración de unidades y políticas", () => {
       expectedRevision: 1,
     })).rejects.toMatchObject({ data: { code: "ADMIN_INVALID_STATE", context: { field: "activo", reason: "policy must be inactive before deletion" } } });
   });
+
+  it("paginates ACTIVE units in key order with the public projection and excludes inactive rows", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(api.catalogoAdmin.unidades.crearUnidad, { clave: "INACTIVE", nombre: "Inactive" });
+    await t.mutation(api.catalogoAdmin.unidades.crearUnidad, { clave: "METRO", nombre: "Metro", descripcion: "Length", simbolo: "m", activo: true });
+    await t.mutation(api.catalogoAdmin.unidades.crearUnidad, { clave: "LINEAL", nombre: "Lineal", descripcion: "Linear", simbolo: "lm", activo: true });
+
+    const first = await t.query(api.catalogoAdmin.unidades.listarUnidades, { modo: "ACTIVE", cursor: null, pageSize: 1 });
+    expect(first.items).toHaveLength(1);
+    expect(first.items[0]).toMatchObject({ clave: "LINEAL", nombre: "Lineal", descripcion: "Linear", simbolo: "lm", activo: true, revision: 1, effective: true });
+    expect(Object.keys(first.items[0]!).sort()).toEqual(["activo", "clave", "descripcion", "effective", "id", "nombre", "revision", "simbolo"]);
+    expect(first.continuationCursor).not.toBeNull();
+
+    const second = await t.query(api.catalogoAdmin.unidades.listarUnidades, { modo: "ACTIVE", cursor: first.continuationCursor, pageSize: 1 });
+    expect(second).toMatchObject({ items: [expect.objectContaining({ clave: "METRO", activo: true })], continuationCursor: null, isExhausted: true });
+    expect([...first.items, ...second.items].map(unit => unit.clave)).toEqual(["LINEAL", "METRO"]);
+  });
 });
