@@ -12,15 +12,18 @@ export type AgregadoInput = {
 };
 
 export type ResultadoAgregado = { status: AggregateStatus; violations: AggregateViolation[] };
+type AggregateValidationPurpose = "ADMINISTRATION" | "RESOURCE";
 
-export function validarAgregado(input: AgregadoInput): ResultadoAgregado {
+export function validarAgregado(input: AgregadoInput, purpose: AggregateValidationPurpose = "ADMINISTRATION"): ResultadoAgregado {
   if (!input.effective) return { status: "NOT_EVALUATED", violations: [] };
   const violations: AggregateViolation[] = [];
   if (input.hierarchy.familyOfTypeId !== input.hierarchy.familyId || input.hierarchy.classOfFamilyId !== input.hierarchy.classId)
     violations.push({ code: "HIERARCHY_REFERENCE_INVALID" });
-  const principals = input.principalUnits.filter(policy => policy.active && policy.principal !== false);
-  if (principals.length !== 1) violations.push({ code: "PRINCIPAL_UNIT_COUNT", detail: `expected one principal, got ${principals.length}` });
-  if (principals.some(policy => !policy.unitActive)) violations.push({ code: "UNIT_INACTIVE" });
+  if (purpose === "ADMINISTRATION") {
+    const principals = input.principalUnits.filter(policy => policy.active && policy.principal !== false);
+    if (principals.length !== 1) violations.push({ code: "PRINCIPAL_UNIT_COUNT", detail: `expected one principal, got ${principals.length}` });
+    if (principals.some(policy => !policy.unitActive)) violations.push({ code: "UNIT_INACTIVE" });
+  }
   const presentations = input.presentationPolicies.filter(policy => policy.active);
   if (presentations.length !== 1) violations.push({ code: "PRESENTATION_COUNT", detail: `expected one active presentation, got ${presentations.length}` });
   if (presentations.some(policy => policy.tokenCount < 1)) violations.push({ code: "PRESENTATION_TOKEN_INVALID" });
