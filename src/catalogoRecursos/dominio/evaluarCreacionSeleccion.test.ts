@@ -208,6 +208,25 @@ describe("evaluarCreacionSeleccion", () => {
     expect(foreign.evaluation.issues.map(issue => issue.code)).toContain("ALLOWED_VALUE_FOREIGN");
   });
 
+  it("accepts an active selected Unit without policy data, retains UNIT_INVALID, and keeps incomplete attributes", async () => {
+    const selectionGraph = graph({
+      hierarchyValid: true,
+      unitValid: true,
+      familiaAsignaciones: [{ id: "required", familiaId: "family", definicionId: "required", definicionClave: "A", activo: true, aplicabilidad: "REQUIRED", participaIdentidad: false, orden: 0, modoCaptura: "SELECCION", effectiveReasons: [] }],
+      tipoAsignaciones: [],
+      reglas: [],
+      valoresPermitidos: [{ id: "required-value", definicionAtributoId: "required", clave: "REQUIRED", nombre: "Required", orden: 0, activo: true, valor: { kind: "TEXTO", value: "required" } }],
+    });
+    const valid = await evaluarCreacionSeleccion(input([{ asignacionAtributoId: "required", valorPermitidoId: "required-value" }]), selectionGraph);
+    const inactive = await evaluarCreacionSeleccion(input([{ asignacionAtributoId: "required", valorPermitidoId: "required-value" }]), { ...selectionGraph, unitValid: false });
+    const incomplete = await evaluarCreacionSeleccion(input([]), selectionGraph);
+
+    expect(valid.evaluation.status).toBe("VALID");
+    expect(inactive.evaluation.issues.map(issue => issue.code)).toContain("UNIT_INVALID");
+    expect(inactive.evaluation.status).toBe("INVALID");
+    expect(incomplete.evaluation).toMatchObject({ status: "INCOMPLETE", faltantesRequeridos: ["required"] });
+  });
+
   it("rejects non-finite typed numbers as catalog corruption", async () => {
     const catalog = graph({
       familiaAsignaciones: [{ id: "number", familiaId: "family", definicionId: "number", definicionClave: "N", activo: true, aplicabilidad: "REQUIRED", participaIdentidad: false, orden: 0, modoCaptura: "SELECCION", effectiveReasons: [] }],

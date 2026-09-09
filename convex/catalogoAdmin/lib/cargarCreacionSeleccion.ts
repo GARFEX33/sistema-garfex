@@ -2,7 +2,6 @@ import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { resolverAsignaciones } from "../../../src/catalogoRecursos/dominio/asignacionesEfectivas";
 import { resolverModoCaptura } from "../../../src/catalogoRecursos/dominio/modoCaptura";
-import { resolverUnidadesEfectivas, type PoliticaUnidadEfectiva } from "../../../src/catalogoRecursos/dominio/unidadesEfectivas";
 import type { SelectionCatalogGraph, SelectionCreationInput } from "../../../src/catalogoRecursos/dominio/evaluarCreacionSeleccion";
 
 export const MAX_SELECTION_CATALOG_ROWS = 200;
@@ -38,30 +37,7 @@ export async function cargarCreacionSeleccion(ctx: DbContext, input: SelectionCr
     && String(familia.claseRecursoId) === input.claseRecursoId
     && String(tipo.familiaRecursoId) === input.familiaRecursoId);
   const ownershipValid = input.ownership.kind === "GLOBAL" || Boolean(organizacion?.activo);
-
-  const familyPolicies = familia === null ? [] : bounded(await ctx.db.query("politicasUnidadRecurso")
-    .withIndex("porFamilia", query => query.eq("familiaRecursoId", familia._id)).take(MAX_SELECTION_CATALOG_ROWS + 1));
-  const typePolicies = tipo === null ? [] : bounded(await ctx.db.query("politicasUnidadRecurso")
-    .withIndex("porTipo", query => query.eq("tipoRecursoId", tipo._id)).take(MAX_SELECTION_CATALOG_ROWS + 1));
-  const policyRows = [...familyPolicies.filter(row => row.tipoRecursoId === undefined), ...typePolicies];
-  const policyUnits = new Map((await Promise.all([...new Set(policyRows.map(row => row.unidadId))].map(async unidadId => [String(unidadId), await ctx.db.get(unidadId)] as const))).map(([id, row]) => [id, row]));
-  const asPolicy = (row: typeof familyPolicies[number]): PoliticaUnidadEfectiva => ({
-    id: String(row._id), familiaRecursoId: String(row.familiaRecursoId),
-    ...(row.tipoRecursoId === undefined ? {} : { tipoRecursoId: String(row.tipoRecursoId) }),
-    unidadId: String(row.unidadId), activo: row.activo, principal: row.principal,
-    unidadActiva: policyUnits.get(String(row.unidadId))?.activo === true,
-  });
-  const effectivePolicies = resolverUnidadesEfectivas({
-    familia: familyPolicies.filter(row => row.tipoRecursoId === undefined).map(asPolicy),
-    tipo: typePolicies.map(asPolicy), tipoEfectivo: hierarchyValid,
-  });
-  const politicasUnidadEfectivas = effectivePolicies.selected.map(policy => ({
-    id: policy.id, familiaRecursoId: policy.familiaRecursoId,
-    ...(policy.tipoRecursoId === undefined ? {} : { tipoRecursoId: policy.tipoRecursoId }),
-    unidadId: policy.unidadId, activo: policy.activo, principal: policy.principal, state: "SELECTED" as const,
-    unidad: reference(policyUnits.get(policy.unidadId) ?? null),
-  }));
-  const unitValid = Boolean(unidad?.activo && effectivePolicies.selected.some(policy => policy.unidadId === input.unidadId));
+  const unitValid = Boolean(unidad?.activo);
 
   const rows = familia === null ? [] : bounded(await ctx.db.query("atributosRecurso")
     .withIndex("porFamilia", query => query.eq("familiaRecursoId", familia._id)).take(MAX_SELECTION_CATALOG_ROWS + 1));
@@ -104,5 +80,5 @@ export async function cargarCreacionSeleccion(ctx: DbContext, input: SelectionCr
     .withIndex("porTipo", query => query.eq("tipoRecursoId", tipo._id)).take(MAX_SELECTION_CATALOG_ROWS + 1))
     .filter(rule => rule.activo).map(rule => ({ id: String(rule._id), atributoCondicionId: String(rule.atributoCondicionId), ...(rule.opcionCondicionId === undefined ? {} : { opcionCondicionId: String(rule.opcionCondicionId) }), ...(rule.valorPermitidoCondicionId === undefined ? {} : { valorPermitidoCondicionId: String(rule.valorPermitidoCondicionId) }), atributoAfectadoId: String(rule.atributoAfectadoId), aplicabilidad: rule.aplicabilidad, activo: rule.activo }));
 
-  return { hierarchyValid, unitValid, ownershipValid, clase: reference(clase), familia: referenciaFamilia(familia), tipo: referenciaTipo(tipo), unidad: reference(unidad), ...(organizacion === null ? {} : { organizacion: reference(organizacion) }), politicasUnidadEfectivas, familiaAsignaciones, tipoAsignaciones, valoresPermitidos, valoresPermitidosDiagnosticos, opciones, reglas };
+  return { hierarchyValid, unitValid, ownershipValid, clase: reference(clase), familia: referenciaFamilia(familia), tipo: referenciaTipo(tipo), unidad: reference(unidad), ...(organizacion === null ? {} : { organizacion: reference(organizacion) }), familiaAsignaciones, tipoAsignaciones, valoresPermitidos, valoresPermitidosDiagnosticos, opciones, reglas };
 }

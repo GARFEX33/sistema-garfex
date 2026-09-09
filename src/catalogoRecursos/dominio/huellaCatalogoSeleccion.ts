@@ -1,12 +1,10 @@
 import type { ValorPermitidoTipado } from "./tipos";
 
 export type ReferenciaCatalogo = Readonly<{ id: string; clave?: string; nombre?: string; activo: boolean; definicionAtributoId?: string; claseRecursoId?: string; familiaRecursoId?: string }>;
-type PoliticaUnidadHuella = Readonly<{ id: string; familiaRecursoId: string; tipoRecursoId?: string; unidadId: string; activo: boolean; principal: boolean; state: string; unidad?: ReferenciaCatalogo }>;
 export type HuellaInput = Readonly<{ claseRecursoId: string; familiaRecursoId: string; tipoRecursoId: string; unidadId: string; ownership: Readonly<{ kind: "GLOBAL" }> | Readonly<{ kind: "ORGANIZATION"; organizacionId: string }> }>;
 export type HuellaGraph = Readonly<Record<string, unknown> & {
   hierarchyValid?: boolean; unitValid?: boolean;
   clase?: ReferenciaCatalogo; familia?: ReferenciaCatalogo; tipo?: ReferenciaCatalogo; unidad?: ReferenciaCatalogo; organizacion?: ReferenciaCatalogo;
-  politicasUnidadEfectivas?: readonly PoliticaUnidadHuella[];
   familiaAsignaciones: readonly Record<string, unknown>[]; tipoAsignaciones: readonly Record<string, unknown>[];
   valoresPermitidos: readonly Readonly<{ id: string; definicionAtributoId: string; clave: string; nombre: string; orden: number; activo: boolean; valor: ValorPermitidoTipado }>[];
   opciones?: readonly ReferenciaCatalogo[]; reglas: readonly Record<string, unknown>[];
@@ -38,7 +36,6 @@ export async function huellaCatalogoSeleccion(input: HuellaInput, graph: HuellaG
   const optionIds = new Set(storedValues.flatMap((value) => value.valor.kind === "OPCION" ? [value.valor.opcionAtributoId] : []));
   const options = [...(graph.opciones ?? [])].filter((option) => optionIds.has(option.id)).sort((a, b) => compararPuntosCodigo(a.clave ?? "", b.clave ?? "") || compararPuntosCodigo(a.id, b.id));
   const rules = [...graph.reglas].sort((a, b) => compararPuntosCodigo(texto(a.atributoCondicionId), texto(b.atributoCondicionId)) || compararPuntosCodigo(texto(a.valorPermitidoCondicionId) || "PRESENCE", texto(b.valorPermitidoCondicionId) || "PRESENCE") || compararPuntosCodigo(texto(a.atributoAfectadoId), texto(b.atributoAfectadoId)) || compararPuntosCodigo(texto(a.aplicabilidad), texto(b.aplicabilidad)) || compararPuntosCodigo(texto(a.id), texto(b.id)));
-  const policies = [...(graph.politicasUnidadEfectivas ?? [])].sort((a, b) => compararPuntosCodigo(a.familiaRecursoId, b.familiaRecursoId) || compararPuntosCodigo(a.tipoRecursoId ?? "", b.tipoRecursoId ?? "") || compararPuntosCodigo(a.unidadId, b.unidadId) || compararPuntosCodigo(a.id, b.id)).map(policy => ({ id: policy.id, familiaRecursoId: policy.familiaRecursoId, tipoRecursoId: policy.tipoRecursoId ?? null, unidadId: policy.unidadId, activo: policy.activo, principal: policy.principal, state: policy.state, unidad: referencia("POLICY_UNIT", policy.unidadId, policy.unidad) }));
   const canonical = {
     ownership: input.ownership.kind === "ORGANIZATION" ? { kind: input.ownership.kind, organization: referencia("ORGANIZATION", input.ownership.organizacionId, graph.organizacion) } : { kind: input.ownership.kind },
     hierarchy: {
@@ -46,8 +43,8 @@ export async function huellaCatalogoSeleccion(input: HuellaInput, graph: HuellaG
       relationships: { familyToClass: { familiaId: graph.familia?.id ?? null, claseRecursoId: graph.familia?.claseRecursoId ?? null }, typeToFamily: { tipoId: graph.tipo?.id ?? null, familiaRecursoId: graph.tipo?.familiaRecursoId ?? null } },
       hierarchyValid: graph.hierarchyValid ?? null, unitValid: graph.unitValid ?? null,
     },
-    policies, assignments, values, options, rules,
+    assignments, values, options, rules,
   };
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`selection-catalog-fingerprint:v1\n${json(canonical)}`));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`selection-catalog-fingerprint:v2\n${json(canonical)}`));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
