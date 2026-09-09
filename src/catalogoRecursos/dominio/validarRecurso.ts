@@ -11,8 +11,6 @@ export function validarRecurso(snapshot: CatalogoSnapshot, entrada: EntradaRecur
   const resolved = resolverCatalogoEfectivo(snapshot);
   if (!resolved.effective || !clase || !familia || !tipo || !unidad?.activo)
     return fallo(resolved.effectiveReasons.includes("HIERARCHY_INVALID") ? "JERARQUIA_INVALIDA" : "JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA");
-  if (!resolved.policies.some(policy => policy.unidadId === unidad.id && policy.activo)) return fallo("UNIDAD_NO_PERMITIDA");
-
   const originalById = new Map(snapshot.atributos.map(row => [row.id, row]));
   const aplicables = new Map<IdDominio, AtributoConDefinicion & { definicion: NonNullable<AtributoConDefinicion["definicion"]> }>();
   for (const selected of resolved.assignments) {

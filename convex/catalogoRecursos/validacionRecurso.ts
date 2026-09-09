@@ -111,8 +111,7 @@ async function cargarSnapshot(ctx: MutationCtx, entrada: CrearRecursoEntrada): P
   const [claseDoc, familiaDoc, tipoDoc, unidadDoc] = await Promise.all([
     ctx.db.get(entrada.claseRecursoId), ctx.db.get(entrada.familiaRecursoId), ctx.db.get(entrada.tipoRecursoId), ctx.db.get(entrada.unidadId),
   ]);
-  const [politicas, registros, reglas] = await Promise.all([
-    familiaDoc ? ctx.db.query("politicasUnidadRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", familiaDoc._id)).collect() : Promise.resolve([]),
+  const [registros, reglas] = await Promise.all([
     familiaDoc ? ctx.db.query("atributosRecurso").withIndex("porFamilia", q => q.eq("familiaRecursoId", familiaDoc._id)).collect() : Promise.resolve([]),
     tipoDoc ? ctx.db.query("reglasAtributoRecurso").withIndex("porTipo", q => q.eq("tipoRecursoId", tipoDoc._id)).collect() : Promise.resolve([]),
   ]);
@@ -131,7 +130,7 @@ async function cargarSnapshot(ctx: MutationCtx, entrada: CrearRecursoEntrada): P
     familia: familiaDoc ? { id: id(familiaDoc._id), clave: familiaDoc.clave, activo: familiaDoc.activo, claseRecursoId: id(familiaDoc.claseRecursoId) } : null,
     tipo: tipoDoc ? { id: id(tipoDoc._id), clave: tipoDoc.clave, activo: tipoDoc.activo, familiaRecursoId: id(tipoDoc.familiaRecursoId) } : null,
     unidad: unidadDoc ? { id: id(unidadDoc._id), activo: unidadDoc.activo } : null,
-    politicas: politicas.map(p => ({ id: id(p._id), activo: p.activo, familiaRecursoId: id(p.familiaRecursoId), tipoRecursoId: p.tipoRecursoId === undefined ? undefined : id(p.tipoRecursoId), unidadId: id(p.unidadId) })),
+    politicas: [],
     atributos: registros.map(r => { const d = definicion(r); return { id: id(r._id), activo: r.activo, definicionAtributoId: id(r.definicionAtributoId), tipoRecursoId: r.tipoRecursoId === undefined ? undefined : id(r.tipoRecursoId), aplicabilidad: r.aplicabilidad, participaIdentidad: r.participaIdentidad, definicion: d ? { id: id(d._id), clave: d.clave, tipoDato: d.tipoDato, activo: d.activo } : null }; }),
     reglas: reglas.map(r => ({ id: id(r._id), activo: r.activo, atributoCondicionId: id(r.atributoCondicionId), opcionCondicionId: r.opcionCondicionId === undefined ? undefined : id(r.opcionCondicionId), valorPermitidoCondicionId: r.valorPermitidoCondicionId === undefined ? undefined : id(r.valorPermitidoCondicionId), atributoAfectadoId: id(r.atributoAfectadoId), aplicabilidad: r.aplicabilidad })),
     opciones: opciones.map(o => ({ id: id(o._id), activo: o.activo, definicionAtributoId: id(o.definicionAtributoId), clave: o.clave })),

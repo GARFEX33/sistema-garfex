@@ -30,6 +30,36 @@ describe("precedencia de atributos", () => {
     if (resultado.ok) expect([...resultado.value.atributos.keys()]).toEqual(["def"]);
   });
 
+  it("accepts active Units without matching policies but preserves Unit and attribute failures", () => {
+    const noPolicy = base();
+    noPolicy.politicas = [];
+    expect(validarRecurso(noPolicy, entrada("atributo-tipo")).ok).toBe(true);
+
+    const foreignPolicy = base();
+    foreignPolicy.politicas = [{ id: "foreign", activo: true, familiaRecursoId: "familia", unidadId: "other-unit" }];
+    expect(validarRecurso(foreignPolicy, entrada("atributo-tipo")).ok).toBe(true);
+
+    const inactive = base();
+    inactive.unidad = { id: "unidad", activo: false };
+    expect(validarRecurso(inactive, entrada("atributo-tipo"))).toEqual({ ok: false, code: "JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA" });
+    const absent = base();
+    absent.unidad = null;
+    expect(validarRecurso(absent, entrada("atributo-tipo"))).toEqual({ ok: false, code: "JERARQUIA_O_UNIDAD_INEXISTENTE_INACTIVA" });
+
+    expect(validarRecurso(noPolicy, { ...entrada("atributo-tipo"), valores: [] })).toEqual({ ok: false, code: "ATRIBUTO_REQUERIDO_AUSENTE" });
+    expect(validarRecurso(noPolicy, { ...entrada("atributo-tipo"), valores: [
+      { atributoRecursoId: "atributo-tipo", valor: "first" },
+      { atributoRecursoId: "atributo-tipo", valor: "second" },
+    ] })).toEqual({ ok: false, code: "ATRIBUTO_REPETIDO" });
+    expect(validarRecurso(foreignPolicy, { ...entrada("atributo-tipo"), valores: [{ atributoRecursoId: "atributo-tipo", valor: 1 }] })).toEqual({ ok: false, code: "TIPO_DE_VALOR_INVALIDO" });
+
+    const optionSnapshot = base();
+    optionSnapshot.politicas = [];
+    optionSnapshot.atributos[1].definicion = { id: "def", clave: "DEF", tipoDato: "OPCION", activo: true };
+    optionSnapshot.opciones = [{ id: "option", clave: "OPTION", activo: true, definicionAtributoId: "def" }];
+    expect(validarRecurso(optionSnapshot, { ...entrada("atributo-tipo"), valores: [{ atributoRecursoId: "atributo-tipo", valor: "option", opcionAtributoId: "other-option" }] })).toEqual({ ok: false, code: "OPCION_INVALIDA" });
+  });
+
   it("uses presence rather than truthiness for required and forbidden values", () => {
     for (const [tipoDato, value] of [["BOOLEANO", false], ["NUMERO", 0], ["TEXTO", ""]] as const) {
       const snapshot = base();
@@ -37,6 +67,7 @@ describe("precedencia de atributos", () => {
       expect(validarRecurso(snapshot, { ...entrada("atributo-tipo"), valores: [{ atributoRecursoId: "atributo-tipo", valor: value }] }).ok).toBe(true);
     }
     const forbidden = base();
+    forbidden.politicas = [];
     forbidden.atributos[1].aplicabilidad = "FORBIDDEN";
     expect(validarRecurso(forbidden, entrada("atributo-tipo"))).toEqual({ ok: false, code: "ATRIBUTO_PROHIBIDO" });
   });

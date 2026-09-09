@@ -678,6 +678,29 @@ describe("catalogoAdmin.recursos legacy contract / WU11", () => {
     expect(legacyCreator).toContain("descripcion: v.optional(v.string())");
     expect(legacyCreator).toContain("valores: v.array(resourceValueInputValidator)");
     expect(legacyCreator).not.toMatch(/expectedCatalogFingerprint|valorPermitidoId/);
+        expect(legacyCreator).toContain('cargarAgregado(ctx, args.tipoRecursoId, {}, "RESOURCE")');
+      });
+
+      describe("B3 policy-independent legacy guards", () => {
+        it("accepts an active Unit with no matching policy through create, update, and activate", async () => {
+        const t = convexTest(schema, modules);
+        const fixture = await seedFixture(t);
+        await t.run(async ctx => {
+          const foreignUnit = await ctx.db.insert("unidades", { clave: "FOREIGN", nombre: "Foreign", activo: true, revision: 1 });
+          await ctx.db.insert("politicasUnidadRecurso", { familiaRecursoId: fixture.family, unidadId: foreignUnit, principal: true, activo: true, revision: 1 });
+          await ctx.db.insert("politicasPresentacionCanonica", { tipoRecursoId: fixture.typeA, tokens: [{ tipo: "TYPE_NAME" }], separador: " / ", activo: true, revision: 1 });
+        });
+        const created = await t.mutation(api.catalogoAdmin.recursos.crearRecurso, {
+          claseRecursoId: fixture.clazz, familiaRecursoId: fixture.family, tipoRecursoId: fixture.typeA, unidadId: fixture.unit,
+          nombre: "No policy resource", valores: [], ownership: { kind: "ORGANIZATION", organizacionId: fixture.organization },
+        });
+        expect(created).toMatchObject({ disposition: "CREATED", item: { unidadId: fixture.unit, organizacionId: fixture.organization, activo: false, revision: 1 } });
+        const updated = await t.mutation(api.catalogoAdmin.recursos.actualizarRecurso, {
+          recursoId: created.item.id, expectedRevision: 1, nombre: "Renamed resource", ownership: { kind: "ORGANIZATION", organizacionId: fixture.organization },
+        });
+        expect(updated).toMatchObject({ disposition: "UPDATED", item: { organizacionId: fixture.organization, activo: false, revision: 2 } });
+        await expect(t.mutation(api.catalogoAdmin.recursos.activarRecurso, { recursoId: created.item.id, expectedRevision: 2 })).resolves.toMatchObject({ disposition: "UPDATED", item: { organizacionId: fixture.organization, activo: true, revision: 3 } });
+      });
   });
 });
 
@@ -898,6 +921,10 @@ describe("catalogoAdmin.recursos.crearRecursoDesdeSelecciones / WU9", () => {
         const updateSource = source.slice(source.indexOf("export const actualizarRecurso"));
         expect(updateSource).not.toMatch(/lock|retry|compensat|cache|coordinator/i);
         expect(updateSource.match(/reemplazarValoresRecurso/g)).toHaveLength(1);
+            const createSource = source.slice(source.indexOf("export const crearRecurso ="), source.indexOf("function deriveScopeKey"));
+            const aggregateSource = source.slice(source.indexOf("async function validateCurrentResourceAggregate"), source.indexOf("export const actualizarRecurso"));
+            expect(createSource).toContain('cargarAgregado(ctx, args.tipoRecursoId, {}, "RESOURCE")');
+            expect(aggregateSource).toContain('cargarAgregado(ctx, tipoRecursoId, {}, "RESOURCE")');
         expect(updateSource.match(/ctx\.db\.patch\(actual!\._id/g)).toHaveLength(1);
         expect(updateSource).not.toMatch(/catalogoRevisiones|catalogoTipoSnapshots|public/);
       });

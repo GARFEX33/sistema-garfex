@@ -179,7 +179,7 @@ export const crearRecurso = mutation({
     const validacion = await validarRecursoAdministrativo(ctx, entrada);
     if (!validacion.ok) throw new ConvexError(mapResourceValidationFailure(validacion.code, resourceEntity));
 
-    const aggregate = await cargarAgregado(ctx, args.tipoRecursoId);
+    const aggregate = await cargarAgregado(ctx, args.tipoRecursoId, {}, "RESOURCE");
     if (!aggregate.effective) {
       adminInvalidReference({ entityKind: "recursos", field: "classification", reference: resourceEntity, reason: "RESOURCE_CATALOG_NOT_EFFECTIVE" });
     }
@@ -324,7 +324,7 @@ function resourceValuesEqual(left: Array<{ atributoRecursoId: Id<"atributosRecur
 }
 
 async function validateCurrentResourceAggregate(ctx: QueryCtx, tipoRecursoId: Id<"tiposRecurso">, entity: { kind: "recursos"; id: Id<"recursos"> }): Promise<void> {
-  const aggregate = await cargarAgregado(ctx, tipoRecursoId);
+  const aggregate = await cargarAgregado(ctx, tipoRecursoId, {}, "RESOURCE");
   if (!aggregate.effective) adminInvalidReference({ entityKind: "recursos", field: "classification", reference: { kind: "tiposRecurso", id: tipoRecursoId }, reason: "RESOURCE_CATALOG_NOT_EFFECTIVE" });
   if (aggregate.status !== "VALID") {
     const violations = aggregate.violations.length > 0

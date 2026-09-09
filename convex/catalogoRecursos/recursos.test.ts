@@ -105,8 +105,7 @@ describe("recursos", () => {
   });
 
   it.each([
-    ["unidad no permitida", (f: Fixture) => ({ unidadId: f.unidadMala }), /Unidad no permitida/],
-    ["atributo requerido ausente", (_f: Fixture) => ({ valores: [] }), /Atributo requerido ausente/],
+        ["atributo requerido ausente", (_f: Fixture) => ({ valores: [] }), /Atributo requerido ausente/],
     ["tipo incorrecto", (f: Fixture) => ({ valores: [{ atributoRecursoId: f.color, valor: 3 }] }), /Tipo de valor inválido/],
     ["opcion de otra definicion", (f: Fixture) => ({ valores: [{ atributoRecursoId: f.color, valor: "auto", opcionAtributoId: f.automatico }] }), /Opción inválida/],
     ["atributo de otra familia", (f: Fixture) => ({ valores: [{ atributoRecursoId: f.atributoOtraFamilia, valor: 3 }] }), /Atributo no aplicable/],
@@ -153,9 +152,11 @@ describe("recursos", () => {
     ] }))).rejects.toThrow(/Número no finito/);
   });
 
-  it("acepta una política de unidad específica del tipo", async () => {
+  it("acepta una unidad activa sin política y una política específica del tipo", async () => {
     const t = convexTest(schema, modules); const f = await seedFixture(t);
-    const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { unidadId: f.unidadTipo }));
+    const sinPolitica = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { unidadId: f.unidadMala }));
+        expect(sinPolitica.unidadId).toBe(f.unidadMala);
+        const creado = await t.mutation(api.catalogoRecursos.recursos.crearRecurso, input(f, { unidadId: f.unidadTipo, nombre: "Bomba por tipo", valores: [...input(f).valores, { atributoRecursoId: f.peso, valor: 1 }] }));
     expect(creado.unidadId).toBe(f.unidadTipo);
   });
 
